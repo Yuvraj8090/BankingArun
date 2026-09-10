@@ -1,0 +1,43 @@
+{
+  "summary": "Verified all requested new features + regression. 23/23 backend pytest cases pass (7-role login, retail 3-card seed with exact numbers/networks/statuses/expiries/issuer, UPI status/link/QR, all 4 role panels + RBAC, brute-force lockout NOW correctly firing at the 6th attempt thanks to X-Forwarded-For fix, plus prior CORS+PHP+bcrypt+banking regression). Frontend: public / home renders the white ICICI-style theme with 'National Bharat Bank' logo, personal/corporate/loans/investments nav, hero 'Banking made simple, secure & Bharat-ready', product grid and Quick Services box. Retail login → Cards & UPI tab shows all 3 card tiles with the exact seeded card numbers (4532 9845 2109 8821, 5241 7373 2160 2721, 5241 9548 3082 4607), holder RAHUL SHARMA, VISA/RuPay/mastercard network badges, 'Issued by Bank Only' subheader, freeze/PIN/hotlist/UPI icon actions. Bank Owner login lands on Executive Dashboard with Total Customers/Liquidity/Transactions/Active Branches/Loan Pipeline/Rating/CAR/NPA tiles and Rate & Policy Configuration section. Two minor design/spec deviations found: (a) the 2nd and 3rd card tiles use orange gradient colors (#f26722 RuPay orange + #f79e1b Mastercard yellow) which visually contradicts the 'NO orange color anywhere' mandate — even though those are the real brand colors; (b) the UPI-on-Debit-Card tab label says 'Launch Tomorrow' but the spec asks for a 'LAUNCHING TOMORROW' red badge on the tab (the launch banner inside the tab does correctly say 'LAUNCHING TOMORROW'). No blocking issues; brute-force fix confirmed working.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CardsChequesPage NetworkBadge / card gradients", "issue": "RuPay tile gradient (from-[#0b4481] via-[#008752] to-[#f26722]) and Mastercard tile gradient (from-[#eb001b] via-[#f79e1b] to-[#c8102e]) include orange/amber colors. The spec explicitly says 'NO orange color anywhere'. Consider recoloring RuPay tile to a deep-green/blue combo and Mastercard tile to a red/crimson gradient without #f79e1b amber.", "selector": "/app/frontend/src/pages/CardsChequesPage.js lines 15,16,181,182", "priority": "MEDIUM"},
+      {"component": "CardsChequesPage tab badge", "issue": "UPI tab is labelled 'Launch Tomorrow' — spec requires a red 'LAUNCHING TOMORROW' badge on the tab (the inner banner is correct).", "selector": "CardsChequesPage.js line 150 (badge: 'Launch Tomorrow')", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Cards & UPI", "issues": ["Orange in RuPay/Mastercard card gradients conflicts with the deep-blue + crimson-only palette required by problem statement"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_security.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Replace orange stops (#f26722, #f79e1b) inside CardsChequesPage RuPay and Mastercard gradients + NetworkBadge with deep-blue / crimson equivalents to fully honour the 'no orange' theme.",
+    "Change the UPI tab badge text from 'Launch Tomorrow' to 'LAUNCHING TOMORROW' (red) to match the spec exactly."
+  ],
+  "critical_code_review_comments": [
+    "server.py L611-612: X-Forwarded-For fallback now correctly used for brute-force identifier AND audit_logs.ip — verified via test_new_features::test_brute_force_lockout_at_five_attempts (6th attempt returns 429).",
+    "server.py is ~1727 lines; splitting into routers (auth/accounts/cards/upi/panels/hostinger/admin) would drastically improve maintainability.",
+    "CardsChequesPage.js is 596 lines — consider extracting <CardTile>, <UpiTab>, <ChequeTab> into subcomponents.",
+    "server.py L994 uses `await db.list_collection_names()` inside a `find(...)` conditional — this always incurs an extra DB round-trip on every staff-panel call; cheap fix is to just do `await db.tickets.find({}).to_list(20)` (Mongo returns [] for missing collection).",
+    "In `_require_roles` the 403 message leaks the required role list; safe here (internal panels) but consider generic message for public endpoints."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/iteration_3.json",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "success_rate": {"backend": "100% (23/23)", "frontend": "95% (home + cards + owner dashboard verified; 2 minor spec deviations)"},
+  "test_credentials": "All 7 seeded accounts from /app/memory/test_credentials.md log in successfully and receive correct role.",
+  "seed_data_creation": "Tests marked one loan application as approved and one collection case as reminder_sent (idempotent — safe to re-run). Linked one card to UPI (upi_linked=true). No new users created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All backend endpoints in scope are green. Only pending items are 2 minor cosmetic UI adjustments in /app/frontend/src/pages/CardsChequesPage.js: remove orange hex stops from RuPay & Mastercard gradients + NetworkBadge (lines 15-16, 181-182) and change the UPI tab badge from 'Launch Tomorrow' to 'LAUNCHING TOMORROW'. Brute-force lockout regression is fixed and verified. Do NOT retest CORS/PHP/bcrypt — stable.",
+  "rca of the issue": "The X-Forwarded-For fix in server.py login handler (L611-612) resolves the earlier lockout drift. Behind the k8s ingress the XFF header consistently identifies the same client, so the per-identifier counter now increments once per real failed attempt, causing the 6th attempt to correctly return 429. Confirmed by test_new_features::test_brute_force_lockout_at_five_attempts (all first 5 attempts = 401, 6th = 429)."
+}

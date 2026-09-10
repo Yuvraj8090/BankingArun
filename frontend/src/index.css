@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Clean banking light theme (SBI / ICICI inspired) */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 33%;           /* SBI deep blue */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;         /* SBI red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 33%;
+    --radius: 0.5rem;
+  }
+}
+
+body {
+  margin: 0;
+  background-color: #f5f7fa;
+  color: #0f172a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Bank brand colors — reusable */
+.bank-primary { color: #0b3b8c; }
+.bg-bank-primary { background-color: #0b3b8c; }
+.bg-bank-primary-hover:hover { background-color: #092e6f; }
+.bank-red { color: #c8102e; }
+.bg-bank-red { background-color: #c8102e; }
+.bank-gold { color: #b8860b; }
+
+/* Custom scrollbars — light */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Ticker marquee for public home page */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-track {
+  animation: ticker-scroll 40s linear infinite;
+}

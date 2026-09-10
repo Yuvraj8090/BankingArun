@@ -1,0 +1,40 @@
+{
+  "summary": "Phase-5 features (Refer & Earn, Standing Instructions, AI Face-Match on Video KYC, Super-Admin Runtime Config, AuthPage rewrite with referral pre-fill + Passkey) fully verified. Backend: 19/19 pytest pass in /app/backend/tests/test_phase5_features.py — covers /referrals/my-code idempotence, /referrals/history payout, full SI CRUD + pause/resume/delete, identical-image auto_approve (score >=99), different-image lower verdict, admin/config RBAC (retail 403, admin 403, bank_owner 200), PUT config persistence with masked SID, OTP mock still returns demo_otp after live_otp=false, plus 7-role login + 3-card + UPI regression. Frontend: Loading /?ref=RAH12345 → clicking navbar 'Open Account' opens AuthPage with register tab pre-selected AND referral input auto-filled to RAH12345; Passkey button visible on login tab; two-panel layout confirmed (brand panel on left is #0b3b8c, form on right white). Retail sidebar now shows 'Refer & Earn' and 'Standing Instructions' tabs — Refer & Earn page renders code RAH84093, shareable link (?ref=RAH84093), WhatsApp/Twitter/Email share buttons, 3-step 'How it works' block and referral history table showing the referee (paid, ₹500). Standing Instructions page renders 4 category tiles (Rent/SIP/EMI/Insurance) and the created rent SI (₹25,000 monthly, active). Bank Owner sidebar shows 'System Config' — page renders live_otp toggle, Twilio SID (masked AC_**********789), SendGrid API key (masked), From email, Referral reward INR (500), Face-match threshold (92). Retail login still redirects to dashboard; admin/staff/collection/loan/owner all authenticated in regression tests.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Root URL with ?ref=CODE", "issue": "Spec says loading / with ?ref=CODE should AUTO-open Open Account tab. Currently the AuthPage's ?ref= useEffect only runs after the user manually clicks 'Open Account' or 'Login' in the navbar (AuthPage mount). App.js does NOT check the URL param to auto-set showAuthModal=true / authIsRegister=true on landing. Referral link recipients therefore have to click a button before the referral field is pre-filled. Fix: in App.js MainApp, add a useEffect that reads window.location.search once, and if 'ref' is present set setShowAuthModal(true) + setAuthIsRegister(true).", "affected_selectors": ["auth-tab-register", "register-referral-input"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase5_features.py",
+    "/app/test_reports/pytest/phase5_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: In /app/frontend/src/App.js MainApp, add a useEffect that reads ?ref= from window.location.search and calls setShowAuthModal(true) + setAuthIsRegister(true) so the AuthPage opens automatically on referral link visits (currently requires an extra click on Open Account/Login)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 2484 lines — Phase 5 (referrals, standing instructions, face match, admin config) was again bolted onto the tail. Strong candidate for extraction into /app/backend/routers/{referrals,standing_instructions,kyc_face_match,admin_config}.py.",
+    "Referral bonus is credited unconditionally at REGISTER time (server.py L631-670). The reward_note says 'as soon as they open an account AND complete KYC' but code triggers on registration only. Consider gating on kyc_status=='verified' or add a follow-up cron; else attackers can farm referrals by registering many accounts with the same phone/pan without ever doing KYC.",
+    "Standing Instructions have no scheduler/worker — the endpoints create/pause/resume/delete records with next_run field but nothing actually debits the account when next_run arrives. This is documented as MVP but should be called out to the product owner.",
+    "Face-match is a simple RGB histogram cosine similarity (server.py L2380-2392) — two solid-color images of the same tint will match at ~100%, which is what allowed the identical-b64 test to pass. This is NOT a biometric and should be labeled 'demo only' in UI (currently only labeled in code comment).",
+    "PUT /api/admin/config accepts arbitrary strings for twilio_account_sid / auth_token without format validation (server.py L2443-2452). A typo like 'AC_TEST' could go live and Twilio calls would 401 silently in live mode. Consider a regex ^AC[a-f0-9]{32}$ check and a masked test-call flow before persisting.",
+    "The AdminConfig GET always returns masked secrets, but there is no audit-log write when Bank Owner PUTs updates. For a super-admin config that controls production SMS/Email, every change should be written to db.audit_logs with old→new diff.",
+    "_ensure_ref_code (server.py L2269-2280) has a race condition — two concurrent GETs for a brand-new user could both generate different codes and race the update. In practice low risk (users hit endpoint sequentially) but a unique index on users.referral_code + $setOnInsert would be robust.",
+    "Frontend AuthPage duplicates the b64ToBuf / bufToB64u WebAuthn helpers already in SecurityPage.js — extract to /src/utils/webauthn.js (still pending from iteration_4)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase5_features.py",
+    "/app/test_reports/iteration_5.json",
+    "/app/test_reports/pytest/phase5_results.xml"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "95% — all 4 new pages render + auth referral pre-fill works after 1 click. Minor: URL ?ref= does not auto-open AuthPage on landing."},
+  "test_credentials": "All 7 seeded accounts still login. Phase-5 tests use rahul.sharma (retail), owner@nbbank.in (bank_owner), manager.sbi (admin). Tests also register throw-away referees named referee_<hex>@test.com and kyc_<hex>@test.com for isolation.",
+  "seed_data_creation": "Each pytest run creates: 1 referee user (adds to db.users + adds referral row to db.referrals + credits retail savings +₹500), 2 KYC-test users (adds to db.users + db.kyc_video_submissions with face_match_score). Retail savings balance therefore grows by ₹500 per run. Reset by deleting from db.users where email like '%@test.com' and matching db.referrals rows.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All Phase-5 endpoints green. Standing Instructions has NO cron/executor — endpoints only manage docs. Face-match uses histogram cosine which returns ~100 for identical b64 (used by tests). AdminConfig config values persist in db.system_config _id='global'; the phase5 test resets referral_reward_amount=500 and face_match_auto_threshold=92 at end of test_owner_get_and_update to avoid poisoning downstream tests. The one open item is App.js ?ref= auto-open behaviour — see action_items.",
+  "rca of the issue": "?ref= not auto-opening AuthPage: AuthPage.js has a useEffect that reads ?ref= and sets isRegister=true + referralCode=value, BUT AuthPage is only mounted after user clicks navbar Open Account/Login (App.js gates it behind showAuthModal state). The referral pre-fill therefore works only AFTER the click. Fix: add a useEffect in App.js MainApp for the unauthenticated branch that checks URLSearchParams for 'ref' and calls setShowAuthModal(true) + setAuthIsRegister(true) — 4 lines of code."
+}

@@ -1,0 +1,44 @@
+{
+  "summary": "Verified security fixes and re-ran full backend regression + public UI smoke. 13/14 pytest tests pass. CORS is now correctly locked to allow-list (no wildcard-with-credentials, evil origin not reflected). Hostinger PHP export now uses password_verify() only and schema.sql contains real bcrypt hashes (both via /package and inside the zip). All banking flows (login all 3 roles, accounts/cards/transfer/FD/loan/admin overview/RBI reports) still pass. However, brute-force lockout is NOT triggering at 5 attempts — it only fires after ~10 attempts because request.client.host varies behind the k8s ingress, splitting the IP+email identifier counter. Public / and /rates pages render with PublicNavbar and correct content; no console errors.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/auth/login",
+        "issue": "Brute-force lockout does NOT fire at 5 failed attempts as required. Observed remaining-attempt counter: 4,4,3,3,2,1,0 over 7 tries, meaning fails are being split across different identifiers. Root cause: identifier = f'{request.client.host}:{email}' but behind the ingress/proxy `request.client.host` reflects the immediate upstream (varies between requests / behind LB) instead of the real client IP. Real client IP must be read from X-Forwarded-For (first value) — or drop IP and lock on email alone. Currently a determined attacker can double the effective attempts before lockout.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_security.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix brute-force lockout identifier: derive client IP from `X-Forwarded-For` header (first entry, trimmed) with fallback to request.client.host, OR use email-only identifier. Recommended: `client_ip = (request.headers.get('x-forwarded-for') or '').split(',')[0].strip() or (request.client.host if request.client else '0.0.0.0')`. After the fix, re-verify that the 6th attempt returns 429 within the same test run."
+  ],
+  "critical_code_review_comments": [
+    "server.py L484: `request.client.host` behind an ingress/reverse-proxy is unreliable; use X-Forwarded-For for any per-client rate limiting or audit logging (also affects the ip logged in audit_logs on L523).",
+    "CORS is correctly restricted now (allow-list from env, no wildcard reflection with credentials). Verified via preflight from http://evil.example.com — no ACAO returned.",
+    "Hostinger PHP export login now uses password_verify() only; no plaintext OR-bypass patterns present. schema.sql placeholders {{...}} are replaced at runtime with real $2b$ bcrypt hashes both via /package and inside the zip. Good fix.",
+    "server.py is ~1450 lines; consider splitting routers (auth/accounts/cards/hostinger/admin) into separate modules for maintainability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_security.py",
+    "/app/test_reports/iteration_2.json",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "success_rate": {"backend": "93% (13/14)", "frontend": "100% (public smoke)"},
+  "test_credentials": "Used credentials from /app/memory/test_credentials.md as-is (rahul.sharma / Banking@123 / Txn@1234; tata.corp / Corporate@123 / Corp@1234; manager.sbi / Admin@123).",
+  "seed_data_creation": "Test made one ₹1 UPI transfer, one ₹1 FD booking, one ₹1000 loan application (same as prior iteration). Card online_limit was set to 90000. No new users seeded.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Only remaining critical issue is the brute-force lockout identifier bug. After main agent applies the X-Forwarded-For fix in server.py login handler, re-run pytest /app/backend/tests/test_security.py::test_brute_force_lockout_returns_429 to confirm the 6th consecutive failed attempt returns 429. All other security fixes (CORS, PHP password_verify, bcrypt in schema) are verified working. Public UI (/ and /rates) verified visually.",
+  "rca of the issue": "The brute-force lockout uses `request.client.host` which in FastAPI/Starlette returns the socket peer address (i.e., the k8s ingress/proxy), not the true client IP. Because the ingress may terminate on different upstream sockets/pods across requests, or the reported host varies, each failed login can be recorded under a different identifier string, so the count per identifier stays below 5 for longer than intended. Empirically the counter increments about once every 1.5 real attempts, so lockout fires around attempt #10 instead of #6. Mitigation: parse `X-Forwarded-For` (first IP) — standard behind Emergent's ingress — before composing the identifier, and apply the same fix to the audit_logs 'ip' field."
+}
