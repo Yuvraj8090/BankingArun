@@ -19,7 +19,7 @@ export default function StandingInstructionsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
-    from_account_number: '', beneficiary_name: '', beneficiary_account: '', beneficiary_ifsc: 'SBIN000042',
+    from_account_number: '', beneficiary_name: '', beneficiary_account: '', beneficiary_ifsc: 'AJSP0000042',
     amount: 25000, frequency: 'monthly', category: 'rent',
     start_date: new Date().toISOString().slice(0, 10), end_date: '', remarks: ''
   });

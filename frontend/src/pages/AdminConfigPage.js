@@ -96,7 +96,7 @@ export default function AdminConfigPage() {
             show={showSecrets.sg} onToggle={() => setShowSecrets(s => ({ ...s, sg: !s.sg }))}
             testId="cfg-sg-key" />
           <PlainInput label="From email address"
-            placeholder="alerts@nbbank.in"
+            placeholder="alerts@ajspay.in"
             value={form.sendgrid_from_email || ''}
             onChange={v => setForm(f => ({ ...f, sendgrid_from_email: v }))}
             testId="cfg-sg-from" />

@@ -36,7 +36,7 @@ export default function Navbar({ onNavigate, activeTab }) {
             </div>
             <div className="leading-tight hidden sm:block">
               <div className="font-bold text-base text-slate-900">
-                National <span className="text-[#c8102e]">Bharat</span> Bank
+                AJSPay
               </div>
               <div className="text-[10px] text-slate-500 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-600" /> Secure NetBanking

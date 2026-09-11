@@ -56,7 +56,20 @@ JWT_ALGORITHM = "HS256"
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
 
-app = FastAPI(title="Indian FinTech Core Banking API (SBI, ICICI, HDFC standard)", version="2.0.0")
+# Session cookie flags. Defaults are the production-safe pair (Secure + SameSite=None
+# for a cross-origin frontend). Local HTTP dev must set COOKIE_SECURE=false and
+# COOKIE_SAMESITE=lax, because clients refuse a Secure cookie over plain http://.
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
+COOKIE_SAMESITE = os.environ.get("COOKIE_SAMESITE", "none").lower()
+
+def set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key="access_token", value=token, httponly=True,
+        secure=COOKIE_SECURE, samesite=COOKIE_SAMESITE,
+        max_age=28800, path="/",
+    )
+
+app = FastAPI(title="AJSPay Core Banking API", version="2.0.0")
 api_router = APIRouter(prefix="/api")
 
 # ----------------- Password & JWT Helpers -----------------
@@ -118,7 +131,7 @@ class RegisterRequest(BaseModel):
     initial_deposit: float = 10000.0
     pan_number: Optional[str] = "ABCDE1234F"
     aadhaar_number: Optional[str] = "987654321098"
-    branch: Optional[str] = "SBI-MUM-042 (Nariman Point Main)"
+    branch: Optional[str] = "AJSP-MUM-042 (Nariman Point Main)"
     is_joint: bool = False
     joint_holder_name: Optional[str] = None
     nominee_name: Optional[str] = None
@@ -138,7 +151,7 @@ class TransferRequest(BaseModel):
     from_account_number: str
     to_account_number: str
     beneficiary_name: str
-    beneficiary_ifsc: str = "SBIN000042"
+    beneficiary_ifsc: str = "AJSP0000042"
     transfer_type: str = "IMPS"
     amount: float
     remarks: Optional[str] = "Fund transfer"
@@ -150,7 +163,7 @@ class BulkTransferItem(BaseModel):
     beneficiary_name: str
     account_number: str
     ifsc: str
-    amount: float
+    amount: float = Field(gt=0)  # a negative line would credit the payer
     remarks: Optional[str] = "Corporate payout"
 
 class BulkTransferRequest(BaseModel):
@@ -239,12 +252,12 @@ async def seed_initial_data():
     admin_user = {
         "id": admin_id,
         "name": "Arunabh Mukherjee (Chief Branch Manager)",
-        "email": "manager.sbi@example.com",
+        "email": "manager@ajspay.in",
         "phone": "+91 98200 11223",
         "role": "admin",
         "password_hash": hash_password("Admin@123"),
         "transaction_password_hash": hash_password("Admin@1234"),
-        "branch": "SBI-MUM-042 (Nariman Point Main)",
+        "branch": "AJSP-MUM-042 (Nariman Point Main)",
         "kyc_status": "verified",
         "mfa_enabled": True,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -260,7 +273,7 @@ async def seed_initial_data():
         "role": "retail",
         "password_hash": hash_password("Banking@123"),
         "transaction_password_hash": hash_password("Txn@1234"),
-        "branch": "SBI-MUM-042 (Nariman Point Main)",
+        "branch": "AJSP-MUM-042 (Nariman Point Main)",
         "pan_number": "ABCPS8492K",
         "aadhaar_number": "XXXX-XXXX-4892",
         "kyc_status": "verified",
@@ -273,14 +286,14 @@ async def seed_initial_data():
     acc_retail = {
         "id": str(uuid.uuid4()),
         "user_id": retail_id,
-        "account_number": "SBI00984521098",
-        "ifsc_code": "SBIN000042",
+        "account_number": "AJSP00984521098",
+        "ifsc_code": "AJSP0000042",
         "account_type": "savings",
         "account_name": "Premium Salary Savings",
         "balance": 145850.0,
         "currency": "INR",
         "status": "active",
-        "upi_id": "rahulsharma@sbi",
+        "upi_id": "rahulsharma@ajspay",
         "branch": "Nariman Point, Mumbai",
         "is_joint": False,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -305,7 +318,7 @@ async def seed_initial_data():
     retail_card_visa = {
         "id": "card-visa-001",
         "user_id": retail_id,
-        "account_number": "SBI00984521098",
+        "account_number": "AJSP00984521098",
         "card_number": "4532 9845 2109 8821",
         "card_holder": "RAHUL SHARMA",
         "card_type": "Visa Platinum Debit",
@@ -314,7 +327,7 @@ async def seed_initial_data():
         "cvv": "418",
         "status": "active",
         "is_virtual": True,
-        "issued_by": "National Bharat Bank (Issuer Only)",
+        "issued_by": "AJSPay (Issuer Only)",
         "online_limit": 100000.0,
         "atm_limit": 50000.0,
         "international_enabled": True,
@@ -327,7 +340,7 @@ async def seed_initial_data():
     retail_card_rupay_1 = {
         "id": "card-rupay-001",
         "user_id": retail_id,
-        "account_number": "SBI00984521098",
+        "account_number": "AJSP00984521098",
         "card_number": "5241 7373 2160 2721",
         "card_holder": "RAHUL SHARMA",
         "card_type": "RuPay / Mastercard Global Debit",
@@ -336,7 +349,7 @@ async def seed_initial_data():
         "cvv": "902",
         "status": "dispatch_queued",
         "is_virtual": False,
-        "issued_by": "National Bharat Bank (Issuer Only)",
+        "issued_by": "AJSPay (Issuer Only)",
         "online_limit": 75000.0,
         "atm_limit": 40000.0,
         "international_enabled": False,
@@ -349,7 +362,7 @@ async def seed_initial_data():
     retail_card_rupay_2 = {
         "id": "card-rupay-002",
         "user_id": retail_id,
-        "account_number": "SBI00984521098",
+        "account_number": "AJSP00984521098",
         "card_number": "5241 9548 3082 4607",
         "card_holder": "RAHUL SHARMA",
         "card_type": "RuPay / Mastercard Global Debit",
@@ -358,7 +371,7 @@ async def seed_initial_data():
         "cvv": "561",
         "status": "dispatch_queued",
         "is_virtual": False,
-        "issued_by": "National Bharat Bank (Issuer Only)",
+        "issued_by": "AJSPay (Issuer Only)",
         "online_limit": 75000.0,
         "atm_limit": 40000.0,
         "international_enabled": True,
@@ -379,7 +392,7 @@ async def seed_initial_data():
         "role": "corporate",
         "password_hash": hash_password("Corporate@123"),
         "transaction_password_hash": hash_password("Corp@1234"),
-        "branch": "HDFC-BKC-001 (Bandra Kurla Complex)",
+        "branch": "AJSP-BKC-001 (Bandra Kurla Complex)",
         "pan_number": "AAACT8921M",
         "aadhaar_number": "Corporate Entity",
         "kyc_status": "verified",
@@ -391,14 +404,14 @@ async def seed_initial_data():
     acc_corp = {
         "id": str(uuid.uuid4()),
         "user_id": corp_id,
-        "account_number": "HDFC00129845612",
-        "ifsc_code": "HDFC000001",
+        "account_number": "AJSP00129845612",
+        "ifsc_code": "AJSP0000001",
         "account_type": "current",
         "account_name": "Corporate Operating Account",
         "balance": 1285000.0,
         "currency": "INR",
         "status": "active",
-        "upi_id": "tatadigital@hdfcbank",
+        "upi_id": "tatadigital@ajspay",
         "branch": "Bandra Kurla Complex, Mumbai",
         "is_joint": False,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -410,7 +423,7 @@ async def seed_initial_data():
         {
             "id": "owner-001",
             "name": "Vikram Kothari (Bank Owner)",
-            "email": "owner@nbbank.in",
+            "email": "owner@ajspay.in",
             "phone": "+91 98100 00001",
             "role": "bank_owner",
             "password_hash": hash_password("Owner@123"),
@@ -423,12 +436,12 @@ async def seed_initial_data():
         {
             "id": "staff-001",
             "name": "Meera Iyer (Customer Service Officer)",
-            "email": "meera.staff@nbbank.in",
+            "email": "meera.staff@ajspay.in",
             "phone": "+91 98200 33445",
             "role": "staff",
             "password_hash": hash_password("Staff@123"),
             "transaction_password_hash": hash_password("Txn@1234"),
-            "branch": "SBI-MUM-042 (Nariman Point Main)",
+            "branch": "AJSP-MUM-042 (Nariman Point Main)",
             "kyc_status": "verified",
             "designation": "Front Desk / Teller",
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -436,7 +449,7 @@ async def seed_initial_data():
         {
             "id": "collect-001",
             "name": "Rajesh Nair (Collection Agent)",
-            "email": "collections@nbbank.in",
+            "email": "collections@ajspay.in",
             "phone": "+91 98200 55667",
             "role": "collection_agent",
             "password_hash": hash_password("Collect@123"),
@@ -449,12 +462,12 @@ async def seed_initial_data():
         {
             "id": "loan-001",
             "name": "Aditi Verma (Loan Officer)",
-            "email": "loans@nbbank.in",
+            "email": "loans@ajspay.in",
             "phone": "+91 98200 77889",
             "role": "loan_officer",
             "password_hash": hash_password("Loan@123"),
             "transaction_password_hash": hash_password("Txn@1234"),
-            "branch": "SBI-MUM-042 (Nariman Point Main)",
+            "branch": "AJSP-MUM-042 (Nariman Point Main)",
             "kyc_status": "verified",
             "designation": "Credit Underwriter",
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -484,7 +497,7 @@ async def seed_initial_data():
         {
             "id": str(uuid.uuid4()),
             "user_id": retail_id,
-            "account_number": "SBI00984521098",
+            "account_number": "AJSP00984521098",
             "type": "credit",
             "mode": "NEFT",
             "amount": 95000.0,
@@ -499,13 +512,13 @@ async def seed_initial_data():
         {
             "id": str(uuid.uuid4()),
             "user_id": retail_id,
-            "account_number": "SBI00984521098",
+            "account_number": "AJSP00984521098",
             "type": "debit",
             "mode": "UPI",
             "amount": 2450.0,
             "balance_after": 50850.0,
             "counterparty_name": "Amazon India Payments",
-            "counterparty_acc": "amazonpay@icici",
+            "counterparty_acc": "amazonpay@ajspay",
             "ref_number": "UPI-6192837491",
             "status": "SUCCESS",
             "description": "Electronics Purchase Order #9812",
@@ -514,13 +527,13 @@ async def seed_initial_data():
         {
             "id": str(uuid.uuid4()),
             "user_id": retail_id,
-            "account_number": "SBI00984521098",
+            "account_number": "AJSP00984521098",
             "type": "debit",
             "mode": "IMPS",
             "amount": 15000.0,
             "balance_after": 53300.0,
             "counterparty_name": "Ananya Sharma",
-            "counterparty_acc": "ICIC000492109",
+            "counterparty_acc": "AJSP000492109",
             "ref_number": "IMPS-9921849102",
             "status": "SUCCESS",
             "description": "Family Maintenance",
@@ -530,11 +543,11 @@ async def seed_initial_data():
     await db.transactions.insert_many(sample_txns)
 
     sample_branches = [
-        {"id": "b1", "name": "Nariman Point Main Branch", "bank": "SBI", "code": "SBIN000042", "address": "Air India Building, Nariman Point, Mumbai 400021", "lat": 18.9281, "lng": 72.8228, "phone": "022-22024100", "has_atm": True, "has_cdm": True, "has_locker": True, "timing": "10:00 AM - 4:00 PM"},
-        {"id": "b2", "name": "Bandra Kurla Complex Branch", "bank": "HDFC", "code": "HDFC000001", "address": "G Block, BKC, Bandra East, Mumbai 400051", "lat": 19.0662, "lng": 72.8688, "phone": "022-66521000", "has_atm": True, "has_cdm": True, "has_locker": True, "timing": "9:30 AM - 4:30 PM"},
-        {"id": "b3", "name": "Connaught Place Flagship", "bank": "ICICI", "code": "ICIC000007", "address": "9A, Inner Circle, Connaught Place, New Delhi 110001", "lat": 28.6315, "lng": 77.2167, "phone": "011-41512000", "has_atm": True, "has_cdm": True, "has_locker": True, "timing": "9:30 AM - 5:00 PM"},
-        {"id": "b4", "name": "Koramangala 80 Feet Road", "bank": "SBI", "code": "SBIN004081", "address": "80 Feet Road, 4th Block, Koramangala, Bengaluru 560034", "lat": 12.9352, "lng": 77.6245, "phone": "080-25539800", "has_atm": True, "has_cdm": False, "has_locker": True, "timing": "10:00 AM - 4:00 PM"},
-        {"id": "b5", "name": "Hitech City Madhapur", "bank": "HDFC", "code": "HDFC001928", "address": "Cyber Towers, Hitech City, Hyderabad 500081", "lat": 17.4504, "lng": 78.3808, "phone": "040-67891200", "has_atm": True, "has_cdm": True, "has_locker": False, "timing": "9:30 AM - 4:30 PM"}
+        {"id": "b1", "name": "Nariman Point Main Branch", "bank": "AJSPay", "code": "AJSP0000042", "address": "Air India Building, Nariman Point, Mumbai 400021", "lat": 18.9281, "lng": 72.8228, "phone": "022-22024100", "has_atm": True, "has_cdm": True, "has_locker": True, "timing": "10:00 AM - 4:00 PM"},
+        {"id": "b2", "name": "Bandra Kurla Complex Branch", "bank": "AJSPay", "code": "AJSP0000001", "address": "G Block, BKC, Bandra East, Mumbai 400051", "lat": 19.0662, "lng": 72.8688, "phone": "022-66521000", "has_atm": True, "has_cdm": True, "has_locker": True, "timing": "9:30 AM - 4:30 PM"},
+        {"id": "b3", "name": "Connaught Place Flagship", "bank": "AJSPay", "code": "AJSP0000007", "address": "9A, Inner Circle, Connaught Place, New Delhi 110001", "lat": 28.6315, "lng": 77.2167, "phone": "011-41512000", "has_atm": True, "has_cdm": True, "has_locker": True, "timing": "9:30 AM - 5:00 PM"},
+        {"id": "b4", "name": "Koramangala 80 Feet Road", "bank": "AJSPay", "code": "AJSP0004081", "address": "80 Feet Road, 4th Block, Koramangala, Bengaluru 560034", "lat": 12.9352, "lng": 77.6245, "phone": "080-25539800", "has_atm": True, "has_cdm": False, "has_locker": True, "timing": "10:00 AM - 4:00 PM"},
+        {"id": "b5", "name": "Hitech City Madhapur", "bank": "AJSPay", "code": "AJSP0001928", "address": "Cyber Towers, Hitech City, Hyderabad 500081", "lat": 17.4504, "lng": 78.3808, "phone": "040-67891200", "has_atm": True, "has_cdm": True, "has_locker": False, "timing": "9:30 AM - 4:30 PM"}
     ]
     await db.branches.insert_many(sample_branches)
 
@@ -553,7 +566,7 @@ async def register(req: RegisterRequest, response: Response):
         raise HTTPException(status_code=400, detail="Account with this email already exists.")
     
     user_id = str(uuid.uuid4())
-    account_number = "SBI00" + "".join([str(random.randint(0, 9)) for _ in range(9)])
+    account_number = "AJSP0" + "".join([str(random.randint(0, 9)) for _ in range(9)])
     
     user_doc = {
         "id": user_id,
@@ -579,13 +592,13 @@ async def register(req: RegisterRequest, response: Response):
         "id": str(uuid.uuid4()),
         "user_id": user_id,
         "account_number": account_number,
-        "ifsc_code": "SBIN000042",
+        "ifsc_code": "AJSP0000042",
         "account_type": req.account_type,
         "account_name": f"{req.account_type.capitalize()} Account",
         "balance": max(req.initial_deposit, 1000.0),
         "currency": "INR",
         "status": "active",
-        "upi_id": f"{req.email.split('@')[0]}@sbi",
+        "upi_id": f"{req.email.split('@')[0]}@ajspay",
         "branch": req.branch,
         "is_joint": req.is_joint,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -641,7 +654,7 @@ async def register(req: RegisterRequest, response: Response):
             await db.transactions.insert_one({
                 "id": str(uuid.uuid4()), "user_id": user_id, "account_number": account_number,
                 "type": "credit", "mode": "ACCOUNT_OPENING", "amount": reward, "balance_after": new_bal,
-                "counterparty_name": "Refer & Earn Bonus", "counterparty_acc": "NBB-REWARDS",
+                "counterparty_name": "Refer & Earn Bonus", "counterparty_acc": "AJSPAY-REWARDS",
                 "ref_number": f"RRB-{random.randint(1000000, 9999999)}", "status": "SUCCESS",
                 "description": f"Welcome bonus via referral {req.referral_code.upper()}",
                 "timestamp": datetime.now(timezone.utc).isoformat()
@@ -654,7 +667,7 @@ async def register(req: RegisterRequest, response: Response):
                 await db.transactions.insert_one({
                     "id": str(uuid.uuid4()), "user_id": referrer["id"], "account_number": referrer_acc["account_number"],
                     "type": "credit", "mode": "ACCOUNT_OPENING", "amount": reward, "balance_after": referrer_new_bal,
-                    "counterparty_name": "Refer & Earn Payout", "counterparty_acc": "NBB-REWARDS",
+                    "counterparty_name": "Refer & Earn Payout", "counterparty_acc": "AJSPAY-REWARDS",
                     "ref_number": f"RRP-{random.randint(1000000, 9999999)}", "status": "SUCCESS",
                     "description": f"Reward for referring {user_doc['name']}",
                     "timestamp": datetime.now(timezone.utc).isoformat()
@@ -670,7 +683,7 @@ async def register(req: RegisterRequest, response: Response):
             ref_reward = reward
 
     token = create_access_token(user_id, req.email.lower(), "retail")
-    response.set_cookie(key="access_token", value=token, httponly=True, secure=True, samesite="none", max_age=28800, path="/")
+    set_session_cookie(response, token)
 
     user_clean = {k: v for k, v in user_doc.items() if k not in ["_id", "password_hash", "transaction_password_hash"]}
     return {"token": token, "user": user_clean, "account_number": account_number, "referral_bonus": ref_reward}
@@ -723,7 +736,7 @@ async def login(req: LoginRequest, response: Response, request: Request):
     })
 
     token = create_access_token(user["id"], user["email"], user.get("role", "retail"))
-    response.set_cookie(key="access_token", value=token, httponly=True, secure=True, samesite="none", max_age=28800, path="/")
+    set_session_cookie(response, token)
 
     user_clean = {k: v for k, v in user.items() if k not in ["_id", "password_hash", "transaction_password_hash"]}
     return {
@@ -970,6 +983,8 @@ async def manage_card(req: CardActionRequest, current_user: dict = Depends(get_c
 
 @api_router.post("/cards/request-physical")
 async def request_physical_card(account_number: str = Query(...), current_user: dict = Depends(get_current_user)):
+    if not await db.accounts.find_one({"account_number": account_number, "user_id": current_user["id"]}):
+        raise HTTPException(status_code=404, detail="Account not found.")
     new_card_doc = {
         "id": str(uuid.uuid4()),
         "user_id": current_user["id"],
@@ -1286,15 +1301,15 @@ async def get_my_loans(current_user: dict = Depends(get_current_user)):
 @api_router.get("/investments/catalog")
 async def get_investment_catalog():
     schemes = [
-        {"id": "mf1", "name": "SBI Bluechip Large Cap Equity Fund", "category": "Equity Large Cap", "cagr_3yr": "18.4%", "risk": "Moderate", "min_sip": 500, "nav": 94.20},
-        {"id": "mf2", "name": "ICICI Prudential Tech Opportunity Fund", "category": "Sectoral Tech", "cagr_3yr": "24.8%", "risk": "High", "min_sip": 1000, "nav": 182.50},
-        {"id": "mf3", "name": "HDFC Balanced Advantage Hybrid Fund", "category": "Dynamic Asset Hybrid", "cagr_3yr": "16.1%", "risk": "Low-Mod", "min_sip": 500, "nav": 445.10},
-        {"id": "mf4", "name": "SBI Nifty 50 Index Fund Direct", "category": "Passive Index", "cagr_3yr": "15.2%", "risk": "Moderate", "min_sip": 500, "nav": 240.80}
+        {"id": "mf1", "name": "AJSPay Bluechip Large Cap Equity Fund", "category": "Equity Large Cap", "cagr_3yr": "18.4%", "risk": "Moderate", "min_sip": 500, "nav": 94.20},
+        {"id": "mf2", "name": "AJSPay Tech Opportunity Fund", "category": "Sectoral Tech", "cagr_3yr": "24.8%", "risk": "High", "min_sip": 1000, "nav": 182.50},
+        {"id": "mf3", "name": "AJSPay Balanced Advantage Hybrid Fund", "category": "Dynamic Asset Hybrid", "cagr_3yr": "16.1%", "risk": "Low-Mod", "min_sip": 500, "nav": 445.10},
+        {"id": "mf4", "name": "AJSPay Nifty 50 Index Fund Direct", "category": "Passive Index", "cagr_3yr": "15.2%", "risk": "Moderate", "min_sip": 500, "nav": 240.80}
     ]
     insurances = [
-        {"id": "ins1", "name": "SBI Life eShield Plus Term Plan", "type": "Life Term Cover", "cover": "₹1.00 Crore", "annual_premium": 8450, "claim_ratio": "98.5%"},
-        {"id": "ins2", "name": "ICICI Lombard Complete Health Shield", "type": "Family Health Floater", "cover": "₹20.00 Lakhs", "annual_premium": 14200, "claim_ratio": "99.1%"},
-        {"id": "ins3", "name": "HDFC ERGO Comprehensive Motor Insurance", "type": "Zero-Dep Auto Cover", "cover": "IDV Market Value", "annual_premium": 7100, "claim_ratio": "97.8%"}
+        {"id": "ins1", "name": "AJSPay Life Shield Plus Term Plan", "type": "Life Term Cover", "cover": "₹1.00 Crore", "annual_premium": 8450, "claim_ratio": "98.5%"},
+        {"id": "ins2", "name": "AJSPay Complete Health Shield", "type": "Family Health Floater", "cover": "₹20.00 Lakhs", "annual_premium": 14200, "claim_ratio": "99.1%"},
+        {"id": "ins3", "name": "AJSPay Comprehensive Motor Insurance", "type": "Zero-Dep Auto Cover", "cover": "IDV Market Value", "annual_premium": 7100, "claim_ratio": "97.8%"}
     ]
     return {"mutual_funds": schemes, "insurance_plans": insurances}
 
@@ -1368,7 +1383,7 @@ async def banking_ai_chatbot(req: ChatQueryRequest):
     msg = req.message.lower()
     
     if "ifsc" in msg or "branch code" in msg:
-        reply = "Our main branches IFSC codes:\n- SBI Nariman Point: **SBIN000042**\n- HDFC Bandra Kurla Complex: **HDFC000001**\n- ICICI Connaught Place: **ICIC000007**\n- SBI Koramangala: **SBIN004081**"
+        reply = "AJSPay main branch IFSC codes:\n- Nariman Point: **AJSP0000042**\n- Bandra Kurla Complex: **AJSP0000001**\n- Connaught Place: **AJSP0000007**\n- Koramangala: **AJSP0004081**"
     elif "limit" in msg or "transfer limit" in msg:
         reply = "Daily Fund Transfer Limits:\n- **IMPS**: Up to ₹5,00,000 instant (24x7)\n- **NEFT**: No minimum, up to ₹10,00,000 per transaction\n- **RTGS**: Min ₹2,00,000, Max ₹25,00,000 (instant settlement)\n- **UPI**: Up to ₹1,00,000 per day"
     elif "fd" in msg or "fixed deposit" in msg or "interest rate" in msg:
@@ -1382,7 +1397,7 @@ async def banking_ai_chatbot(req: ChatQueryRequest):
     elif "loan" in msg or "emi" in msg:
         reply = "We offer Personal Loans starting at **10.50%**, Home Loans at **8.40%**, and Car Loans at **8.75%**."
     else:
-        reply = "I am your 24x7 Virtual NetBanking Assistant. You can ask me about fund transfers (IMPS/NEFT/RTGS/UPI), FD rates, debit cards, cheque books, loan eligibility, or branch locations!"
+        reply = "I am your 24x7 AJSPay Assistant. You can ask me about fund transfers (IMPS/NEFT/RTGS/UPI), FD rates, debit cards, cheque books, loan eligibility, or branch locations!"
 
     return {"response": reply, "timestamp": datetime.now(timezone.utc).isoformat()}
 
@@ -1451,324 +1466,28 @@ async def get_rbi_reports(admin: dict = Depends(get_current_admin)):
         }
     }
 
-# ----------------- Hostinger Shared Hosting Code Templates with Password Verification -----------------
-HOSTINGER_PHP_DB = """<?php
-// Hostinger Shared Hosting MySQL Database Connector
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+# ----------------- Hostinger PHP/MySQL Export -----------------
+# The PHP port lives as real files in /hostinger so it can be linted, run locally
+# with `php -S`, and exercised by the same pytest suite as this API.
+HOSTINGER_DIR = Path(__file__).resolve().parent.parent / "hostinger"
+HOSTINGER_FILES = {  # package key -> file name inside the zip
+    "db_php": "db.php",
+    "api_php": "api.php",
+    "schema_sql": "schema.sql",
+    "htaccess": ".htaccess",
+    "deploy_guide": "INSTALL_HOSTINGER.md",
 }
-
-$host = 'localhost'; // Usually localhost in Hostinger cPanel
-$dbname = 'u123456789_banking_db'; // Your Hostinger MySQL DB Name
-$username = 'u123456789_bank_user'; // Your Hostinger MySQL Username
-$password = 'Your_Hostinger_MySQL_Password_Here'; // Your MySQL Password
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Database Connection Failed: " . $e->getMessage()]);
-    exit();
-}
-"""
-
-HOSTINGER_SQL_SCHEMA = """-- Complete Hostinger Shared Hosting MySQL Schema
--- Compatible with Hostinger phpMyAdmin (MySQL 5.7+ / MariaDB 10.3+)
-
-SET FOREIGN_KEY_CHECKS = 0;
-
-CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(36) PRIMARY KEY,
-    name VARCHAR(150) NOT NULL,
-    email VARCHAR(150) UNIQUE NOT NULL,
-    phone VARCHAR(30) NOT NULL,
-    role ENUM('retail', 'corporate', 'admin') DEFAULT 'retail',
-    password_hash VARCHAR(255) NOT NULL,
-    transaction_password_hash VARCHAR(255) NOT NULL,
-    branch VARCHAR(100) DEFAULT 'SBI-MUM-042 (Nariman Point)',
-    pan_number VARCHAR(20),
-    aadhaar_number VARCHAR(30),
-    kyc_status ENUM('pending_approval', 'verified', 'rejected') DEFAULT 'verified',
-    mfa_enabled TINYINT(1) DEFAULT 1,
-    is_joint TINYINT(1) DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS accounts (
-    id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    account_number VARCHAR(30) UNIQUE NOT NULL,
-    ifsc_code VARCHAR(20) DEFAULT 'SBIN000042',
-    account_type ENUM('savings', 'current', 'fixed_deposit', 'recurring_deposit') DEFAULT 'savings',
-    account_name VARCHAR(100) NOT NULL,
-    balance DECIMAL(15,2) DEFAULT 0.00,
-    currency VARCHAR(10) DEFAULT 'INR',
-    status ENUM('active', 'frozen', 'closed') DEFAULT 'active',
-    upi_id VARCHAR(100),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS transactions (
-    id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    account_number VARCHAR(30) NOT NULL,
-    type ENUM('credit', 'debit') NOT NULL,
-    mode ENUM('NEFT', 'RTGS', 'IMPS', 'UPI', 'ACCOUNT_OPENING', 'CORPORATE_BULK') NOT NULL,
-    amount DECIMAL(15,2) NOT NULL,
-    balance_after DECIMAL(15,2) NOT NULL,
-    counterparty_name VARCHAR(150),
-    counterparty_acc VARCHAR(50),
-    ref_number VARCHAR(100) UNIQUE NOT NULL,
-    status ENUM('SUCCESS', 'PENDING', 'FAILED') DEFAULT 'SUCCESS',
-    description VARCHAR(255),
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS cards (
-    id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    account_number VARCHAR(30) NOT NULL,
-    card_number VARCHAR(30) NOT NULL,
-    card_holder VARCHAR(100) NOT NULL,
-    card_type VARCHAR(50) DEFAULT 'Visa Platinum Debit',
-    expiry_date VARCHAR(10) NOT NULL,
-    cvv VARCHAR(5) NOT NULL,
-    status ENUM('active', 'frozen', 'hotlisted', 'dispatch_queued') DEFAULT 'active',
-    is_virtual TINYINT(1) DEFAULT 1,
-    online_limit DECIMAL(12,2) DEFAULT 50000.00,
-    atm_limit DECIMAL(12,2) DEFAULT 40000.00,
-    international_enabled TINYINT(1) DEFAULT 0,
-    pin VARCHAR(10) DEFAULT '1234',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS deposits (
-    id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    deposit_number VARCHAR(30) UNIQUE NOT NULL,
-    deposit_type ENUM('fixed', 'recurring') DEFAULT 'fixed',
-    principal_amount DECIMAL(15,2) NOT NULL,
-    interest_rate DECIMAL(5,2) NOT NULL,
-    tenure_months INT NOT NULL,
-    maturity_amount DECIMAL(15,2) NOT NULL,
-    maturity_date DATE NOT NULL,
-    status ENUM('active', 'closed') DEFAULT 'active',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
--- Pre-seed Initial Retail & Admin Users
--- IMPORTANT: The password_hash values below are runtime-generated bcrypt hashes
--- for the demo passwords. Rotate them for any production deployment.
-INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash, branch, kyc_status) 
-VALUES 
-('admin-001', 'Arunabh Mukherjee (Chief Branch Manager)', 'manager.sbi@example.com', '+91 98200 11223', 'admin', '{{ADMIN_PWD_HASH}}', '{{ADMIN_TXN_HASH}}', 'SBI-MUM-042 (Nariman Point)', 'verified'),
-('retail-001', 'Rahul Sharma', 'rahul.sharma@example.com', '+91 98190 44556', 'retail', '{{RETAIL_PWD_HASH}}', '{{RETAIL_TXN_HASH}}', 'SBI-MUM-042 (Nariman Point)', 'verified'),
-('corp-001', 'Tata Corp Services Pvt Ltd', 'tata.corp@example.com', '+91 98200 44556', 'corporate', '{{CORP_PWD_HASH}}', '{{CORP_TXN_HASH}}', 'HDFC-MUM-104 (BKC)', 'verified');
-
-INSERT INTO accounts (id, user_id, account_number, ifsc_code, account_type, account_name, balance, upi_id)
-VALUES
-('acc-001', 'retail-001', 'SBI00984521098', 'SBIN000042', 'savings', 'Premium Salary Savings', 145850.00, 'rahulsharma@sbi');
-"""
-
-HOSTINGER_PHP_API = """<?php
-// Hostinger Core Banking REST API Endpoint with Secure Password Verification
-require_once 'db.php';
-
-header('Content-Type: application/json');
-
-$method = $_SERVER['REQUEST_METHOD'];
-$path = isset($_GET['action']) ? $_GET['action'] : '';
-
-switch ($path) {
-    case 'login':
-        if ($method === 'POST') {
-            $data = json_decode(file_get_contents('php://input'), true);
-            $email = $data['email'] ?? '';
-            $password = $data['password'] ?? '';
-            
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
-            
-            // Validate password securely using bcrypt password_verify (no plaintext fallback)
-            if ($user && password_verify($password, $user['password_hash'])) {
-                unset($user['password_hash']);
-                unset($user['transaction_password_hash']);
-                echo json_encode(["status" => "success", "token" => bin2hex(random_bytes(32)), "user" => $user]);
-            } else {
-                http_response_code(401);
-                echo json_encode(["status" => "error", "message" => "Invalid email or password"]);
-            }
-        }
-        break;
-
-    case 'accounts':
-        $user_id = $_GET['user_id'] ?? 'retail-001';
-        $stmt = $pdo->prepare("SELECT * FROM accounts WHERE user_id = ?");
-        $stmt->execute([$user_id]);
-        $accounts = $stmt->fetchAll();
-        echo json_encode(["status" => "success", "accounts" => $accounts]);
-        break;
-
-    case 'transfer':
-        if ($method === 'POST') {
-            $data = json_decode(file_get_contents('php://input'), true);
-            $from = $data['from_account_number'];
-            $to = $data['to_account_number'];
-            $amount = floatval($data['amount']);
-            $mode = $data['transfer_type'] ?? 'IMPS';
-            
-            $pdo->beginTransaction();
-            $stmt = $pdo->prepare("SELECT balance FROM accounts WHERE account_number = ? FOR UPDATE");
-            $stmt->execute([$from]);
-            $sender = $stmt->fetch();
-            
-            if (!$sender || $sender['balance'] < $amount) {
-                $pdo->rollBack();
-                http_response_code(400);
-                echo json_encode(["status" => "error", "message" => "Insufficient funds"]);
-                exit();
-            }
-            
-            $new_balance = $sender['balance'] - $amount;
-            $pdo->prepare("UPDATE accounts SET balance = ? WHERE account_number = ?")->execute([$new_balance, $from]);
-            
-            $ref = "UTR-" . $mode . "-" . date('YmdHis') . "-" . rand(100, 999);
-            $pdo->prepare("INSERT INTO transactions (id, user_id, account_number, type, mode, amount, balance_after, counterparty_name, counterparty_acc, ref_number, description) VALUES (?, ?, ?, 'debit', ?, ?, ?, ?, ?, ?, ?)")
-                ->execute([uniqid(), 'retail-001', $from, $mode, $amount, $new_balance, $data['beneficiary_name'] ?? 'Beneficiary', $to, $ref, $data['remarks'] ?? 'Fund Transfer']);
-            
-            $pdo->commit();
-            echo json_encode(["status" => "success", "message" => "Transfer complete", "ref_number" => $ref, "new_balance" => $new_balance]);
-        }
-        break;
-
-    default:
-        echo json_encode([
-            "system" => "Indian NetBanking Hostinger Shared Hosting API",
-            "version" => "1.0",
-            "status" => "Active & cPanel Ready",
-            "documentation" => "Refer to INSTALL_HOSTINGER.md"
-        ]);
-        break;
-}
-"""
-
-HOSTINGER_HTACCESS = """# Hostinger Apache / LiteSpeed .htaccess Configuration
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/(.*)$ api.php?action=$1 [QSA,L]
-
-# Force HTTPS on Hostinger
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-# Security Headers
-Header always set X-Content-Type-Options "nosniff"
-Header always set X-Frame-Options "SAMEORIGIN"
-Header always set X-XSS-Protection "1; mode=block"
-"""
-
-HOSTINGER_DEPLOY_GUIDE = """# Complete Hostinger Shared Hosting Deployment Guide
-## Indian Core Banking System (SBI / HDFC / ICICI Architecture)
-
-### 1. Requirements on Hostinger
-- Hostinger Single / Premium / Business Web Hosting
-- PHP 8.0, 8.1, 8.2 or 8.3 (Enabled by default in Hostinger hPanel)
-- MySQL 5.7+ / MariaDB 10.3+ (Available in Hostinger Databases)
-- Free SSL Certificate (Auto-activated via Let's Encrypt in Hostinger)
-
----
-
-### 2. Step-by-Step Deployment Instructions
-
-#### Step 1: Create MySQL Database in Hostinger hPanel
-1. Log in to your **Hostinger Control Panel (hPanel)**.
-2. Navigate to **Databases** -> **Management**.
-3. Create a new MySQL Database:
-   - **Database Name:** e.g., `u123456789_banking_db`
-   - **Username:** e.g., `u123456789_bank_user`
-   - **Password:** Strong password of your choice.
-4. Click **Create**.
-
-#### Step 2: Import Database Schema
-1. In hPanel, click **Enter phpMyAdmin** next to your newly created database.
-2. Click on the **Import** tab at the top.
-3. Select the `schema.sql` file provided in this export package.
-4. Click **Go** / **Import**. All tables and initial seed data will be created!
-
-#### Step 3: Configure Database Credentials in `db.php`
-1. Open the file `db.php` in your code editor or File Manager.
-2. Replace `$dbname`, `$username`, and `$password` with your Hostinger database credentials:
-   ```php
-   $host = 'localhost';
-   $dbname = 'u123456789_banking_db';
-   $username = 'u123456789_bank_user';
-   $password = 'Your_Secret_MySQL_Password';
-   ```
-
-#### Step 4: Upload Files via Hostinger File Manager
-1. In Hostinger hPanel, go to **Files** -> **File Manager**.
-2. Navigate to `public_html`.
-3. Upload all files from the zip package (`index.html`, `db.php`, `api.php`, `.htaccess`, `schema.sql`, `assets/`).
-4. Ensure `.htaccess` is present in `public_html` to handle routing and SSL enforcement.
-
-#### Step 5: Verify Live Deployment
-1. Visit your domain `https://yourdomain.com` in any browser.
-2. Log in with the pre-seeded demo accounts:
-   - **Retail Customer:** `rahul.sharma@example.com` / `Banking@123` (Txn Pwd: `Txn@1234`)
-   - **Branch Manager:** `manager.sbi@example.com` / `Admin@123`
-"""
-
-def _render_hostinger_sql() -> str:
-    """Inject fresh bcrypt hashes so the exported SQL seed is genuinely usable
-    with password_verify() on Hostinger PHP. PHP's password_verify accepts both
-    $2y$ and $2b$ prefixes, so bcrypt hashes generated here work as-is."""
-    return (
-        HOSTINGER_SQL_SCHEMA
-        .replace("{{ADMIN_PWD_HASH}}", hash_password("Admin@123"))
-        .replace("{{ADMIN_TXN_HASH}}", hash_password("Txn@1234"))
-        .replace("{{RETAIL_PWD_HASH}}", hash_password("Banking@123"))
-        .replace("{{RETAIL_TXN_HASH}}", hash_password("Txn@1234"))
-        .replace("{{CORP_PWD_HASH}}", hash_password("Corporate@123"))
-        .replace("{{CORP_TXN_HASH}}", hash_password("Corp@1234"))
-    )
 
 @api_router.get("/hostinger/package")
 async def get_hostinger_package():
-    return {
-        "db_php": HOSTINGER_PHP_DB,
-        "api_php": HOSTINGER_PHP_API,
-        "schema_sql": _render_hostinger_sql(),
-        "htaccess": HOSTINGER_HTACCESS,
-        "deploy_guide": HOSTINGER_DEPLOY_GUIDE
-    }
+    return {key: (HOSTINGER_DIR / name).read_text() for key, name in HOSTINGER_FILES.items()}
 
 @api_router.get("/hostinger/download-zip")
 async def download_hostinger_zip():
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.writestr("db.php", HOSTINGER_PHP_DB)
-        zip_file.writestr("api.php", HOSTINGER_PHP_API)
-        zip_file.writestr("schema.sql", _render_hostinger_sql())
-        zip_file.writestr(".htaccess", HOSTINGER_HTACCESS)
-        zip_file.writestr("INSTALL_HOSTINGER.md", HOSTINGER_DEPLOY_GUIDE)
-    
+        for name in HOSTINGER_FILES.values():
+            zip_file.write(HOSTINGER_DIR / name, name)
     zip_buffer.seek(0)
     return StreamingResponse(
         zip_buffer,
@@ -1789,20 +1508,20 @@ def _send_otp_via_twilio(phone: str, otp: str) -> str:
         return "twilio_not_configured"
     try:
         c = TwilioClient(sid, tok)
-        c.messages.create(to=phone, from_=frm, body=f"National Bharat Bank OTP: {otp}. Valid 5 min. Never share.")
+        c.messages.create(to=phone, from_=frm, body=f"AJSPay OTP: {otp}. Valid 5 min. Never share.")
         return "sent"
     except Exception as e:
         return f"twilio_error: {str(e)[:80]}"
 
 def _send_otp_via_sendgrid(email: str, otp: str, purpose: str) -> str:
     key = os.environ.get("SENDGRID_API_KEY", "")
-    frm = os.environ.get("SENDGRID_FROM_EMAIL", "alerts@nbbank.in")
+    frm = os.environ.get("SENDGRID_FROM_EMAIL", "alerts@ajspay.in")
     if not (key and SendGridAPIClient and SGMail):
         return "sendgrid_not_configured"
     try:
         msg = SGMail(
             from_email=frm, to_emails=email,
-            subject=f"NBBank OTP — {purpose}",
+            subject=f"AJSPay OTP — {purpose}",
             html_content=f"<p>Your OTP is <b style='font-size:22px'>{otp}</b>. Valid for 5 minutes.</p><p>Never share this with anyone.</p>"
         )
         SendGridAPIClient(key).send(msg)
@@ -1843,7 +1562,7 @@ async def otp_send(req: OtpSendRequest, current_user: dict = Depends(get_current
             try:
                 TwilioClient(cfg["twilio_sid"], cfg["twilio_token"]).messages.create(
                     to=current_user.get("phone", ""), from_=cfg["twilio_from"],
-                    body=f"NBB OTP: {otp}. Valid 5 min. Never share.")
+                    body=f"AJSPay OTP: {otp}. Valid 5 min. Never share.")
                 delivery["sms"] = "sent"
             except Exception as e:
                 delivery["sms"] = f"twilio_error: {str(e)[:60]}"
@@ -1851,7 +1570,7 @@ async def otp_send(req: OtpSendRequest, current_user: dict = Depends(get_current
             try:
                 SendGridAPIClient(cfg["sendgrid_key"]).send(SGMail(
                     from_email=cfg["sendgrid_from"], to_emails=current_user["email"],
-                    subject=f"NBBank OTP — {req.purpose}",
+                    subject=f"AJSPay OTP — {req.purpose}",
                     html_content=f"<p>Your OTP is <b style='font-size:22px'>{otp}</b>. Valid 5 min.</p>"))
                 delivery["email"] = "sent"
             except Exception as e:
@@ -1887,7 +1606,7 @@ async def otp_verify(req: OtpVerifyRequest, current_user: dict = Depends(get_cur
 # WebAuthn / Passkeys — register + login
 # ============================================================================
 WEBAUTHN_RP_ID = os.environ.get("WEBAUTHN_RP_ID", "localhost")
-WEBAUTHN_RP_NAME = os.environ.get("WEBAUTHN_RP_NAME", "National Bharat Bank")
+WEBAUTHN_RP_NAME = os.environ.get("WEBAUTHN_RP_NAME", "AJSPay")
 WEBAUTHN_ORIGIN = os.environ.get("WEBAUTHN_ORIGIN", "http://localhost:3000")
 
 @api_router.post("/passkey/register/challenge")
@@ -2014,7 +1733,7 @@ async def passkey_login_complete(req: PasskeyLoginCompleteRequest, response: Res
     await db.passkey_challenges.delete_one({"user_id": user["id"], "type": "login"})
 
     token = create_access_token(user["id"], user["email"], user.get("role", "retail"))
-    response.set_cookie(key="access_token", value=token, httponly=True, secure=True, samesite="none", max_age=28800, path="/")
+    set_session_cookie(response, token)
     user_clean = {k: v for k, v in user.items() if k not in ["_id", "password_hash", "transaction_password_hash"]}
     await db.audit_logs.insert_one({
         "id": str(uuid.uuid4()), "user_id": user["id"], "email": user["email"],
@@ -2161,7 +1880,7 @@ async def statement_pdf(account_number: str = Query(...),
     hdr = ParagraphStyle('hdr', parent=styles['Title'], fontSize=16, textColor=colors.HexColor('#0b3b8c'), spaceAfter=4)
     small = ParagraphStyle('small', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#334155'))
     story = []
-    story.append(Paragraph("National Bharat Bank", hdr))
+    story.append(Paragraph("AJSPay", hdr))
     story.append(Paragraph("RBI-regulated · Head Office: Nariman Point, Mumbai · IFSC prefix per branch", small))
     story.append(Spacer(1, 8))
     story.append(Paragraph(f"<b>Account Statement</b> — {account_number}", styles['Heading3']))
@@ -2219,7 +1938,7 @@ async def statement_excel(account_number: str = Query(...),
     ws = wb.active
     ws.title = "Statement"
     # Header block
-    ws["A1"] = "National Bharat Bank — RBI Regulated"
+    ws["A1"] = "AJSPay — RBI Regulated"
     ws["A1"].font = Font(bold=True, size=14, color="0B3B8C")
     ws["A2"] = f"Account Statement — {account_number}"
     ws["A2"].font = Font(bold=True, size=12)
@@ -2275,14 +1994,14 @@ async def _ensure_ref_code(user_id: str, name: str) -> str:
         if not await db.users.find_one({"referral_code": code}):
             await db.users.update_one({"id": user_id}, {"$set": {"referral_code": code}})
             return code
-    code = f"NBB{uuid.uuid4().hex[:6].upper()}"
+    code = f"AJS{uuid.uuid4().hex[:6].upper()}"
     await db.users.update_one({"id": user_id}, {"$set": {"referral_code": code}})
     return code
 
 @api_router.get("/referrals/my-code")
 async def referrals_my_code(current_user: dict = Depends(get_current_user)):
     code = await _ensure_ref_code(current_user["id"], current_user.get("name", "USR"))
-    base = os.environ.get("PUBLIC_APP_URL", "https://banking-suite-pro-1.preview.emergentagent.com")
+    base = os.environ.get("PUBLIC_APP_URL", "http://localhost:3000")
     return {
         "referral_code": code,
         "referral_link": f"{base}/?ref={code}",
@@ -2303,7 +2022,7 @@ class StandingInstructionCreate(BaseModel):
     from_account_number: str
     beneficiary_name: str
     beneficiary_account: str
-    beneficiary_ifsc: str = "SBIN000042"
+    beneficiary_ifsc: str = "AJSP0000042"
     amount: float
     frequency: str = "monthly"   # daily | weekly | monthly | quarterly
     category: str = "generic"    # rent | sip | emi | insurance | generic
@@ -2433,7 +2152,7 @@ async def admin_config_get(current_user: dict = Depends(get_current_user)):
         "twilio_account_sid_masked": _mask(cfg.get("twilio_account_sid", os.environ.get("TWILIO_ACCOUNT_SID", ""))),
         "twilio_from_number": cfg.get("twilio_from_number", os.environ.get("TWILIO_FROM_NUMBER", "")),
         "sendgrid_api_key_masked": _mask(cfg.get("sendgrid_api_key", os.environ.get("SENDGRID_API_KEY", ""))),
-        "sendgrid_from_email": cfg.get("sendgrid_from_email", os.environ.get("SENDGRID_FROM_EMAIL", "alerts@nbbank.in")),
+        "sendgrid_from_email": cfg.get("sendgrid_from_email", os.environ.get("SENDGRID_FROM_EMAIL", "alerts@ajspay.in")),
         "referral_reward_amount": cfg.get("referral_reward_amount", REFERRAL_REWARD_AMOUNT),
         "face_match_auto_threshold": cfg.get("face_match_auto_threshold", 92.0),
         "twilio_configured": bool(cfg.get("twilio_account_sid") or os.environ.get("TWILIO_ACCOUNT_SID")),
@@ -2460,7 +2179,7 @@ async def _resolve_delivery_config():
         "twilio_token": cfg.get("twilio_auth_token") or os.environ.get("TWILIO_AUTH_TOKEN", ""),
         "twilio_from": cfg.get("twilio_from_number") or os.environ.get("TWILIO_FROM_NUMBER", ""),
         "sendgrid_key": cfg.get("sendgrid_api_key") or os.environ.get("SENDGRID_API_KEY", ""),
-        "sendgrid_from": cfg.get("sendgrid_from_email") or os.environ.get("SENDGRID_FROM_EMAIL", "alerts@nbbank.in")
+        "sendgrid_from": cfg.get("sendgrid_from_email") or os.environ.get("SENDGRID_FROM_EMAIL", "alerts@ajspay.in")
     }
 
 app.include_router(api_router)
@@ -2469,10 +2188,7 @@ app.include_router(api_router)
 cors_env = os.environ.get('CORS_ORIGINS', '')
 origins_list = [o.strip() for o in cors_env.split(',') if o.strip() and o.strip() != '*']
 if not origins_list:
-    origins_list = [
-        "http://localhost:3000",
-        "https://banking-suite-pro-1.preview.emergentagent.com"
-    ]
+    origins_list = ["http://localhost:3000"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -2481,3 +2197,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(self)"
+    resp.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'"
+    resp.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    return resp

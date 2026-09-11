@@ -50,7 +50,7 @@ export default function Dashboard({ onNavigate }) {
     try {
       const res = await api.transferFunds({
         from_account_number: selectedAcc.account_number,
-        to_account_number: "SBI00" + Math.floor(100000000 + Math.random() * 900000000),
+        to_account_number: "AJSP0" + Math.floor(100000000 + Math.random() * 900000000),
         beneficiary_name: quickBeneficiary,
         transfer_type: "IMPS",
         amount: parseFloat(quickAmount),

@@ -112,13 +112,13 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-md bg-white/10 flex items-center justify-center"><Building2 className="w-6 h-6 text-white" /></div>
           <div>
-            <div className="text-xl font-bold">National <span className="text-red-300">Bharat</span> Bank</div>
+            <div className="text-xl font-bold">AJSPay</div>
             <div className="text-[11px] text-white/70">RBI regulated · DICGC insured ₹5 lakh</div>
           </div>
         </div>
         <div className="space-y-4">
           <h2 className="text-2xl lg:text-3xl font-bold leading-tight">
-            Secure banking, <br/>reimagined for every Bharatiya.
+            Secure banking, <br/>reimagined for every Indian.
           </h2>
           <p className="text-sm text-white/80">
             Open a savings account in minutes, transfer via NEFT/RTGS/IMPS/UPI, manage cards, book FDs, apply for loans — all in one place.
@@ -129,7 +129,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
             <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-300" /> Video KYC — no branch visit</li>
           </ul>
         </div>
-        <div className="text-[11px] text-white/60">© 2026 NBBank Ltd. · Toll-free 1800-123-4567</div>
+        <div className="text-[11px] text-white/60">© 2026 AJSPay Ltd. · Toll-free 1800-123-4567</div>
       </div>
 
       {/* Right panel — form */}

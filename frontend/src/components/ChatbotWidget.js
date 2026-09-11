@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
-import { Bot, X, Send, Sparkles, HelpCircle, MessageSquare } from 'lucide-react';
+import { Bot, X, Send, Sparkles } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { sender: 'bot', text: 'Namaste! I am your 24x7 Bharat AI Banking Assistant. Ask me about IFSC codes, FD rates, IMPS/NEFT limits, or loan eligibility!' }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
   const quickPrompts = [
     "What are current FD interest rates?",
-    "What is the SBI Nariman Point IFSC?",
+    "What is the AJSPay Nariman Point IFSC?",
     "What are the IMPS & UPI transfer limits?",
     "How to hotlist or block my debit card?"
   ];
@@ -61,16 +59,17 @@ export default function ChatbotWidget() {
               </div>
               <div>
                 <h3 className="text-xs font-bold flex items-center gap-1.5">
-                  Bharat NetBanking Assistant <Sparkles className="w-3 h-3 text-amber-300" />
+                  AJSPay Assistant <Sparkles className="w-3 h-3 text-amber-300" />
                 </h3>
                 <p className="text-[10px] text-cyan-300 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online (SBI YONO / HDFC / ICICI AI)
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online
                 </p>
               </div>
             </div>
             <button
               data-testid="chatbot-close-btn"
-              onClick={() => setIsOpen(false)}
+              aria-label="Close chat"
+              onClick={() => { setIsOpen(false); setMessages([]); }}
               className="p-1 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white"
             >
               <X className="w-4 h-4" />

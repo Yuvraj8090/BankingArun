@@ -193,7 +193,7 @@ export default function CardsChequesPage() {
                       <div className="flex items-center gap-2">
                         <Building2 className="w-4 h-4 text-white/70" />
                         <span className="text-[10px] font-bold uppercase tracking-widest text-white/90">
-                          National Bharat Bank
+                          AJSPay
                         </span>
                       </div>
                       <p className="text-[10px] text-white/70 mt-0.5">A/C {card.account_number}</p>

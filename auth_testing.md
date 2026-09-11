@@ -3,7 +3,7 @@
 ## Credentials
 - Retail: `rahul.sharma@example.com` / `Banking@123` (Txn Pwd: `Txn@1234`)
 - Corporate: `tata.corp@example.com` / `Corporate@123` (Txn Pwd: `Corp@1234`)
-- Admin / Branch Manager: `manager.sbi@example.com` / `Admin@123`
+- Admin / Branch Manager: `manager@ajspay.in` / `Admin@123`
 
 ## Quick Curl Verification:
 ```bash

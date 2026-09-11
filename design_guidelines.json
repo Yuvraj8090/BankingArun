@@ -14,38 +14,16 @@
   },
   "colors": {
     "themes": {
-      "sbi_yono": {
-        "name": "SBI YONO Navy & Sky",
+      "ajspay": {
+        "name": "AJSPay Blue & Red",
         "primary": "#0F294A",
         "primary_foreground": "#FFFFFF",
-        "accent": "#00A3E0",
+        "accent": "#C8102E",
         "accent_foreground": "#FFFFFF",
         "background": "#F4F7FA",
         "card": "#FFFFFF",
         "border": "#D2E0EE",
         "muted": "#5A738E"
-      },
-      "hdfc_bank": {
-        "name": "HDFC Corporate Blue & Red",
-        "primary": "#002A5C",
-        "primary_foreground": "#FFFFFF",
-        "accent": "#ED1C24",
-        "accent_foreground": "#FFFFFF",
-        "background": "#F7F8FA",
-        "card": "#FFFFFF",
-        "border": "#D8E2ED",
-        "muted": "#4A5D78"
-      },
-      "icici_bank": {
-        "name": "ICICI Wealth Orange & Maroon",
-        "primary": "#8A1C14",
-        "primary_foreground": "#FFFFFF",
-        "accent": "#F37021",
-        "accent_foreground": "#FFFFFF",
-        "background": "#FAF7F5",
-        "card": "#FFFFFF",
-        "border": "#EAD7CE",
-        "muted": "#75463E"
       }
     },
     "neutrals": {
@@ -87,7 +65,7 @@
   "universal_guidelines_for_main_agent": [
     "NEVER use transparent backgrounds on headers without backdrop blur.",
     "Always include data-testid on buttons, inputs, tabs, and modals.",
-    "Implement theme switchers dynamically updating CSS variables for SBI, HDFC, and ICICI.",
+    "Keep AJSPay branding consistent across all customer and staff surfaces.",
     "Ensure all API requests have robust error handling and loading skeletons."
   ]
 }

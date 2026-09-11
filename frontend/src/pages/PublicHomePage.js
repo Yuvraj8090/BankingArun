@@ -64,7 +64,7 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
         </div>
       </div>
 
-      {/* Hero — clean white, ICICI style */}
+      {/* Hero */}
       <section className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
 
@@ -76,7 +76,7 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 leading-tight tracking-tight">
               Banking made <span className="text-[#0b3b8c]">simple</span>,
-              <br className="hidden sm:inline" /> secure & <span className="text-[#c8102e]">Bharat-ready</span>.
+              <br className="hidden sm:inline" /> secure & <span className="text-[#c8102e]">India-ready</span>.
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 max-w-2xl leading-relaxed">
@@ -107,7 +107,7 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
             </div>
           </div>
 
-          {/* Right card — quick services (ICICI-style card) */}
+          {/* Right card — quick services */}
           <div className="lg:col-span-5">
             <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
@@ -187,7 +187,7 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" /> No paperwork · Instant results
               </div>
               <div className="flex items-center gap-2 text-slate-700">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Same formulas used by SBI, ICICI, HDFC
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Transparent AJSPay repayment formulas
               </div>
               <div className="flex items-center gap-2 text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Apply online after previewing your EMI

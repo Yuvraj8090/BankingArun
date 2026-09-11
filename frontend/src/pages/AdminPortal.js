@@ -76,7 +76,7 @@ export default function AdminPortal() {
                   Branch Manager &amp; RBI Compliance Portal
                 </h1>
                 <p className="text-[11px] text-slate-500">
-                  Nariman Point Main Branch (SBI-MUM-042) · RBI Master Direction KYC · PMLA Section 12
+                  Nariman Point Main Branch (AJSP-MUM-042) · RBI Master Direction KYC · PMLA Section 12
                 </p>
               </div>
             </div>

@@ -1,0 +1,39 @@
+# AJSPay on Hostinger (Apache / LiteSpeed)
+
+Options -Indexes
+ServerSignature Off
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Hand the Authorization header to PHP (CGI/FastCGI setups strip it otherwise)
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# /api/* -> api.php, which routes on the original request path
+RewriteRule ^api/ api.php [L,QSA]
+
+# React single-page app: serve real files, send every other path to index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Only api.php and the built frontend are reachable over HTTP
+<FilesMatch "^\.|\.(sql|md|log|env|ini|bak)$|^(db|config\.local)\.php$">
+    Require all denied
+</FilesMatch>
+
+# Cap request bodies at 8 MB to blunt oversized-upload abuse
+LimitRequestBody 8388608
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(self)"
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+    # Needs the frontend built with INLINE_RUNTIME_CHUNK=false (see INSTALL_HOSTINGER.md)
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://api.qrserver.com; connect-src 'self'; media-src 'self' blob:; frame-src https://maps.google.com https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Header unset X-Powered-By
+</IfModule>

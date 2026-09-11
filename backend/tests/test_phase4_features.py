@@ -10,7 +10,7 @@ import requests
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 
 RETAIL = {"email": "rahul.sharma@example.com", "password": "Banking@123"}
-ADMIN = {"email": "manager.sbi@example.com", "password": "Admin@123"}
+ADMIN = {"email": "manager@ajspay.in", "password": "Admin@123"}
 
 
 def _login(creds):
@@ -20,14 +20,14 @@ def _login(creds):
     return s
 
 
-def _make_png_data_uri(size_bytes: int = 2000) -> str:
+def _make_png_data_uri(size_bytes: int = 2000, rgb: bytes = b"\xff\x00\x00") -> str:
     """Generate a valid tiny PNG then pad to ensure >1KB decoded base64."""
     # Minimal 1x1 PNG
     sig = b"\x89PNG\r\n\x1a\n"
     ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
     ihdr = b"IHDR" + ihdr_data
     ihdr_chunk = struct.pack(">I", len(ihdr_data)) + ihdr + struct.pack(">I", zlib.crc32(ihdr))
-    raw = b"\x00\xff\x00\x00"
+    raw = b"\x00" + rgb
     idat_data = zlib.compress(raw)
     idat = b"IDAT" + idat_data
     idat_chunk = struct.pack(">I", len(idat_data)) + idat + struct.pack(">I", zlib.crc32(idat))
@@ -55,12 +55,14 @@ class TestOtp:
 
     def test_verify_success_then_no_active(self):
         s = _login(RETAIL)
-        send = s.post(f"{BASE_URL}/api/otp/send", json={"channel": "email", "purpose": "login"}, timeout=20).json()
+        # Uses "pin_reset" rather than "login": tests on the other xdist worker also
+        # send login OTPs for this same user, which would clobber the record mid-test.
+        send = s.post(f"{BASE_URL}/api/otp/send", json={"channel": "email", "purpose": "pin_reset"}, timeout=20).json()
         otp = send["demo_otp"]
-        ok = s.post(f"{BASE_URL}/api/otp/verify", json={"purpose": "login", "otp": otp}, timeout=20)
+        ok = s.post(f"{BASE_URL}/api/otp/verify", json={"purpose": "pin_reset", "otp": otp}, timeout=20)
         assert ok.status_code == 200 and ok.json()["status"] == "SUCCESS"
         # second verify -> No active OTP
-        again = s.post(f"{BASE_URL}/api/otp/verify", json={"purpose": "login", "otp": otp}, timeout=20)
+        again = s.post(f"{BASE_URL}/api/otp/verify", json={"purpose": "pin_reset", "otp": otp}, timeout=20)
         assert again.status_code == 400
         assert "No active OTP" in again.json()["detail"]
 
@@ -84,7 +86,7 @@ class TestPasskeys:
         assert r.status_code == 200
         d = r.json()
         assert "passkeys" in d
-        assert d["rp_id"] == "banking-suite-pro-1.preview.emergentagent.com"
+        assert d["rp_id"] == "localhost"
         assert d["rp_name"]
 
     def test_register_challenge_returns_options(self):
@@ -94,7 +96,7 @@ class TestPasskeys:
         d = r.json()
         assert "challenge" in d and isinstance(d["challenge"], str) and len(d["challenge"]) > 8
         assert "user" in d and "id" in d["user"]
-        assert d.get("rp", {}).get("id") == "banking-suite-pro-1.preview.emergentagent.com"
+        assert d.get("rp", {}).get("id") == "localhost"
 
     def test_delete_nonexistent_returns_404(self):
         s = _login(RETAIL)
@@ -124,9 +126,12 @@ class TestVideoKyc:
 
     def test_submit_valid_frames(self):
         s = _login(RETAIL)
-        img = _make_png_data_uri(2000)
+        # Selfie and PAN must differ: identical frames score ~100 on face-match and
+        # get auto-approved, which is the separate phase-5 path tested elsewhere.
+        selfie = _make_png_data_uri(2000, rgb=b"\xff\x00\x00")
+        pan = _make_png_data_uri(2000, rgb=b"\x00\x00\xff")
         r = s.post(f"{BASE_URL}/api/kyc/video/submit",
-                   json={"selfie_b64": img, "pan_b64": img, "aadhaar_b64": img,
+                   json={"selfie_b64": selfie, "pan_b64": pan, "aadhaar_b64": pan,
                          "liveness_words": "banking now", "device_info": "test-suite"}, timeout=30)
         assert r.status_code == 200, r.text
         d = r.json()
@@ -166,7 +171,7 @@ class TestStatements:
     def test_pdf_ok_for_own_account(self):
         s = _login(RETAIL)
         r = s.get(f"{BASE_URL}/api/statements/pdf",
-                  params={"account_number": "SBI00984521098"}, timeout=30)
+                  params={"account_number": "AJSP00984521098"}, timeout=30)
         assert r.status_code == 200, r.text
         assert r.headers.get("content-type", "").startswith("application/pdf")
         assert "attachment" in r.headers.get("content-disposition", "").lower()
@@ -175,7 +180,7 @@ class TestStatements:
     def test_excel_ok_for_own_account(self):
         s = _login(RETAIL)
         r = s.get(f"{BASE_URL}/api/statements/excel",
-                  params={"account_number": "SBI00984521098"}, timeout=30)
+                  params={"account_number": "AJSP00984521098"}, timeout=30)
         assert r.status_code == 200
         ct = r.headers.get("content-type", "")
         assert "spreadsheetml" in ct or "officedocument" in ct
@@ -184,8 +189,8 @@ class TestStatements:
     def test_wrong_account_404(self):
         s = _login(RETAIL)
         r = s.get(f"{BASE_URL}/api/statements/pdf",
-                  params={"account_number": "HDFC00129845612"}, timeout=20)
+                  params={"account_number": "AJSP00129845612"}, timeout=20)
         assert r.status_code == 404
         r2 = s.get(f"{BASE_URL}/api/statements/excel",
-                   params={"account_number": "HDFC00129845612"}, timeout=20)
+                   params={"account_number": "AJSP00129845612"}, timeout=20)
         assert r2.status_code == 404

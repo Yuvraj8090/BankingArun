@@ -7,11 +7,11 @@ BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 CREDS = {
     "retail": {"email": "rahul.sharma@example.com", "password": "Banking@123"},
     "corporate": {"email": "tata.corp@example.com", "password": "Corporate@123"},
-    "admin": {"email": "manager.sbi@example.com", "password": "Admin@123"},
-    "bank_owner": {"email": "owner@nbbank.in", "password": "Owner@123"},
-    "staff": {"email": "meera.staff@nbbank.in", "password": "Staff@123"},
-    "collection_agent": {"email": "collections@nbbank.in", "password": "Collect@123"},
-    "loan_officer": {"email": "loans@nbbank.in", "password": "Loan@123"},
+    "admin": {"email": "manager@ajspay.in", "password": "Admin@123"},
+    "bank_owner": {"email": "owner@ajspay.in", "password": "Owner@123"},
+    "staff": {"email": "meera.staff@ajspay.in", "password": "Staff@123"},
+    "collection_agent": {"email": "collections@ajspay.in", "password": "Collect@123"},
+    "loan_officer": {"email": "loans@ajspay.in", "password": "Loan@123"},
 }
 
 
@@ -47,7 +47,7 @@ def test_retail_has_exactly_three_seeded_cards():
     assert visa["status"] == "active"
     assert visa["expiry_date"] == "08/29"
     assert visa["card_holder"] == "RAHUL SHARMA"
-    assert "Bank" in visa["issued_by"] and "Only" in visa["issued_by"]
+    assert "AJSPay" in visa["issued_by"] and "Only" in visa["issued_by"]
 
     rupay = by_id["card-rupay-001"]
     assert rupay["card_number"] == "5241 7373 2160 2721"
@@ -70,7 +70,7 @@ def test_upi_status_headline_and_primary_id():
     data = r.json()
     assert "UPI on Debit Card" in data["status_headline"]
     assert "NPCI" in data["status_headline"]
-    assert data["primary_upi_id"] == "rahulsharma@sbi"
+    assert data["primary_upi_id"] == "rahulsharma@ajspay"
     assert len(data["linkable_cards"]) >= 3
 
 
@@ -88,8 +88,8 @@ def test_upi_link_card_and_qr():
     qr = s.get(f"{BASE_URL}/api/upi/qr", timeout=20)
     assert qr.status_code == 200
     body = qr.json()
-    assert body["upi_id"] == "rahulsharma@sbi"
-    assert "pa=rahulsharma@sbi" in body["upi_uri"]
+    assert body["upi_id"] == "rahulsharma@ajspay"
+    assert "pa=rahulsharma@ajspay" in body["upi_uri"]
 
 
 # ---------- ROLE PANELS + RBAC ----------

@@ -3,7 +3,7 @@ import { Camera, ShieldCheck, Video, CheckCircle2, RefreshCw, Upload, RotateCcw,
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
-const LIVENESS_WORDS = ['MUMBAI', 'BHARAT', 'DELHI', 'JAIPUR', 'KOLKATA'];
+const LIVENESS_WORDS = ['MUMBAI', 'INDIA', 'DELHI', 'JAIPUR', 'KOLKATA'];
 
 const STEPS = [
   { key: 'selfie', label: 'Selfie', icon: User, prompt: 'Look at the camera and stay steady' },

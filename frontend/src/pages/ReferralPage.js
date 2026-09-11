@@ -23,11 +23,11 @@ export default function ReferralPage() {
 
   const shareTo = (channel) => {
     if (!data) return;
-    const msg = encodeURIComponent(`Open a free savings account with National Bharat Bank and we both get ₹${data.reward_amount}! ${data.referral_link}`);
+    const msg = encodeURIComponent(`Open a free savings account with AJSPay and we both get ₹${data.reward_amount}! ${data.referral_link}`);
     const urls = {
       whatsapp: `https://wa.me/?text=${msg}`,
       twitter: `https://twitter.com/intent/tweet?text=${msg}`,
-      email: `mailto:?subject=${encodeURIComponent('Join me on NBBank')}&body=${msg}`
+      email: `mailto:?subject=${encodeURIComponent('Join me on AJSPay')}&body=${msg}`
     };
     window.open(urls[channel], '_blank', 'noopener,noreferrer');
   };
@@ -100,7 +100,7 @@ export default function ReferralPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           {[
             { i: Share2, t: 'Share your link', d: 'Send your unique link over WhatsApp, email or social media.' },
-            { i: Users, t: 'Friend joins & completes KYC', d: 'They open a new NBBank account using your code.' },
+            { i: Users, t: 'Friend joins & completes KYC', d: 'They open a new AJSPay account using your code.' },
             { i: Wallet, t: 'Both get ₹500', d: `You and your friend each receive ₹${data.reward_amount} instantly.` }
           ].map((s, i) => (
             <div key={i} className="p-4 rounded-md border border-slate-200 bg-slate-50">

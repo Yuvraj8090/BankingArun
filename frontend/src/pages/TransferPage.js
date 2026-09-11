@@ -17,7 +17,7 @@ export default function TransferPage() {
   const [fromAcc, setFromAcc] = useState('');
   const [toAcc, setToAcc] = useState('');
   const [beneficiaryName, setBeneficiaryName] = useState('');
-  const [ifsc, setIfsc] = useState('SBIN000042');
+  const [ifsc, setIfsc] = useState('AJSP0000042');
   const [transferType, setTransferType] = useState('IMPS');
   const [amount, setAmount] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -30,7 +30,7 @@ export default function TransferPage() {
 
   // Bulk Upload State
   const [bulkText, setBulkText] = useState(
-    "Rajesh Kumar,SBI00918273645,SBIN000042,12500,June Vendor Payout\nAnkita Sen,HDFC00998811223,HDFC000001,8400,Design Freelance Stipend\nVikram Mehta,ICIC00112233445,ICIC000007,15000,Cloud Hosting Invoice"
+    "Rajesh Kumar,AJSP00918273645,AJSP0000042,12500,June Vendor Payout\nAnkita Sen,AJSP00998811223,AJSP0000001,8400,Design Freelance Stipend\nVikram Mehta,AJSP00112233445,AJSP0000007,15000,Cloud Hosting Invoice"
   );
 
   const [transactions, setTransactions] = useState([]);
@@ -107,7 +107,7 @@ export default function TransferPage() {
         transfers.push({
           beneficiary_name: parts[0],
           account_number: parts[1],
-          ifsc: parts[2] || 'SBIN000042',
+          ifsc: parts[2] || 'AJSP0000042',
           amount: parseFloat(parts[3]),
           remarks: parts[4] || 'Corporate Payout'
         });
@@ -236,7 +236,7 @@ export default function TransferPage() {
                     required
                     value={toAcc}
                     onChange={(e) => setToAcc(e.target.value)}
-                    placeholder="e.g. SBI00129845612"
+                    placeholder="e.g. AJSP00129845612"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono"
                   />
                 </div>
@@ -264,7 +264,7 @@ export default function TransferPage() {
                     required
                     value={ifsc}
                     onChange={(e) => setIfsc(e.target.value)}
-                    placeholder="SBIN000042"
+                    placeholder="AJSP0000042"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono uppercase"
                   />
                 </div>
@@ -359,7 +359,7 @@ export default function TransferPage() {
                   required
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="e.g. merchant@icici, friend@okhdfcbank"
+                  placeholder="e.g. merchant@ajspay, friend@ajspay"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono"
                 />
               </div>
@@ -423,7 +423,7 @@ export default function TransferPage() {
             <form onSubmit={handleBulkTransfer} className="space-y-4 text-xs">
               <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center justify-between">
                 <span>Corporate Multi-Beneficiary Bulk Batch Upload</span>
-                <span className="text-amber-400 font-mono">HDFC / SBI Corporate CMS</span>
+                <span className="text-amber-400 font-mono">AJSPay Corporate CMS</span>
               </h2>
 
               <p className="text-slate-400 text-[11px]">

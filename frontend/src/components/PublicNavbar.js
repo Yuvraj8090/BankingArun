@@ -49,7 +49,7 @@ export default function PublicNavbar({ onOpenAuth, onNavigatePublic, activePubli
   return (
     <header className="bg-white shadow-sm sticky top-0 z-40 border-b border-slate-200">
 
-      {/* Top utility strip — like ICICI */}
+      {/* Top utility strip */}
       <div className="bg-slate-900 text-slate-200 text-[11px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -83,15 +83,15 @@ export default function PublicNavbar({ onOpenAuth, onNavigatePublic, activePubli
             </div>
             <div className="leading-tight">
               <div className="font-bold text-lg text-slate-900 tracking-tight">
-                National <span className="text-[#c8102e]">Bharat</span> Bank
+                AJSPay
               </div>
               <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" /> Multi-bank suite (SBI · ICICI · HDFC style)
+                <ShieldCheck className="w-3 h-3 text-emerald-600" /> Secure digital banking
               </div>
             </div>
           </div>
 
-          {/* Search bar — like ICICI */}
+          {/* Search bar */}
           <div className="hidden lg:flex flex-1 max-w-md mx-8">
             <div className="w-full flex items-center border border-slate-300 rounded-md px-3 h-9 focus-within:border-blue-800">
               <Search className="w-4 h-4 text-slate-400" />
@@ -129,7 +129,7 @@ export default function PublicNavbar({ onOpenAuth, onNavigatePublic, activePubli
           </div>
         </div>
 
-        {/* Bottom nav — sticky category menu like ICICI */}
+        {/* Bottom nav — sticky category menu */}
         <nav className="hidden md:flex items-center gap-1 h-11 border-t border-slate-100">
           {primaryNavBtn('public-nav-home', 'Home', 'home')}
           {navGroups.map(g => (

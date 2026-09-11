@@ -1,13 +1,13 @@
-# PRD — Indian NetBanking Web App (SBI / ICICI / HDFC Standard)
+# PRD — AJSPay Digital Banking Web App
 
 ## Original Problem Statement
-Build a comprehensive banking web app with frontend + backend deployable on Hostinger shared hosting. Must replicate SBI YONO, ICICI iMobile & HDFC NetBanking flows: account opening + KYC, multi-role auth (login + txn pwd), NEFT/RTGS/IMPS/UPI transfers, cards, cheques, FD/RD, loans, investments, admin/RBI compliance, plus generation of a PHP + MySQL cPanel bundle.
+Build a comprehensive AJSPay banking app with frontend + backend deployable on Hostinger shared hosting: account opening + KYC, multi-role auth (login + txn pwd), NEFT/RTGS/IMPS/UPI transfers, cards, cheques, FD/RD, loans, investments, admin/RBI compliance, plus generation of a PHP + MySQL cPanel bundle.
 
 Additionally per latest scope:
 - Exactly 3 debit cards for retail user rahul.sharma (Visa Platinum + 2 RuPay/Mastercard dispatch-queued)
 - UPI-on-Debit-Card module ("Launching Tomorrow" / pending NPCI approval)
 - Multi-role RBAC panels: Bank Owner, Branch Manager, Staff, Customer, Collection, Loan Dept
-- Clean white ICICI/SBI theme — deep blue #0b3b8c + crimson #c8102e, NO orange
+- Clean white AJSPay theme — deep blue #0b3b8c + crimson #c8102e, NO orange
 - Icon-heavy navigation, corporate/sober look
 
 ## Architecture
@@ -16,8 +16,8 @@ Additionally per latest scope:
 - Hostinger export: /api/hostinger/download-zip renders db.php + api.php + schema.sql (with real bcrypt hashes) + .htaccess + install guide
 
 ## Personas / Seeded Accounts (see /app/memory/test_credentials.md)
-- retail (rahul.sharma), corporate (tata.corp), admin (manager.sbi)
-- bank_owner (owner@nbbank.in), staff (meera.staff), collection_agent (collections), loan_officer (loans)
+- retail (rahul.sharma), corporate (tata.corp), admin (manager@ajspay.in)
+- bank_owner (owner@ajspay.in), staff (meera.staff), collection_agent (collections), loan_officer (loans)
 
 ## Implemented (Feb 2026)
 - Full auth (register/login/me/logout/tx-pin) + brute-force lockout (5 fails / 15 min) using XFF

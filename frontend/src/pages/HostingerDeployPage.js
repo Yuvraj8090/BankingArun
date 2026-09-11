@@ -37,20 +37,23 @@ export default function HostingerDeployPage() {
     toast.success("Copied to clipboard!");
   };
 
-  const comparisonData = [
-    { module: "Instant Fund Transfers (IMPS, NEFT, RTGS)", sbi: "✅", icici: "✅", hdfc: "✅", thisApp: "✅ Fully Integrated" },
-    { module: "UPI VPA & QR Payment Simulation", sbi: "✅", icici: "✅", hdfc: "✅", thisApp: "✅ NPCI Standard" },
-    { module: "Corporate Bulk CMS Batch Transfers", sbi: "❌ (Corp Only)", icici: "❌ (Corp Only)", hdfc: "✅", thisApp: "✅ Built-in CSV Parser" },
-    { module: "Virtual Debit Card & Instant Hotlisting", sbi: "✅", icici: "✅", hdfc: "✅", thisApp: "✅ Live Toggle & CVV" },
-    { module: "Online FD / RD Booking with Maturity Calc", sbi: "✅", icici: "✅", hdfc: "✅", thisApp: "✅ Real-time Compound Calc" },
-    { module: "Personal & Home Loan EMI Calculator", sbi: "✅", icici: "✅", hdfc: "✅", thisApp: "✅ Dynamic Sliders" },
-    { module: "Mutual Funds & Insurance Policies", sbi: "✅ (SBI MF)", icici: "✅ (PruMF)", hdfc: "✅", thisApp: "✅ Multi-Bank Catalog" },
-    { module: "Cheque Book Request & Stop Payment", sbi: "✅", icici: "✅", hdfc: "✅", thisApp: "✅ CTS-2010 Workflow" },
-    { module: "24x7 Intelligent Banking Chatbot", sbi: "✅ Sandy", icici: "✅ iPal", hdfc: "✅ EVA", thisApp: "✅ Bharat AI Assistant" },
-    { module: "Branch Manager KYC & Audit Logs", sbi: "Branch Staff", icici: "Branch Staff", hdfc: "Branch Staff", thisApp: "✅ Integrated Portal" },
-    { module: "RBI Regulatory Filing Reports (CTR/STR)", sbi: "Internal", icici: "Internal", hdfc: "Internal", thisApp: "✅ 1-Click Export" },
-    { module: "Hostinger Shared Hosting cPanel Deployment", sbi: "❌", icici: "❌", hdfc: "❌", thisApp: "✅ 1-Click Ready (PHP/MySQL)" }
+  // What the PHP/MySQL port in /hostinger covers today. FastAPI serves every module.
+  const capabilityData = [
+    { module: "Login, Registration & Sessions", ported: true },
+    { module: "Accounts, Balances & Transaction History", ported: true },
+    { module: "Instant Fund Transfers (IMPS, NEFT, RTGS, UPI)", ported: true },
+    { module: "Corporate Bulk CMS Batch Transfers", ported: true },
+    { module: "Debit Cards: Freeze, Hotlist, Limits & PIN", ported: true },
+    { module: "UPI VPA & QR Payments", ported: true },
+    { module: "Online FD / RD Booking", ported: false },
+    { module: "Loans & EMI Applications", ported: false },
+    { module: "Mutual Funds & Insurance", ported: false },
+    { module: "Cheque Book, Stop Payment & Demand Drafts", ported: false },
+    { module: "Support Chatbot & Complaints", ported: false },
+    { module: "KYC, Passkeys, OTP & Statements", ported: false },
+    { module: "Admin, RBI Reports & Staff Panels", ported: false }
   ];
+  const portedCount = capabilityData.filter(row => row.ported).length;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -80,13 +83,15 @@ export default function HostingerDeployPage() {
         </button>
       </div>
 
-      {/* Feature Comparison Checklist */}
+      {/* Capability checklist */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
         <div className="flex justify-between items-center pb-2 border-b border-slate-800">
           <h2 className="font-bold text-white text-sm">
-            Indian Banking Feature Comparison Matrix (SBI YONO vs ICICI iMobile vs HDFC vs This App)
+            AJSPay Banking Capabilities
           </h2>
-          <span className="text-emerald-400 text-xs font-mono">100% Feature Parity</span>
+          <span className="text-amber-300 text-xs font-mono">
+            {portedCount} of {capabilityData.length} modules ported to PHP/MySQL
+          </span>
         </div>
 
         <div className="overflow-x-auto">
@@ -94,20 +99,16 @@ export default function HostingerDeployPage() {
             <thead className="bg-slate-950 text-[11px] uppercase text-slate-400">
               <tr>
                 <th className="p-3">Core Banking Feature</th>
-                <th className="p-3 text-center">SBI YONO</th>
-                <th className="p-3 text-center">ICICI iMobile</th>
-                <th className="p-3 text-center">HDFC NetBanking</th>
-                <th className="p-3 text-right">This Web App</th>
+                <th className="p-3 text-right">AJSPay Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {comparisonData.map((row, idx) => (
+              {capabilityData.map((row, idx) => (
                 <tr key={idx} className="hover:bg-slate-800/40">
                   <td className="p-3 font-semibold text-slate-200">{row.module}</td>
-                  <td className="p-3 text-center text-slate-400">{row.sbi}</td>
-                  <td className="p-3 text-center text-slate-400">{row.icici}</td>
-                  <td className="p-3 text-center text-slate-400">{row.hdfc}</td>
-                  <td className="p-3 text-right font-bold text-emerald-400">{row.thisApp}</td>
+                  <td className={`p-3 text-right font-bold ${row.ported ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {row.ported ? '✅ PHP/MySQL ready' : '⏳ FastAPI only'}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -11,8 +11,8 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
 
 RETAIL = ("rahul.sharma@example.com", "Banking@123")
-OWNER = ("owner@nbbank.in", "Owner@123")
-ADMIN = ("manager.sbi@example.com", "Admin@123")
+OWNER = ("owner@ajspay.in", "Owner@123")
+ADMIN = ("manager@ajspay.in", "Admin@123")
 
 
 def _login(email, password):
@@ -80,7 +80,7 @@ class TestReferrals:
         code = requests.get(f"{API}/referrals/my-code", headers=_hdr(retail_token)).json()["referral_code"]
         accs = requests.get(f"{API}/accounts", headers=_hdr(retail_token)).json()
         accs_list = accs.get("accounts", accs) if isinstance(accs, dict) else accs
-        savings = next(a for a in accs_list if a["account_number"] == "SBI00984521098")
+        savings = next(a for a in accs_list if a["account_number"] == "AJSP00984521098")
         pre_bal = savings["balance"]
 
         # Register new user with the code
@@ -109,7 +109,7 @@ class TestReferrals:
         # Referrer got +500
         accs_after = requests.get(f"{API}/accounts", headers=_hdr(retail_token)).json()
         after_list = accs_after.get("accounts", accs_after) if isinstance(accs_after, dict) else accs_after
-        savings_after = next(a for a in after_list if a["account_number"] == "SBI00984521098")
+        savings_after = next(a for a in after_list if a["account_number"] == "AJSP00984521098")
         assert abs(savings_after["balance"] - (pre_bal + 500)) < 0.01, f"pre={pre_bal} post={savings_after['balance']}"
 
         # History includes referral
@@ -134,10 +134,10 @@ class TestStandingInstructions:
 
         # Create
         payload = {
-            "from_account_number": "SBI00984521098",
+            "from_account_number": "AJSP00984521098",
             "beneficiary_name": "TEST Landlord",
-            "beneficiary_account": "HDFC00099887766",
-            "beneficiary_ifsc": "HDFC0000100",
+            "beneficiary_account": "AJSP00099887766",
+            "beneficiary_ifsc": "AJSP0000100",
             "amount": 25000,
             "frequency": "monthly",
             "category": "rent",
@@ -321,11 +321,11 @@ class TestRegression:
     @pytest.mark.parametrize("email,pw", [
         ("rahul.sharma@example.com", "Banking@123"),
         ("tata.corp@example.com", "Corporate@123"),
-        ("manager.sbi@example.com", "Admin@123"),
-        ("owner@nbbank.in", "Owner@123"),
-        ("meera.staff@nbbank.in", "Staff@123"),
-        ("collections@nbbank.in", "Collect@123"),
-        ("loans@nbbank.in", "Loan@123"),
+        ("manager@ajspay.in", "Admin@123"),
+        ("owner@ajspay.in", "Owner@123"),
+        ("meera.staff@ajspay.in", "Staff@123"),
+        ("collections@ajspay.in", "Collect@123"),
+        ("loans@ajspay.in", "Loan@123"),
     ])
     def test_all_roles_login(self, email, pw):
         r = requests.post(f"{API}/auth/login", json={"email": email, "password": pw})

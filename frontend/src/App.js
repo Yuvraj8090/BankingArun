@@ -65,7 +65,7 @@ function MainApp() {
       <div className="min-h-screen bg-white flex items-center justify-center text-slate-700 text-sm">
         <div className="flex items-center gap-3">
           <div className="w-5 h-5 border-2 border-blue-700 border-t-transparent rounded-full animate-spin"></div>
-          <span>Connecting to National Bharat Core Banking Ledger…</span>
+          <span>Connecting to AJSPay Core Banking Ledger…</span>
         </div>
       </div>
     );
@@ -161,9 +161,9 @@ function PublicFooter() {
     <footer className="bg-slate-900 text-slate-300 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-xs">
         <div className="col-span-2 md:col-span-1">
-          <h4 className="text-white font-semibold mb-3 text-sm">National Bharat Bank</h4>
+          <h4 className="text-white font-semibold mb-3 text-sm">AJSPay</h4>
           <p className="text-slate-400 leading-relaxed">
-            A demo core-banking suite modelled on SBI YONO, ICICI iMobile & HDFC NetBanking. RBI Master Direction compliant architecture.
+            Secure digital banking for personal and business customers, built on an RBI-compliant core architecture.
           </p>
         </div>
         <div>
@@ -188,14 +188,14 @@ function PublicFooter() {
           <h4 className="text-white font-semibold mb-3">Support</h4>
           <ul className="space-y-1.5 text-slate-400">
             <li>Toll-Free: 1800-123-4567</li>
-            <li>customercare@nbbank.in</li>
+            <li>support@ajspay.in</li>
             <li>Branch &amp; ATM Locator</li>
             <li>Grievance Redressal</li>
           </ul>
         </div>
       </div>
       <div className="border-t border-slate-800 py-4 text-center text-[11px] text-slate-500">
-        © 2026 National Bharat Bank Ltd. All Rights Reserved. Deposits insured by DICGC up to ₹5 Lakh.
+        © 2026 AJSPay Ltd. All Rights Reserved. Deposits insured by DICGC up to ₹5 Lakh.
       </div>
     </footer>
   );
