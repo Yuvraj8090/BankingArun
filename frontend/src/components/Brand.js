@@ -12,7 +12,7 @@ export default function Brand({ variant = 'compact', className = '', height = 40
   const logo = (
     <img
       src={SOURCES[variant] || SOURCES.compact}
-      alt="AJS Pay Nidhi Limited"
+      alt="Aadhunik Jeewan Sanchay Nidhi Limited"
       style={{ height }}
       className={`w-auto ${onDark ? '' : className}`}
       draggable="false"

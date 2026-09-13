@@ -33,6 +33,8 @@ import StatementsPage from './pages/StatementsPage';
 import ReferralPage from './pages/ReferralPage';
 import StandingInstructionsPage from './pages/StandingInstructionsPage';
 import AdminConfigPage from './pages/AdminConfigPage';
+import SchemesPage from './pages/SchemesPage';
+import AgentsPage from './pages/AgentsPage';
 import HostingerDeployPage from './pages/HostingerDeployPage';
 import AuthPage from './pages/AuthPage';
 import { Toaster } from 'sonner';
@@ -135,6 +137,8 @@ function AppShell() {
     referrals: <ReferralPage />,
     'standing-instructions': <StandingInstructionsPage />,
     'admin-config': <AdminConfigPage />,
+    schemes: <SchemesPage />,
+    agents: <AgentsPage />,
     hostinger: <HostingerDeployPage />
   };
 
@@ -230,11 +234,11 @@ function PublicFooter() {
       </div>
       <div className="border-t border-slate-800 py-4 px-4 text-center text-[11px] text-slate-500 space-y-1">
         <p>
-          AJS Pay Nidhi Limited is a Nidhi company incorporated under the Companies Act, 2013 and governed by the
-          Nidhi Rules, 2014. It is not a bank, it is not licensed or regulated by the Reserve Bank of India, and
-          deposits are not insured by DICGC.
+          Aadhunik Jeewan Sanchay Nidhi Limited (CIN U65990UP2019PLN121746) is a Nidhi company incorporated under the
+          Companies Act, 2013 and governed by the Nidhi Rules, 2014. It is not a bank, it is not licensed or regulated
+          by the Reserve Bank of India, deposits are not insured by DICGC, and it deals only with its members.
         </p>
-        <p>© {new Date().getFullYear()} AJS Pay Nidhi Limited. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited. All rights reserved.</p>
       </div>
     </footer>
   );

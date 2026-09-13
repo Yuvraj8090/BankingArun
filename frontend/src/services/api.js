@@ -140,5 +140,19 @@ export const api = {
 
   // Super-admin runtime config
   adminConfigGet: async () => (await axios.get(`${API}/admin/config`, getAuthHeaders())).data,
-  adminConfigSet: async (payload) => (await axios.put(`${API}/admin/config`, payload, getAuthHeaders())).data
+  adminConfigSet: async (payload) => (await axios.put(`${API}/admin/config`, payload, getAuthHeaders())).data,
+
+  // Scheme master (back office only)
+  schemesList: async () => (await axios.get(`${API}/schemes`, getAuthHeaders())).data,
+  schemeCreate: async (payload) => (await axios.post(`${API}/schemes`, payload, getAuthHeaders())).data,
+  schemeUpdate: async (id, payload) => (await axios.patch(`${API}/schemes/${id}`, payload, getAuthHeaders())).data,
+  schemeDelete: async (id) => (await axios.delete(`${API}/schemes/${id}`, getAuthHeaders())).data,
+
+  // Field agents and their collection records (no commission)
+  agentsList: async () => (await axios.get(`${API}/agents`, getAuthHeaders())).data,
+  agentCreate: async (payload) => (await axios.post(`${API}/agents`, payload, getAuthHeaders())).data,
+  agentUpdate: async (id, payload) => (await axios.patch(`${API}/agents/${id}`, payload, getAuthHeaders())).data,
+  agentDelete: async (id) => (await axios.delete(`${API}/agents/${id}`, getAuthHeaders())).data,
+  agentCollections: async (id) => (await axios.get(`${API}/agents/${id}/collections`, getAuthHeaders())).data,
+  collectionCreate: async (payload) => (await axios.post(`${API}/collections`, payload, getAuthHeaders())).data
 };

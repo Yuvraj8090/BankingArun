@@ -30,7 +30,7 @@ $config = [
     'trust_proxy'         => false,
     'public_app_url'      => '',        // e.g. https://yourdomain.com (referral links)
     'webauthn_rp_id'      => '',        // your domain, e.g. yourdomain.com (passkeys)
-    'webauthn_rp_name'    => 'AJS Pay Nidhi Limited',
+    'webauthn_rp_name'    => 'Aadhunik Jeewan Sanchay Nidhi Limited',
     'webauthn_origin'     => '',        // e.g. https://yourdomain.com
     // OTP delivery. With live_otp false the API runs in demo mode and shows the OTP.
     // The bank owner can also set these from the System Config screen.
@@ -143,7 +143,7 @@ function scalar(string $sql, array $params = []): mixed
 const FLOAT_COLUMNS = ['balance', 'amount', 'balance_after', 'online_limit', 'atm_limit', 'principal_amount',
     'interest_rate', 'maturity_amount', 'fee', 'invested_amount', 'current_value', 'units', 'outstanding', 'roi',
     'face_match_score', 'lat', 'lng', 'credit_amount', 'sum_assured', 'annual_premium', 'amount_requested',
-    'calculated_emi', 'monthly_income'];
+    'calculated_emi', 'monthly_income', 'total_deposit', 'contribution_amount', 'collected_total'];
 const BOOL_COLUMNS = ['is_virtual', 'international_enabled', 'contactless_enabled', 'ecom_enabled', 'upi_linked',
     'is_joint', 'mfa_enabled', 'has_atm', 'has_cdm', 'has_locker', 'verified'];
 const TIME_COLUMNS = ['created_at', 'timestamp', 'submitted_at', 'reviewed_at', 'verified_at'];

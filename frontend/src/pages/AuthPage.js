@@ -126,7 +126,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
           </ul>
         </div>
         <div className="text-[11px] text-white/60">
-          © {new Date().getFullYear()} AJS Pay Nidhi Limited · Toll-free 1800-123-4567
+          © {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited · Toll-free 1800-123-4567
         </div>
       </div>
 

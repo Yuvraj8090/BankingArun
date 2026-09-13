@@ -10,6 +10,7 @@ require __DIR__ . '/modules/banking.php';
 require __DIR__ . '/modules/statements.php';
 require __DIR__ . '/modules/security.php';
 require __DIR__ . '/modules/staff.php';
+require __DIR__ . '/modules/master.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
 const TRANSFER_MODES = ['IMPS', 'NEFT', 'RTGS', 'UPI'];
@@ -701,6 +702,12 @@ $routes = [
     'POST /kyc/video/decision' => 'route_kyc_decision',
     'GET /hostinger/package' => 'route_hostinger_package',
     'GET /hostinger/download-zip' => 'route_hostinger_zip',
+    // Scheme master & field agents (modules/master.php) — back office only
+    'GET /schemes' => 'route_schemes_list',
+    'POST /schemes' => 'route_scheme_create',
+    'GET /agents' => 'route_agents_list',
+    'POST /agents' => 'route_agent_create',
+    'POST /collections' => 'route_collection_create',
 ];
 // Routes with an id in the path. Exact routes above are matched first.
 $paramRoutes = [
@@ -711,6 +718,11 @@ $paramRoutes = [
     ['DELETE', '#^/passkey/([\w-]{1,64})$#', 'route_passkey_delete'],
     ['GET', '#^/kyc/video/([\w-]{1,64})/face-match$#', 'route_kyc_face_match'],
     ['GET', '#^/kyc/video/([\w-]{1,64})$#', 'route_kyc_detail'],
+    ['PATCH', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_update'],
+    ['DELETE', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_delete'],
+    ['PATCH', '#^/agents/([\w-]{1,64})$#', 'route_agent_update'],
+    ['DELETE', '#^/agents/([\w-]{1,64})$#', 'route_agent_delete'],
+    ['GET', '#^/agents/([\w-]{1,64})/collections$#', 'route_collections_list'],
 ];
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

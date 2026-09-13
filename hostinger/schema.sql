@@ -474,3 +474,67 @@ INSERT IGNORE INTO collection_cases (id, borrower, loan_ref, outstanding, dpd_da
 ('col-002', 'Sunita Deshmukh', 'HL-33112', 892000.00, 15, '2026-02-05', 'follow_up', '+91 98222 55667'),
 ('col-003', 'Kavita Rao', 'VL-77401', 45250.00, 90, '2026-01-10', 'legal_notice', '+91 98333 88991'),
 ('col-004', 'Amit Sinha', 'PL-88203', 22500.00, 5, '2026-02-12', 'reminder_sent', '+91 98444 12345');
+
+-- ---------------------------------------------------------------------------
+-- Scheme master and field agents (back office only; never shown publicly)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS schemes (
+    id VARCHAR(36) PRIMARY KEY,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(120) NOT NULL,
+    scheme_type VARCHAR(10) NOT NULL DEFAULT 'recurring',  -- daily | recurring | fixed | mis
+    tenure_months INT NOT NULL,
+    contribution_amount DECIMAL(15,2),                     -- per day or per month, for instalment plans
+    principal_amount DECIMAL(15,2),                        -- lump sum, for FD / MIS
+    total_deposit DECIMAL(15,2) NOT NULL,
+    maturity_amount DECIMAL(15,2) NOT NULL,
+    payout_type VARCHAR(10) NOT NULL DEFAULT 'maturity',   -- maturity | monthly
+    status VARCHAR(10) NOT NULL DEFAULT 'draft',           -- active | draft | inactive
+    notes VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_type_status (scheme_type, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agents (
+    id VARCHAR(36) PRIMARY KEY,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    branch VARCHAR(100),
+    status VARCHAR(10) NOT NULL DEFAULT 'active',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- What an agent collected in the field. Records only: no commission is calculated
+-- or paid, because the Nidhi Rules bar incentives for mobilising deposits.
+CREATE TABLE IF NOT EXISTS agent_collections (
+    id VARCHAR(36) PRIMARY KEY,
+    agent_id VARCHAR(36) NOT NULL,
+    member_user_id VARCHAR(36),
+    account_number VARCHAR(30) NOT NULL,
+    scheme_id VARCHAR(36),
+    amount DECIMAL(15,2) NOT NULL,
+    collected_on DATE NOT NULL,
+    receipt_no VARCHAR(30),
+    notes VARCHAR(255),
+    recorded_by VARCHAR(36),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_agent_date (agent_id, collected_on),
+    FOREIGN KEY (agent_id) REFERENCES agents(id),
+    FOREIGN KEY (scheme_id) REFERENCES schemes(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Plans from the printed plan book. Those whose implied return exceeds the
+-- 12.5% Nidhi Rules cap are loaded as drafts and cannot be activated.
+INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_amount, principal_amount,
+    total_deposit, maturity_amount, payout_type, status, notes) VALUES
+('sch-rd-1y', 'AJS-RD-1Y', 'Masik Yojana 1 Year', 'recurring', 12, 500.00, NULL, 6000.00, 6360.00, 'maturity', 'active', 'Plan book: 1 year, stated 6.5%'),
+('sch-rd-2y', 'AJS-RD-2Y', 'Masik Yojana 2 Year', 'recurring', 24, 500.00, NULL, 12000.00, 12960.00, 'maturity', 'active', 'Plan book: 2 year, stated 8.5%'),
+('sch-rd-3y', 'AJS-RD-3Y', 'Masik Yojana 3 Year', 'recurring', 36, 500.00, NULL, 18000.00, 21975.00, 'maturity', 'draft', 'Plan book says 10.5% but the maturity figure works out to ~13.4% — above the cap, review before activating'),
+('sch-rd-5y', 'AJS-RD-5Y', 'Masik Yojana 5 Year', 'recurring', 60, 500.00, NULL, 30000.00, 39150.00, 'maturity', 'draft', 'Plan book: 5 year, stated 12.5% — check against the cap before activating'),
+('sch-rd-6y', 'AJS-RD-6Y', 'Masik Yojana 6 Year', 'recurring', 72, 500.00, NULL, 36000.00, 52500.00, 'maturity', 'draft', 'Plan book: 6 year, stated 14.5% — above the Nidhi cap'),
+('sch-dd-3y', 'AJS-DD-3Y', 'Daily Yojana 3 Year', 'daily', 36, 100.00, NULL, 108000.00, 125900.00, 'maturity', 'draft', 'Plan book: daily ₹100 for 3 years'),
+('sch-dd-5y', 'AJS-DD-5Y', 'Daily Yojana 5 Year', 'daily', 60, 50.00, NULL, 90000.00, 117900.00, 'maturity', 'draft', 'Plan book: daily ₹50 for 5 years'),
+('sch-fd-8y', 'AJS-FD-8Y', 'Savadhi Yojana (3x in 8 years)', 'fixed', 96, NULL, 2500.00, 2500.00, 7500.00, 'maturity', 'draft', 'Plan book: 3x in 8 years — well above the Nidhi cap'),
+('sch-mis-5y', 'AJS-MIS-5Y', 'Niyamit Aay 60 Month MIS', 'mis', 60, NULL, 10000.00, 10000.00, 15000.00, 'monthly', 'draft', 'Plan book: ₹10,000 unit, ₹250 monthly payout');

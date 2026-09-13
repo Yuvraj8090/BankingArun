@@ -247,7 +247,7 @@ function xlsx_sheet(array $rows, array $widths = []): string
 function statement_xlsx(array $user, array $account, array $txns, ?string $start, ?string $end): string
 {
     $rows = [
-        [['AJS Pay Nidhi Limited', 1]],
+        [['Aadhunik Jeewan Sanchay Nidhi Limited', 1]],
         [['Account Statement — ' . $account['account_number'], 2]],
         [['Customer: ' . $user['name'] . ' · Type: ' . ucfirst($account['account_type']) . ' · IFSC: ' . $account['ifsc_code'], 0]],
         [['Period: ' . ($start ?? 'All') . ' → ' . ($end ?? 'today') . ' · Generated: ' . gmdate('d-M-Y H:i') . ' UTC', 0]],

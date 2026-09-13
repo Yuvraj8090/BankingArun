@@ -1,7 +1,8 @@
 import {
   LayoutDashboard, ArrowRightLeft, CreditCard, PiggyBank, Banknote,
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
-  GanttChartSquare, Building2, Video, ShieldCheck, FileText, Gift, Repeat, Settings2
+  GanttChartSquare, Building2, Video, ShieldCheck, FileText, Gift, Repeat, Settings2,
+  Layers, ClipboardList
 } from 'lucide-react';
 
 // Role → sidebar menu. The same list is the access rule for /app/* URLs:
@@ -38,6 +39,8 @@ export const NAV_BY_ROLE = {
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
     { id: 'collection', label: 'Collections', icon: Wallet, testId: 'tab-collection' },
+    { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
+    { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue' },
     { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' },
     { id: 'hostinger', label: 'Hostinger Package', icon: Globe, testId: 'tab-hostinger', highlight: true }
@@ -47,11 +50,15 @@ export const NAV_BY_ROLE = {
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
     { id: 'collection', label: 'Collections', icon: Wallet, testId: 'tab-collection' },
+    { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
+    { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue' },
     { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
   ],
   bank_owner: [
     { id: 'owner', label: 'Executive Dashboard', icon: Crown, testId: 'tab-owner' },
+    { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
+    { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'admin-config', label: 'System Config (Twilio/SendGrid)', icon: Settings2, testId: 'tab-admin-config' },
     { id: 'admin', label: 'All Branches', icon: Building2, testId: 'tab-admin' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
@@ -62,6 +69,7 @@ export const NAV_BY_ROLE = {
   ],
   staff: [
     { id: 'staff', label: 'Customer Console', icon: Users, testId: 'tab-staff' },
+    { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'kyc', label: 'KYC Verification', icon: FileBadge2, testId: 'tab-kyc' },
     { id: 'transfer', label: 'Process Transfer', icon: ArrowRightLeft, testId: 'tab-transfer' },
     { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
