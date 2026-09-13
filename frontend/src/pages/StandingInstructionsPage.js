@@ -119,7 +119,15 @@ export default function StandingInstructionsPage() {
                       <div className="text-[11px] text-slate-500 mt-0.5">
                         {cat.label} · {si.frequency} · Next {si.next_run}
                         {si.end_date && ` · Until ${si.end_date}`}
+                        {si.executions > 0 && ` · Paid ${si.executions}×`}
                       </div>
+                      {/* Why the last run didn't go through, so a paused instruction isn't a mystery */}
+                      {si.last_status === 'failed' && si.last_error && (
+                        <div data-testid={`si-error-${si.id}`} className="text-[11px] text-[#c8102e] mt-1">
+                          Last attempt on {si.last_run} failed: {si.last_error}
+                          {si.status === 'paused' && ' Paused after repeated failures — resume it once the account is funded.'}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

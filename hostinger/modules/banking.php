@@ -478,8 +478,20 @@ function si_set_status(string $id, string $status, string $message): void
 {
     global $pdo;
     $user = current_user();
-    owned_instruction($user, $id);
-    $pdo->prepare('UPDATE standing_instructions SET status = ? WHERE id = ? AND user_id = ?')->execute([$status, $id, $user['id']]);
+    $si = owned_instruction($user, $id);
+    // Resuming clears the failure count cron.php built up, so an instruction
+    // paused after repeated failures gets a full set of retries again. It also
+    // catches up from today rather than replaying every date it was paused for.
+    if ($status === 'active') {
+        $today = (new DateTimeImmutable('today', new DateTimeZone(IST)))->format('Y-m-d');
+        $nextRun = ($si['next_run'] === null || $si['next_run'] < $today) ? $today : $si['next_run'];
+        $pdo->prepare("UPDATE standing_instructions SET status = 'active', failures = 0, last_error = NULL,
+            last_status = NULL, last_run = NULL, next_run = ? WHERE id = ? AND user_id = ?")
+            ->execute([$nextRun, $id, $user['id']]);
+    } else {
+        $pdo->prepare('UPDATE standing_instructions SET status = ? WHERE id = ? AND user_id = ?')
+            ->execute([$status, $id, $user['id']]);
+    }
     audit($user, 'SI_' . strtoupper($status), $id);
     respond(['status' => 'SUCCESS', 'message' => $message]);
 }

@@ -5,8 +5,9 @@ declare(strict_types=1);
 
 const ADMIN_ROLES = ['admin', 'branch_manager', 'bank_owner'];
 const KYC_FRAME_MAX = 2000000;  // base64 characters per photo (~1.5 MB image)
-const PACKAGE_FILES = ['db_php' => 'db.php', 'api_php' => 'api.php', 'schema_sql' => 'schema.sql',
-    'htaccess' => '.htaccess', 'deploy_guide' => 'INSTALL_HOSTINGER.md'];
+const PACKAGE_FILES = ['db_php' => 'db.php', 'api_php' => 'api.php', 'cron_php' => 'cron.php',
+    'schema_sql' => 'schema.sql', 'migrate_sql' => 'migrate.sql', 'htaccess' => '.htaccess',
+    'deploy_guide' => 'INSTALL_HOSTINGER.md'];
 
 function staff_user(array $roles): array
 {

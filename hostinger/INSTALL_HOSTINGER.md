@@ -17,7 +17,9 @@ This package runs the AJSPay React app on standard Hostinger web hosting with a 
 | `db.php` | Configuration defaults, database connection, shared helpers |
 | `modules/` | Banking services, statements, security (OTP/passkeys), staff and admin |
 | `assets/` | Logo used in generated PDF statements |
-| `schema.sql` | Database tables and demo data |
+| `schema.sql` | Database tables and demo data — for a **fresh** database |
+| `migrate.sql` | Upgrades a database created from an **earlier** `schema.sql`, keeping its data |
+| `cron.php` | Runs standing instructions and scheduled transfers when they come due |
 | `.htaccess` | Routing, HTTPS, security headers, file protection |
 
 ## Deploy
@@ -29,6 +31,17 @@ hPanel → **Databases → Management** → create a database and user with a st
 ### 2. Import the schema
 
 Open **phpMyAdmin** for that database → **Import** → choose `schema.sql` → **Go**.
+
+The database user hPanel creates owns the database, so it has the rights to create
+these tables. If the import reports `CREATE command denied`, you are connected as a
+user that only has read/write rights — import as the owner shown in
+**Databases → Management** instead.
+
+**Already running an older build?** Import `migrate.sql` instead of `schema.sql`.
+It adds the scheme, agent and collection tables and the columns `cron.php` needs,
+without touching any existing row. Importing `schema.sql` over a live database is
+also safe (every statement is `IF NOT EXISTS` / `INSERT IGNORE`) but it will not add
+columns to tables you already have — so run `migrate.sql` for an upgrade.
 
 ### 3. Create `config.local.php`
 
@@ -88,7 +101,45 @@ In hPanel **File Manager**, open `public_html` and upload `api.php`, `db.php`, `
 | Collections | collections@ajspay.in | Collect@123 | Txn@1234 |
 | Loan officer | loans@ajspay.in | Loan@123 | Txn@1234 |
 
-### 7. Turn on live OTP (optional)
+### 7. Schedule the cron job (required for standing instructions)
+
+Standing instructions and scheduled transfers are only promises until `cron.php`
+runs them. Without this step no recurring payment ever leaves an account.
+
+hPanel → **Advanced → Cron Jobs** → **Create new cron job**:
+
+- **Type of cron job**: PHP
+- **Command**: `/usr/bin/php /home/<your-user>/public_html/cron.php`
+- **Schedule**: once a day, in the small hours — **2:00 AM** is a good choice
+
+Replace `<your-user>` with your hosting account name; hPanel shows the full path in
+**Files → File Manager**. If PHP lives elsewhere on your plan, use the interpreter
+path hPanel suggests for a PHP cron job.
+
+What it does on each run:
+
+- Pays every standing instruction whose next date has arrived, then moves that date
+  on by its frequency. Monthly and quarterly instructions keep the day of the month
+  the customer chose, clamped in shorter months (a 31st instruction falls on the 28th
+  in February).
+- Executes one-off scheduled transfers on or after their date, marking each
+  `EXECUTED` with a UTR, or `FAILED` with a reason.
+- Leaves an instruction it cannot pay (insufficient balance, frozen account) due, to
+  retry on the next run, and pauses it after 3 failures in a row so it stops trying.
+  The customer sees the reason on their Standing Instructions page.
+- Writes an audit-log row for every payment, failure and pause.
+
+Notes:
+
+- It is safe to run more often than daily — each instruction is attempted at most
+  once per calendar day, and a MySQL lock keeps two overlapping runs from paying twice.
+- It never runs over HTTP: it refuses any web request and `.htaccess` denies the file.
+- Check it by hand over SSH with `php cron.php --dry-run`, which lists what is due and
+  writes nothing.
+- Exit codes: `0` all clear, `2` it ran but something failed and needs a look, `1` it
+  could not run at all. Point hPanel's cron email at yourself to see the report.
+
+### 8. Turn on live OTP (optional)
 
 Sign in as the bank owner and open **System Config**. Enter your Twilio and SendGrid keys and switch on live OTP. The keys are encrypted before they are stored, and only ever shown back masked. Until you do this, the app runs in demo mode and shows the OTP on screen.
 
@@ -134,7 +185,9 @@ Sign in as the bank owner and open **System Config**. Enter your Twilio and Send
 
 ## Known limitations
 
-- Scheduled transfers and standing instructions are stored, but nothing executes them yet. Add a cPanel cron job when you want them to run.
+- Standing instructions and scheduled transfers only run if you set up the cron job in step 7. Nothing recurring happens without it.
+- Cron pays interbank instructions by debiting the customer only. There is no real NEFT/RTGS connection, so an outgoing payment to another bank is recorded, not actually settled.
+- Deposits do not mature on their own: interest is shown from the booked rate, and nothing credits a deposit at the end of its term.
 - Card CVVs are stored so the virtual-card screen can show them. That's fine for a demo, but PCI DSS forbids storing CVVs in a real card system.
 - Video KYC face-match compares colour histograms. It is an image heuristic, not a biometric identity check, and should never be the only KYC control in production.
 - Bulk payouts only debit the corporate account, matching the original backend.

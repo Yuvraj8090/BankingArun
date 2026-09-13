@@ -123,10 +123,15 @@ CREATE TABLE IF NOT EXISTS scheduled_payments (
     transfer_type VARCHAR(10) NOT NULL,
     amount DECIMAL(15,2) NOT NULL,
     schedule_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'SCHEDULED',
+    status VARCHAR(20) NOT NULL DEFAULT 'SCHEDULED',  -- SCHEDULED | EXECUTED | FAILED
     remarks VARCHAR(255),
+    -- Written by cron.php when the payment comes due
+    processed_at DATETIME,
+    ref_number VARCHAR(50),
+    failure_reason VARCHAR(255),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
+    INDEX idx_due (status, schedule_date),
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -143,11 +148,18 @@ CREATE TABLE IF NOT EXISTS standing_instructions (
     start_date DATE NOT NULL,
     end_date DATE,
     remarks VARCHAR(255),
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',  -- active | paused | completed
     executions INT NOT NULL DEFAULT 0,
     next_run DATE,
+    -- Written by cron.php: last_run stops an instruction being attempted twice
+    -- in a day, and failures pauses it after SI_MAX_FAILURES tries in a row.
+    last_run DATE,
+    last_status VARCHAR(20),
+    last_error VARCHAR(255),
+    failures INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
+    INDEX idx_due (status, next_run),
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

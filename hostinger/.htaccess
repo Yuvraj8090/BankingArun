@@ -23,8 +23,9 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [L]
 
-# Only api.php and the built frontend are reachable over HTTP
-<FilesMatch "^\.|\.(sql|md|log|env|ini|bak)$|^(db|config\.local)\.php$">
+# Only api.php and the built frontend are reachable over HTTP.
+# cron.php is CLI-only (it also refuses to run under a web SAPI).
+<FilesMatch "^\.|\.(sql|md|log|env|ini|bak)$|^(db|config\.local|cron)\.php$">
     Require all denied
 </FilesMatch>
 

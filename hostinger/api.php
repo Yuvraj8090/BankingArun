@@ -725,6 +725,12 @@ $paramRoutes = [
     ['GET', '#^/agents/([\w-]{1,64})/collections$#', 'route_collections_list'],
 ];
 
+// cron.php includes this file to reuse insert_txn(), audit() and the constants.
+// There is no request to dispatch under the CLI, so stop here with the routes defined.
+if (PHP_SAPI === 'cli') {
+    return;
+}
+
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $apiAt = strpos($path, '/api/');

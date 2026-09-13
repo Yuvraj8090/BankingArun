@@ -6,10 +6,22 @@ import {
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
+// Tab id, label, and the key it reads from the package response.
+const CODE_TABS = [
+  ['guide', 'Installation Manual', 'deploy_guide'],
+  ['db', 'db.php (MySQL Connector)', 'db_php'],
+  ['api', 'api.php (Core REST API)', 'api_php'],
+  ['cron', 'cron.php (Scheduled Payments)', 'cron_php'],
+  ['schema', 'schema.sql (Fresh Install)', 'schema_sql'],
+  ['migrate', 'migrate.sql (Upgrade Existing)', 'migrate_sql'],
+  ['htaccess', '.htaccess (SSL & Routing)', 'htaccess']
+];
+
 export default function HostingerDeployPage() {
   const [pkg, setPkg] = useState(null);
-  const [activeCodeTab, setActiveCodeTab] = useState('guide'); // guide, db, api, schema, htaccess
+  const [activeCodeTab, setActiveCodeTab] = useState('guide');
   const [loading, setLoading] = useState(true);
+  const activeCodeKey = (CODE_TABS.find(([id]) => id === activeCodeTab) || CODE_TABS[0])[2];
 
   useEffect(() => {
     const load = async () => {
@@ -125,61 +137,22 @@ export default function HostingerDeployPage() {
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div className="flex flex-wrap gap-1.5 text-xs">
-            <button
-              data-testid="tab-code-guide"
-              onClick={() => setActiveCodeTab('guide')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                activeCodeTab === 'guide' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white bg-slate-950'
-              }`}
-            >
-              Installation Manual
-            </button>
-            <button
-              data-testid="tab-code-db"
-              onClick={() => setActiveCodeTab('db')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                activeCodeTab === 'db' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white bg-slate-950'
-              }`}
-            >
-              db.php (MySQL Connector)
-            </button>
-            <button
-              data-testid="tab-code-api"
-              onClick={() => setActiveCodeTab('api')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                activeCodeTab === 'api' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white bg-slate-950'
-              }`}
-            >
-              api.php (Core REST API)
-            </button>
-            <button
-              data-testid="tab-code-schema"
-              onClick={() => setActiveCodeTab('schema')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                activeCodeTab === 'schema' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white bg-slate-950'
-              }`}
-            >
-              schema.sql (Database Tables)
-            </button>
-            <button
-              data-testid="tab-code-htaccess"
-              onClick={() => setActiveCodeTab('htaccess')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                activeCodeTab === 'htaccess' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white bg-slate-950'
-              }`}
-            >
-              .htaccess (SSL & Routing)
-            </button>
+            {CODE_TABS.map(([id, label]) => (
+              <button
+                key={id}
+                data-testid={`tab-code-${id}`}
+                onClick={() => setActiveCodeTab(id)}
+                className={`px-3 py-1.5 rounded-lg font-medium transition ${
+                  activeCodeTab === id ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white bg-slate-950'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           <button
-            onClick={() => {
-              const text = activeCodeTab === 'guide' ? pkg?.deploy_guide :
-                           activeCodeTab === 'db' ? pkg?.db_php :
-                           activeCodeTab === 'api' ? pkg?.api_php :
-                           activeCodeTab === 'schema' ? pkg?.schema_sql : pkg?.htaccess;
-              copyCode(text || '');
-            }}
+            onClick={() => copyCode(pkg?.[activeCodeKey] || '')}
             className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
           >
             <Copy className="w-3.5 h-3.5" /> Copy Code
@@ -189,11 +162,7 @@ export default function HostingerDeployPage() {
         {/* Code Container */}
         <div className="bg-slate-950 rounded-xl p-4 border border-slate-800/80 overflow-x-auto max-h-[450px]">
           <pre className="font-mono text-xs text-slate-200 whitespace-pre-wrap leading-relaxed">
-            {activeCodeTab === 'guide' && pkg?.deploy_guide}
-            {activeCodeTab === 'db' && pkg?.db_php}
-            {activeCodeTab === 'api' && pkg?.api_php}
-            {activeCodeTab === 'schema' && pkg?.schema_sql}
-            {activeCodeTab === 'htaccess' && pkg?.htaccess}
+            {pkg?.[activeCodeKey]}
           </pre>
         </div>
       </div>
