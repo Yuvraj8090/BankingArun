@@ -35,6 +35,8 @@ import StandingInstructionsPage from './pages/StandingInstructionsPage';
 import AdminConfigPage from './pages/AdminConfigPage';
 import SchemesPage from './pages/SchemesPage';
 import AgentsPage from './pages/AgentsPage';
+import FraudMonitorPage from './pages/FraudMonitorPage';
+import SecurityCenterPage from './pages/SecurityCenterPage';
 import HostingerDeployPage from './pages/HostingerDeployPage';
 import AuthPage from './pages/AuthPage';
 import { Toaster } from 'sonner';
@@ -139,6 +141,8 @@ function AppShell() {
     'admin-config': <AdminConfigPage />,
     schemes: <SchemesPage />,
     agents: <AgentsPage />,
+    fraud: <FraudMonitorPage />,
+    'security-center': <SecurityCenterPage />,
     hostinger: <HostingerDeployPage />
   };
 

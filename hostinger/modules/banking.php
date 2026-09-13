@@ -156,12 +156,18 @@ function route_apply_loan(array $d): void
     $emi = round($amount * $r * (1 + $r) ** $tenure / ((1 + $r) ** $tenure - 1), 2);
     $eligibility = $income * 0.5 >= $emi ? 'Pre-Approved' : 'Under Review';
     $number = 'LN-' . gmdate('Ym') . '-' . random_int(10000, 99999);
+    $id = uuid4();
     $pdo->prepare('INSERT INTO loan_applications (id, user_id, applicant, loan_application_no, loan_type, amount,
             tenure_months, roi, calculated_emi, monthly_income, employment_type, purpose, eligibility_status, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([uuid4(), $user['id'], $user['name'], $number, $type, $amount, $tenure, $rate, $emi, $income,
+        ->execute([$id, $user['id'], $user['name'], $number, $type, $amount, $tenure, $rate, $emi, $income,
             clip($d['employment_type'], 50), clip($d['purpose'], 255), $eligibility, 'under_review']);
     audit($user, 'LOAN_APPLIED', "$number $type " . rupees($amount));
+    // Grade it for the loan desk. The grade is advisory: it never decides the
+    // application, and the applicant is not shown it.
+    store_loan_score_safely(['id' => $id, 'user_id' => $user['id'], 'amount' => $amount,
+        'calculated_emi' => $emi, 'monthly_income' => $income,
+        'employment_type' => clip($d['employment_type'], 50)]);
     respond(['status' => 'SUCCESS', 'application_no' => $number, 'calculated_emi' => $emi, 'interest_rate' => $rate,
         'eligibility' => $eligibility, 'message' => 'Application for ' . ucfirst($type) . ' Loan submitted successfully!']);
 }
@@ -283,30 +289,8 @@ function route_branches(array $d): void
     respond(['branches' => out_all(rows('SELECT * FROM branches ORDER BY id'))]);
 }
 
-function route_chat(array $d): void
-{
-    need($d, 'message');
-    $msg = strtolower(clip($d['message'], 500));
-    $has = fn(string ...$words) => array_filter($words, fn($w) => str_contains($msg, $w)) !== [];
-    if ($has('ifsc', 'branch code')) {
-        $reply = "AJSPay main branch IFSC codes:\n- Nariman Point: **AJSP0000042**\n- Bandra Kurla Complex: **AJSP0000001**\n- Connaught Place: **AJSP0000007**\n- Koramangala: **AJSP0004081**";
-    } elseif ($has('limit')) {
-        $reply = "Daily Fund Transfer Limits:\n- **IMPS**: Up to ₹5,00,000 instant (24x7)\n- **NEFT**: No minimum, up to ₹10,00,000 per transaction\n- **RTGS**: Min ₹2,00,000, Max ₹25,00,000 (instant settlement)\n- **UPI**: Up to ₹1,00,000 per day";
-    } elseif ($has('fd', 'fixed deposit', 'interest rate')) {
-        $reply = "Current Fixed Deposit (FD) Interest Rates:\n- 7 to 365 Days: **6.50% p.a.**\n- 1 Year to 2 Years: **7.25% p.a.**\n- 2 Years to 3 Years: **7.50% p.a.**\n*Senior citizens enjoy additional 0.50% p.a.*";
-    } elseif ($has('hotlist', 'block card', 'lost card')) {
-        $reply = 'To block or hotlist your debit card immediately, visit the **Cards & Digital Services** tab and click **Freeze Card** or **Hotlist Card**. Alternatively call our 24x7 toll-free helpline at **1800 11 2211**.';
-    } elseif ($has('cheque')) {
-        $reply = 'You can request a 25, 50, or 100-leaf personalized CTS-2010 compliant Cheque Book from the **Cards & Cheques** section. Delivered within 3 business days.';
-    } elseif ($has('kyc', 'aadhaar', 'pan')) {
-        $reply = 'KYC documents required: Valid PAN Card + Aadhaar Card / Passport / Voter ID as Official Valid Document (OVD).';
-    } elseif ($has('loan', 'emi')) {
-        $reply = 'We offer Personal Loans starting at **10.50%**, Home Loans at **8.40%**, and Car Loans at **8.75%**.';
-    } else {
-        $reply = 'I am your 24x7 AJSPay Assistant. You can ask me about fund transfers (IMPS/NEFT/RTGS/UPI), FD rates, debit cards, cheque books, loan eligibility, or branch locations!';
-    }
-    respond(['response' => $reply, 'timestamp' => iso(now_utc())]);
-}
+// route_chat now lives in modules/ai.php, where it can answer from the
+// signed-in member's own data instead of a fixed list of replies.
 
 // --- Refer & earn ------------------------------------------------------------------------
 function referral_reward(): float

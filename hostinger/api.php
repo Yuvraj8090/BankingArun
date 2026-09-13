@@ -11,6 +11,9 @@ require __DIR__ . '/modules/statements.php';
 require __DIR__ . '/modules/security.php';
 require __DIR__ . '/modules/staff.php';
 require __DIR__ . '/modules/master.php';
+require __DIR__ . '/modules/defence.php';
+require __DIR__ . '/modules/mfa.php';
+require __DIR__ . '/modules/ai.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
 const TRANSFER_MODES = ['IMPS', 'NEFT', 'RTGS', 'UPI'];
@@ -300,9 +303,16 @@ function route_login(array $d): void
         fail(401, "Invalid email or password. $left attempt(s) remaining before security lockout.");
     }
     clear_fails($identifier);
+    // With an authenticator enrolled, the password alone does not produce a
+    // session: hand back a short-lived challenge and wait for the code.
+    if (!empty($user['totp_enabled'])) {
+        audit($user, 'USER_LOGIN_MFA_PENDING', 'Password accepted, awaiting authenticator code');
+        respond(['mfa_required' => true, 'mfa_token' => mfa_challenge_token($user),
+            'message' => 'Enter the six-digit code from your authenticator app.']);
+    }
     audit($user, 'USER_LOGIN', 'Logged in via ' . (clip($d['device_name'] ?? '', 100) ?: 'web'));
     respond(['token' => start_session($user), 'user' => public_user($user),
-        'message' => 'Login successful', 'mfa_verified' => true]);
+        'message' => 'Login successful', 'mfa_verified' => false]);
 }
 
 function route_me(array $d): void
@@ -436,6 +446,11 @@ function route_transfer(array $d): void
     }
     audit($user, 'FUND_TRANSFER', "$mode " . rupees($amount) . " from $from to $to ($ref)");
     $pdo->commit();
+    // Score the transfer once the money has moved. The member is never told they
+    // were flagged: warning a suspect off is "tipping off", which the PMLA
+    // prohibits. The alert goes to the staff review queue only.
+    score_transfer_safely($user, ['account_number' => $from, 'amount' => $amount, 'ref_number' => $ref,
+        'counterparty_acc' => $to, 'counterparty_name' => $beneficiary, 'balance_after' => $newBalance]);
     respond(['status' => 'SUCCESS', 'message' => 'Successfully transferred ' . rupees($amount) . " via $mode",
         'ref_number' => $ref, 'new_balance' => $newBalance, 'timestamp' => iso($now)]);
 }
@@ -644,6 +659,12 @@ $routes = [
     'GET /auth/me' => 'route_me',
     'POST /auth/logout' => 'route_logout',
     'POST /auth/verify-transaction-pin' => 'route_verify_txn_pin',
+    // Authenticator-app 2FA (modules/mfa.php), open to every role
+    'POST /auth/login/totp' => 'route_login_totp',
+    'GET /totp/status' => 'route_totp_status',
+    'POST /totp/setup' => 'route_totp_setup',
+    'POST /totp/enable' => 'route_totp_enable',
+    'POST /totp/disable' => 'route_totp_disable',
     'GET /accounts' => 'route_accounts',
     'GET /accounts/transactions' => 'route_transactions',
     'POST /accounts/transfer' => 'route_transfer',
@@ -708,6 +729,15 @@ $routes = [
     'GET /agents' => 'route_agents_list',
     'POST /agents' => 'route_agent_create',
     'POST /collections' => 'route_collection_create',
+    // AI module (modules/ai.php)
+    'GET /ai/fraud-queue' => 'route_fraud_queue',
+    'POST /ai/fraud-action' => 'route_fraud_action',
+    'POST /ai/loan-rescore' => 'route_loan_rescore',
+    'GET /ai/collection-anomalies' => 'route_collection_anomalies',
+    // Security centre (modules/defence.php)
+    'GET /security/events' => 'route_security_events',
+    'GET /security/audit' => 'route_security_audit',
+    'POST /security/seal' => 'route_integrity_seal',
 ];
 // Routes with an id in the path. Exact routes above are matched first.
 $paramRoutes = [
@@ -745,6 +775,10 @@ if ($handler === null) {
         }
     }
 }
+// Rate limiting runs before the handler, and before an unknown path is rejected,
+// so probing for routes costs an attacker the same budget as using them.
+guard_request($method, $route);
+
 if ($handler === null) {
     fail(404, 'Not Found');
 }
@@ -752,5 +786,6 @@ try {
     $handler(in_array($method, ['POST', 'PUT', 'PATCH'], true) ? body() : [], $param);
 } catch (Throwable $e) {
     error_log('AJSPay API error: ' . $e);
+    security_event('SERVER_ERROR', 'warning', get_class($e) . ' on ' . $route);
     fail(500, 'Something went wrong. Please try again.');
 }

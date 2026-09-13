@@ -100,11 +100,24 @@ function route_panel_loan_dept(array $d): void
     staff_user(['loan_officer', ...ADMIN_ROLES]);
     $apps = out_all(rows('SELECT * FROM loan_applications ORDER BY created_at DESC LIMIT 100'));
     $byStatus = array_count_values(array_column($apps, 'status'));
+    // Attach the AI module's grade and its reasons so the desk sees why.
+    foreach ($apps as &$app) {
+        $app['risk_score'] = $app['risk_score'] === null ? null : (int)$app['risk_score'];
+        $app['risk_reasons'] = $app['risk_reasons'] ? (json_decode((string)$app['risk_reasons'], true) ?: null) : null;
+    }
+    unset($app);
+    $graded = array_filter($apps, fn($a) => $a['risk_score'] !== null);
     respond([
         'kpis' => ['total_applications' => count($apps),
             'disbursed_amount' => (float)array_sum(array_column(array_filter($apps, fn($a) => $a['status'] === 'disbursed'), 'amount')),
             'in_review' => $byStatus['under_review'] ?? 0, 'documentation' => $byStatus['documentation'] ?? 0,
-            'approved' => $byStatus['approved'] ?? 0, 'npa_ratio' => '2.1%'],
+            'approved' => $byStatus['approved'] ?? 0,
+            // A real NPA ratio needs repayment and ageing data, which this system
+            // does not track, so we report what is actually measured instead of
+            // printing a number nobody computed.
+            'graded' => count($graded),
+            'avg_risk_score' => $graded ? (int)round(array_sum(array_column($graded, 'risk_score')) / count($graded)) : null,
+            'high_risk' => count(array_filter($graded, fn($a) => in_array($a['risk_grade'], ['D', 'E'], true)))],
         'applications' => $apps,
         'by_status' => (object)$byStatus,
     ]);

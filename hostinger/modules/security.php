@@ -16,6 +16,16 @@ function system_config(): array
     return $row ? (json_decode($row['data'], true) ?: []) : [];
 }
 
+// Merges keys into the stored runtime config, leaving the rest alone.
+function save_system_config(array $changes, array $by): void
+{
+    global $pdo;
+    $data = array_merge(system_config(), $changes);
+    $pdo->prepare("INSERT INTO system_config (id, data, updated_by) VALUES ('global', ?, ?)
+        ON DUPLICATE KEY UPDATE data = VALUES(data), updated_by = VALUES(updated_by)")
+        ->execute([json_encode($data, JSON_UNESCAPED_UNICODE), $by['email']]);
+}
+
 function secret_key(): string
 {
     global $config;

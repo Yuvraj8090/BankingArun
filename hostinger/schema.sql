@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     transaction_password_hash VARCHAR(255) NOT NULL,
     session_version INT NOT NULL DEFAULT 0,  -- bumped on logout to revoke issued tokens
+    -- Authenticator-app 2FA (modules/mfa.php). The secret is encrypted at rest
+    -- and the recovery codes are stored only as bcrypt hashes.
+    totp_secret VARCHAR(255),
+    totp_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    totp_backup_codes TEXT,
+    totp_enrolled_at DATETIME,
     branch VARCHAR(100),
     pan_number VARCHAR(10),
     aadhaar_number VARCHAR(20),              -- masked (XXXX-XXXX-1234); the full number is never stored
@@ -222,6 +228,11 @@ CREATE TABLE IF NOT EXISTS loan_applications (
     credit_score INT,
     status VARCHAR(30) NOT NULL DEFAULT 'under_review',
     decision_note VARCHAR(255),
+    -- Written by the AI module's credit grading (modules/ai.php)
+    risk_score INT,
+    risk_grade VARCHAR(2),
+    risk_reasons TEXT,
+    scored_at DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
     INDEX idx_status (status)
@@ -486,6 +497,46 @@ INSERT IGNORE INTO collection_cases (id, borrower, loan_ref, outstanding, dpd_da
 ('col-002', 'Sunita Deshmukh', 'HL-33112', 892000.00, 15, '2026-02-05', 'follow_up', '+91 98222 55667'),
 ('col-003', 'Kavita Rao', 'VL-77401', 45250.00, 90, '2026-01-10', 'legal_notice', '+91 98333 88991'),
 ('col-004', 'Amit Sinha', 'PL-88203', 22500.00, 5, '2026-02-12', 'reminder_sent', '+91 98444 12345');
+
+-- ---------------------------------------------------------------------------
+-- AI module: fraud/AML alerts and the security event log
+-- ---------------------------------------------------------------------------
+-- One row per transfer that scored above the alert floor. `reasons` holds the
+-- signals that produced the score, so every alert can be explained to a
+-- reviewer rather than being an opaque number.
+CREATE TABLE IF NOT EXISTS fraud_alerts (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36),
+    account_number VARCHAR(30),
+    ref_number VARCHAR(50),
+    amount DECIMAL(15,2) NOT NULL,
+    counterparty_acc VARCHAR(50),
+    counterparty_name VARCHAR(150),
+    score INT NOT NULL,
+    severity VARCHAR(10) NOT NULL,                  -- low | medium | high
+    reasons TEXT NOT NULL,                          -- JSON: [{code, label, weight}]
+    status VARCHAR(20) NOT NULL DEFAULT 'open',     -- open | cleared | escalated
+    reviewed_by VARCHAR(36),
+    review_note VARCHAR(255),
+    reviewed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status_score (status, score),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS security_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_type VARCHAR(40) NOT NULL,
+    severity VARCHAR(10) NOT NULL DEFAULT 'info',   -- info | warning | critical
+    user_id VARCHAR(36),
+    email VARCHAR(150),
+    ip VARCHAR(45),
+    route VARCHAR(120),
+    details VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_severity_time (severity, created_at),
+    INDEX idx_type_time (event_type, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- Scheme master and field agents (back office only; never shown publicly)

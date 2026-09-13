@@ -154,5 +154,17 @@ export const api = {
   agentUpdate: async (id, payload) => (await axios.patch(`${API}/agents/${id}`, payload, getAuthHeaders())).data,
   agentDelete: async (id) => (await axios.delete(`${API}/agents/${id}`, getAuthHeaders())).data,
   agentCollections: async (id) => (await axios.get(`${API}/agents/${id}/collections`, getAuthHeaders())).data,
-  collectionCreate: async (payload) => (await axios.post(`${API}/collections`, payload, getAuthHeaders())).data
+  collectionCreate: async (payload) => (await axios.post(`${API}/collections`, payload, getAuthHeaders())).data,
+
+  // AI module: fraud/AML, loan grading, collection anomalies
+  fraudQueue: async (status = 'open') => (await axios.get(`${API}/ai/fraud-queue?status=${status}`, getAuthHeaders())).data,
+  fraudAction: async (payload) => (await axios.post(`${API}/ai/fraud-action`, payload, getAuthHeaders())).data,
+  loanRescore: async () => (await axios.post(`${API}/ai/loan-rescore`, {}, getAuthHeaders())).data,
+  collectionAnomalies: async () => (await axios.get(`${API}/ai/collection-anomalies`, getAuthHeaders())).data,
+
+  // Security centre
+  securityAudit: async () => (await axios.get(`${API}/security/audit`, getAuthHeaders())).data,
+  securityEvents: async (severity) => (await axios.get(
+    `${API}/security/events${severity ? `?severity=${severity}` : ''}`, getAuthHeaders())).data,
+  securitySeal: async () => (await axios.post(`${API}/security/seal`, {}, getAuthHeaders())).data
 };

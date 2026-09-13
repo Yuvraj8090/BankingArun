@@ -65,6 +65,54 @@ CREATE TABLE IF NOT EXISTS agent_collections (
     FOREIGN KEY (scheme_id) REFERENCES schemes(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --- AI module: fraud alerts, security log, loan grading ------------------
+CREATE TABLE IF NOT EXISTS fraud_alerts (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36),
+    account_number VARCHAR(30),
+    ref_number VARCHAR(50),
+    amount DECIMAL(15,2) NOT NULL,
+    counterparty_acc VARCHAR(50),
+    counterparty_name VARCHAR(150),
+    score INT NOT NULL,
+    severity VARCHAR(10) NOT NULL,
+    reasons TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    reviewed_by VARCHAR(36),
+    review_note VARCHAR(255),
+    reviewed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status_score (status, score),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS security_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_type VARCHAR(40) NOT NULL,
+    severity VARCHAR(10) NOT NULL DEFAULT 'info',
+    user_id VARCHAR(36),
+    email VARCHAR(150),
+    ip VARCHAR(45),
+    route VARCHAR(120),
+    details VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_severity_time (severity, created_at),
+    INDEX idx_type_time (event_type, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE loan_applications
+    ADD COLUMN IF NOT EXISTS risk_score INT,
+    ADD COLUMN IF NOT EXISTS risk_grade VARCHAR(2),
+    ADD COLUMN IF NOT EXISTS risk_reasons TEXT,
+    ADD COLUMN IF NOT EXISTS scored_at DATETIME;
+
+-- --- Authenticator-app 2FA -------------------------------------------------
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS totp_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT,
+    ADD COLUMN IF NOT EXISTS totp_enrolled_at DATETIME;
+
 -- --- Columns cron.php writes ----------------------------------------------
 -- Without these the cron run fails on its first UPDATE.
 ALTER TABLE standing_instructions
