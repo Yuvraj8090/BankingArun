@@ -4,9 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { navFor, ROLE_LABEL } from '../navigation';
 
 export default function Sidebar({ activeTab, onSelectTab }) {
-  const { user } = useAuth();
+  const { user, features } = useAuth();
   const role = user?.role || 'retail';
-  const navItems = navFor(role);
+  const navItems = navFor(role, features);
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-4 shrink-0 min-h-[calc(100vh-4rem)]">

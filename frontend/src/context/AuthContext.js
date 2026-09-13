@@ -5,6 +5,9 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  // Regulated capabilities this institution may currently offer; the sidebar
+  // and route guard hide anything not in this list.
+  const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('banking_token') || null);
 
@@ -26,6 +29,7 @@ export const AuthProvider = ({ children }) => {
         });
         if (res.data?.user) {
           setUser(res.data.user);
+          if (Array.isArray(res.data.features)) setFeatures(res.data.features);
         } else {
           setUser(false);
         }
@@ -50,6 +54,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('banking_token', res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
+      if (Array.isArray(res.data.features)) setFeatures(res.data.features);
     }
     return res.data;
   };
@@ -60,6 +65,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('banking_token', res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
+      if (Array.isArray(res.data.features)) setFeatures(res.data.features);
     }
     return res.data;
   };
@@ -82,7 +88,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, setUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, setUser, features }}>
       {children}
     </AuthContext.Provider>
   );

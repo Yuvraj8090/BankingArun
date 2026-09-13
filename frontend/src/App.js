@@ -108,7 +108,7 @@ function AuthRoute({ isRegister }) {
 
 // ---------------- NetBanking ----------------
 function AppShell() {
-  const { user, loading } = useAuth();
+  const { user, loading, features } = useAuth();
   const { tab } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,7 +116,7 @@ function AppShell() {
   if (loading) return <Loading />;
   // Remember the requested page in router state, never in the URL.
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (!canOpen(user.role, tab)) return <Navigate to={homeFor(user.role)} replace />;
+  if (!canOpen(user.role, tab, features)) return <Navigate to={homeFor(user.role)} replace />;
 
   const go = (next) => navigate(`/app/${next}`);
   const pages = {

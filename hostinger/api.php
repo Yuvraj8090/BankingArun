@@ -12,6 +12,7 @@ require __DIR__ . '/modules/security.php';
 require __DIR__ . '/modules/staff.php';
 require __DIR__ . '/modules/master.php';
 require __DIR__ . '/modules/defence.php';
+require __DIR__ . '/modules/compliance.php';
 require __DIR__ . '/modules/mfa.php';
 require __DIR__ . '/modules/ai.php';
 
@@ -311,13 +312,15 @@ function route_login(array $d): void
             'message' => 'Enter the six-digit code from your authenticator app.']);
     }
     audit($user, 'USER_LOGIN', 'Logged in via ' . (clip($d['device_name'] ?? '', 100) ?: 'web'));
-    respond(['token' => start_session($user), 'user' => public_user($user),
+    respond(['token' => start_session($user), 'user' => public_user($user), 'features' => enabled_capabilities(),
         'message' => 'Login successful', 'mfa_verified' => false]);
 }
 
 function route_me(array $d): void
 {
-    respond(['user' => public_user(current_user())]);
+    // `features` tells the app which regulated services it may show; see
+    // modules/compliance.php.
+    respond(['user' => public_user(current_user()), 'features' => enabled_capabilities()]);
 }
 
 function route_logout(array $d): void
@@ -410,6 +413,24 @@ function route_transfer(array $d): void
         fail(400, 'Insufficient balance. Available: ' . rupees((float)$sender['balance']));
     }
 
+    // A payee outside AJSPay is an interbank transfer: it only debits here.
+    $receiver = $locked[$to] ?? null;
+    // Sending money out of this institution needs payment-system authorisation.
+    // Moving it between two member accounts is a book entry on our own ledger
+    // and does not. Decided before anything is debited, and before a transfer
+    // can be parked as a scheduled one.
+    if ($mode === 'UPI') {
+        require_capability('upi');
+    }
+    if ($receiver === null) {
+        require_capability('payment_systems');
+    } else {
+        require_capability('internal_transfers');
+        if (!capability_enabled('payment_systems')) {
+            $mode = 'INTERNAL';  // call it what it actually is
+        }
+    }
+
     if ($scheduleDate !== null) {
         $id = uuid4();
         $pdo->prepare('INSERT INTO scheduled_payments (id, user_id, from_account_number, to_account_number,
@@ -423,8 +444,6 @@ function route_transfer(array $d): void
             'schedule_id' => $id]);
     }
 
-    // A payee outside AJSPay is an interbank transfer: it only debits here.
-    $receiver = $locked[$to] ?? null;
     if ($receiver && $receiver['status'] !== 'active') {
         fail(400, 'The beneficiary account cannot receive funds right now.');
     }
@@ -738,6 +757,9 @@ $routes = [
     'GET /security/events' => 'route_security_events',
     'GET /security/audit' => 'route_security_audit',
     'POST /security/seal' => 'route_integrity_seal',
+    // Regulated-capability register (modules/compliance.php)
+    'GET /compliance/capabilities' => 'route_capabilities',
+    'PUT /compliance/capability' => 'route_capability_set',
 ];
 // Routes with an id in the path. Exact routes above are matched first.
 $paramRoutes = [
@@ -778,6 +800,12 @@ if ($handler === null) {
 // Rate limiting runs before the handler, and before an unknown path is rejected,
 // so probing for routes costs an attacker the same budget as using them.
 guard_request($method, $route);
+
+// Features that need an authorisation this entity does not hold are refused
+// here, before the handler runs, so the gate cannot be missed by a code path.
+if (isset(ROUTE_CAPABILITIES["$method $route"])) {
+    require_capability(ROUTE_CAPABILITIES["$method $route"]);
+}
 
 if ($handler === null) {
     fail(404, 'Not Found');

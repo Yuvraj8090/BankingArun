@@ -255,6 +255,6 @@ function route_login_totp(array $d): void
     }
     clear_fails($identifier);
     audit($user, 'USER_LOGIN', 'Signed in with an authenticator code');
-    respond(['token' => start_session($user), 'user' => public_user($user),
+    respond(['token' => start_session($user), 'user' => public_user($user), 'features' => enabled_capabilities(),
         'message' => 'Login successful', 'mfa_verified' => true]);
 }

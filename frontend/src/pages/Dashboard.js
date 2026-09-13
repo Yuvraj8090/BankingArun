@@ -5,10 +5,16 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
 export default function Dashboard({ onNavigate }) {
   const { currentTheme } = useBankTheme();
+  // Services this institution is not yet authorised to offer must not appear
+  // on the dashboard either (see hostinger/modules/compliance.php).
+  const { features } = useAuth();
+  const canCards = features?.includes('debit_cards');
+  const canUpi = features?.includes('upi');
   const [data, setData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +118,7 @@ export default function Dashboard({ onNavigate }) {
             onClick={() => setShowQuickTransfer(true)}
             className={`px-4 py-2 rounded-xl text-xs font-semibold ${currentTheme.buttonTheme} flex items-center gap-2 shadow-lg`}
           >
-            <Send className="w-3.5 h-3.5" /> Quick Pay (IMPS/UPI)
+            <Send className="w-3.5 h-3.5" /> {canUpi ? 'Quick Pay (IMPS/UPI)' : 'Pay a member'}
           </button>
         </div>
       </div>
@@ -174,7 +180,7 @@ export default function Dashboard({ onNavigate }) {
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-            <span>UPI ID: <strong className="text-slate-300">{primaryAcc?.upi_id}</strong></span>
+            <span>{canUpi ? <>UPI ID: <strong className="text-slate-300">{primaryAcc?.upi_id}</strong></> : 'Member account'}</span>
             <span className="text-emerald-400 flex items-center gap-1">
               <CheckCircle className="w-3 h-3" /> Member deposits
             </span>
@@ -245,8 +251,8 @@ export default function Dashboard({ onNavigate }) {
         {/* Virtual Debit Card Widget & Quick Actions */}
         <div className="space-y-6">
           
-          {/* Card Preview */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          {/* Card Preview — hidden until card issuance is authorised */}
+          {canCards && <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="font-bold text-white text-xs">Primary Debit Card</h3>
               <button onClick={() => onNavigate('cards')} className="text-xs text-cyan-400 hover:underline">
@@ -298,7 +304,7 @@ export default function Dashboard({ onNavigate }) {
                 Cheque Book
               </button>
             </div>
-          </div>
+          </div>}
 
           {/* Core Banking Fast Actions */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-2.5">

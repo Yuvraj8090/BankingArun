@@ -11,7 +11,7 @@ export const NAV_BY_ROLE = {
   retail: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, testId: 'tab-dashboard' },
     { id: 'transfer', label: 'Transfers', icon: ArrowRightLeft, testId: 'tab-transfer' },
-    { id: 'cards', label: 'Cards & UPI', icon: CreditCard, testId: 'tab-cards' },
+    { id: 'cards', label: 'Cards & UPI', icon: CreditCard, testId: 'tab-cards', requires: 'debit_cards' },
     { id: 'deposits', label: 'Deposits', icon: PiggyBank, testId: 'tab-deposits' },
     { id: 'loans', label: 'Loans', icon: Banknote, testId: 'tab-loans' },
     { id: 'standing-instructions', label: 'Standing Instructions', icon: Repeat, testId: 'tab-si' },
@@ -25,7 +25,7 @@ export const NAV_BY_ROLE = {
   corporate: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, testId: 'tab-dashboard' },
     { id: 'transfer', label: 'Bulk Transfers', icon: ArrowRightLeft, testId: 'tab-transfer' },
-    { id: 'cards', label: 'Cards & UPI', icon: CreditCard, testId: 'tab-cards' },
+    { id: 'cards', label: 'Cards & UPI', icon: CreditCard, testId: 'tab-cards', requires: 'debit_cards' },
     { id: 'deposits', label: 'Treasury', icon: PiggyBank, testId: 'tab-deposits' },
     { id: 'loans', label: 'Trade Finance', icon: Banknote, testId: 'tab-loans' },
     { id: 'standing-instructions', label: 'Standing Instructions', icon: Repeat, testId: 'tab-si' },
@@ -101,7 +101,15 @@ export const ROLE_LABEL = {
   staff: 'Staff / Teller', collection_agent: 'Collections', loan_officer: 'Loan Officer'
 };
 
-export const navFor = (role) => NAV_BY_ROLE[role] || NAV_BY_ROLE.retail;
+// `features` is the list of regulated capabilities this institution is
+// currently authorised to offer (see hostinger/modules/compliance.php). A tab
+// whose `requires` is not in that list is hidden and its URL is not openable,
+// so members are never shown a service the server would refuse.
+const allowed = (item, features) =>
+  !item.requires || !Array.isArray(features) || features.includes(item.requires);
+
+export const navFor = (role, features) =>
+  (NAV_BY_ROLE[role] || NAV_BY_ROLE.retail).filter((item) => allowed(item, features));
 export const homeFor = (role) => `/app/${ROLE_HOME[role] || 'dashboard'}`;
-export const canOpen = (role, tab) =>
-  ALWAYS_ALLOWED.includes(tab) || navFor(role).some((item) => item.id === tab);
+export const canOpen = (role, tab, features) =>
+  ALWAYS_ALLOWED.includes(tab) || navFor(role, features).some((item) => item.id === tab);
