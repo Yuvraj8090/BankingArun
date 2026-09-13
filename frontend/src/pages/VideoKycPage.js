@@ -114,7 +114,7 @@ export default function VideoKycPage() {
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Video className="w-5 h-5 text-white" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Video KYC — Instant Verification</h1>
-            <p className="text-xs text-slate-500">RBI-compliant video KYC · No branch visit needed · Approved within 24 hours</p>
+            <p className="text-xs text-slate-500">PAN &amp; Aadhaar video KYC · No branch visit needed · Reviewed within 24 hours</p>
           </div>
         </div>
         {/* Progress */}
@@ -222,7 +222,7 @@ export default function VideoKycPage() {
           ))}
           <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
             <p>• 3 items required · Selfie is used only for face-match with your PAN card</p>
-            <p>• All frames are transmitted over 256-bit TLS and stored in RBI-compliant vault</p>
+            <p>• All frames are transmitted over 256-bit TLS and stored encrypted</p>
             <p>• Manual verification by branch officer within 24 hours</p>
           </div>
         </div>

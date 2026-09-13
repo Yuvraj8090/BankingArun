@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Search
 } from 'lucide-react';
+import Brand from './Brand';
+import { ROLE_HOME } from '../navigation';
 
 const ROLE_BADGE = {
   retail: { label: 'Customer', color: 'bg-blue-50 text-[#0b3b8c] border-blue-200' },
@@ -26,23 +28,13 @@ export default function Navbar({ onNavigate, activeTab }) {
         <div className="flex items-center justify-between h-16 gap-4">
 
           {/* Brand */}
-          <div
-            className="flex items-center gap-3 cursor-pointer shrink-0"
-            onClick={() => onNavigate(user?.role === 'bank_owner' ? 'owner' : user?.role === 'retail' || user?.role === 'corporate' ? 'dashboard' : 'admin')}
+          <button
+            className="flex items-center gap-3 shrink-0"
+            onClick={() => onNavigate(ROLE_HOME[user?.role] || 'dashboard')}
             data-testid="bank-logo-btn"
           >
-            <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <div className="leading-tight hidden sm:block">
-              <div className="font-bold text-base text-slate-900">
-                AJSPay
-              </div>
-              <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" /> Secure NetBanking
-              </div>
-            </div>
-          </div>
+            <Brand variant="compact" height={34} />
+          </button>
 
           {/* Search */}
           <div className="flex-1 max-w-md hidden md:flex">

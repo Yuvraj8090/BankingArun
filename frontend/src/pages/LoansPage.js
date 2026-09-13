@@ -242,7 +242,7 @@ export default function LoansPage() {
 
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
               <p className="font-semibold text-slate-200">Zero Foreclosure Charges:</p>
-              <p>As per RBI guidelines, no penalty on floating interest rate loans prepayment.</p>
+              <p>As per our credit policy, there is no prepayment penalty on floating-rate loans.</p>
             </div>
           </div>
         </div>

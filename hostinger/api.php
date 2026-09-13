@@ -1,11 +1,15 @@
 <?php
-// AJSPay: Hostinger PHP/MySQL REST API.
-// Serves the same /api/* routes and JSON shapes as the FastAPI backend, so the
-// React app runs against it unchanged. Ported so far: auth, accounts and
-// transfers, cards, UPI. Routes that are not ported yet answer 404.
+// AJSPay: Hostinger PHP/MySQL REST API (front controller).
+// Serves the same /api/* routes and JSON shapes the React app expects. Core
+// banking (auth, accounts, transfers, cards, UPI) lives here; the other feature
+// areas live in modules/.
 declare(strict_types=1);
 
 require __DIR__ . '/db.php';
+require __DIR__ . '/modules/banking.php';
+require __DIR__ . '/modules/statements.php';
+require __DIR__ . '/modules/security.php';
+require __DIR__ . '/modules/staff.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
 const TRANSFER_MODES = ['IMPS', 'NEFT', 'RTGS', 'UPI'];
@@ -26,6 +30,11 @@ const PHYSICAL_DEBIT_CARD = ['bin' => '5241', 'type' => 'RuPay / Mastercard Glob
 function b64url(string $raw): string
 {
     return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+}
+
+function b64url_decode(string $s): string
+{
+    return base64_decode(strtr($s, '-_', '+/') . str_repeat('=', (4 - strlen($s) % 4) % 4), true) ?: '';
 }
 
 function sign(string $payload): string
@@ -75,7 +84,7 @@ function current_user(): array
     if (!hash_equals(sign($payload), $signature)) {
         fail(401, 'Invalid session token.');
     }
-    $claims = json_decode((string)base64_decode(strtr($payload, '-_', '+/')), true);
+    $claims = json_decode(b64url_decode($payload), true);
     if (!is_array($claims) || ($claims['exp'] ?? 0) < time()) {
         fail(401, 'Session expired. Please log in again.');
     }
@@ -95,9 +104,11 @@ function public_user(array $user): array
     return out($user);
 }
 
+// The PIN is never stored in the clear, and the CVV is only released through
+// /cards/reveal-cvv after a transaction-password check.
 function public_card(array $card): array
 {
-    unset($card['pin_hash']);
+    unset($card['pin_hash'], $card['cvv']);
     return out($card);
 }
 
@@ -152,7 +163,7 @@ function insert_txn(array $t): void
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([uuid4(), $t['user_id'], $t['account_number'], $t['type'], $t['mode'], $t['amount'],
             $t['balance_after'], $t['counterparty_name'], $t['counterparty_acc'], $t['ref_number'],
-            $t['batch_ref'] ?? null, $t['description'], $t['timestamp'] ?? now_utc()]);
+            $t['batch_ref'] ?? null, mb_substr($t['description'], 0, 255), $t['timestamp'] ?? now_utc()]);
 }
 
 // New cards get a random PIN nobody knows: the cardholder sets their own via "Set PIN".
@@ -177,6 +188,24 @@ function owned_account(array $user, mixed $accountNumber, bool $forUpdate = fals
 {
     return row('SELECT * FROM accounts WHERE account_number = ? AND user_id = ?' . ($forUpdate ? ' FOR UPDATE' : ''),
         [clip($accountNumber, 30), $user['id']]);
+}
+
+// Locks the customer's account and debits it; the caller must be inside a DB transaction.
+function debit_account(array $user, mixed $accountNumber, float $total, string $insufficientMessage): array
+{
+    global $pdo;
+    $account = owned_account($user, $accountNumber, true);
+    if (!$account) {
+        fail(404, 'Account not found.');
+    }
+    if ($account['status'] !== 'active') {
+        fail(403, 'This account is not active for outgoing payments.');
+    }
+    if ((float)$account['balance'] < $total) {
+        fail(400, $insufficientMessage);
+    }
+    $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$total, $account['id']]);
+    return [$account, round((float)$account['balance'] - $total, 2)];
 }
 
 // --- Auth ----------------------------------------------------------------------------
@@ -240,13 +269,14 @@ function route_register(array $d): void
         'mode' => 'ACCOUNT_OPENING', 'amount' => $initial, 'balance_after' => $initial,
         'counterparty_name' => 'Account Opening Initial Fund', 'counterparty_acc' => 'BRANCH-CASH-DESK',
         'ref_number' => 'AOF-' . random_int(1000000, 9999999), 'description' => 'Initial account deposit']);
+    $code = strtoupper(clip($d['referral_code'] ?? '', 12));
+    $bonus = $code === '' ? null : apply_referral_bonus($userId, $name, $email, $accountNumber, $initial, $code);
     $user = row('SELECT * FROM users WHERE id = ?', [$userId]);
     audit($user, 'USER_REGISTER', "Opened account $accountNumber");
     $pdo->commit();
 
-    // Referral codes aren't ported yet, so no signup bonus is applied here.
     respond(['token' => start_session($user), 'user' => public_user($user),
-        'account_number' => $accountNumber, 'referral_bonus' => null]);
+        'account_number' => $accountNumber, 'referral_bonus' => $bonus]);
 }
 
 function route_login(array $d): void
@@ -342,11 +372,9 @@ function route_transfer(array $d): void
     }
     $scheduleDate = null;
     if (!empty($d['is_scheduled']) && !empty($d['schedule_date'])) {
-        $scheduleDate = clip($d['schedule_date'], 10);
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $scheduleDate, new DateTimeZone(IST));
-        if (!$date || $date->format('Y-m-d') !== $scheduleDate
-            || $date < new DateTimeImmutable('today', new DateTimeZone(IST))) {
-            fail(422, 'schedule_date must be a valid date (YYYY-MM-DD), today or later.');
+        $scheduleDate = valid_date($d['schedule_date'], 'schedule_date');
+        if ($scheduleDate < (new DateTimeImmutable('today', new DateTimeZone(IST)))->format('Y-m-d')) {
+            fail(422, 'schedule_date must be today or later.');
         }
     }
     check_txn_password($user, $d['transaction_password'], 'Invalid Transaction Password. Transfer declined.');
@@ -384,7 +412,7 @@ function route_transfer(array $d): void
             'schedule_id' => $id]);
     }
 
-    // A payee outside AJSPay is an interbank transfer: it only debits here, as in FastAPI.
+    // A payee outside AJSPay is an interbank transfer: it only debits here.
     $receiver = $locked[$to] ?? null;
     if ($receiver && $receiver['status'] !== 'active') {
         fail(400, 'The beneficiary account cannot receive funds right now.');
@@ -441,18 +469,8 @@ function route_bulk_transfer(array $d): void
     check_txn_password($user, $d['transaction_password'], 'Invalid Transaction Password.');
 
     $pdo->beginTransaction();
-    $sender = owned_account($user, $d['from_account_number'], true);
-    if (!$sender) {
-        fail(404, 'Source corporate account not found.');
-    }
-    if ($sender['status'] !== 'active') {
-        fail(403, 'This account is not active for outgoing payments.');
-    }
-    if ((float)$sender['balance'] < $total) {
-        fail(400, 'Insufficient corporate balance. Total batch requires ' . rupees($total));
-    }
-    $newBalance = round((float)$sender['balance'] - $total, 2);
-    $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$total, $sender['id']]);
+    [$sender, $newBalance] = debit_account($user, $d['from_account_number'], $total,
+        'Insufficient corporate balance. Total batch requires ' . rupees($total));
     $batch = 'BATCH-CORP-' . gmdate('Ymd') . '-' . random_int(1000, 9999);
     $processed = [];
     foreach ($payouts as $p) {
@@ -477,6 +495,19 @@ function route_cards(array $d): void
         rows('SELECT * FROM cards WHERE user_id = ? ORDER BY created_at, id', [$user['id']]))]);
 }
 
+function route_reveal_cvv(array $d): void
+{
+    $user = current_user();
+    need($d, 'card_id', 'transaction_password');
+    $card = row('SELECT id, cvv, card_number FROM cards WHERE id = ? AND user_id = ?', [clip($d['card_id'], 36), $user['id']]);
+    if (!$card) {
+        fail(404, 'Debit card not found.');
+    }
+    check_txn_password($user, $d['transaction_password'], 'Invalid Transaction Password.');
+    audit($user, 'CARD_CVV_REVEALED', 'Card ending ' . substr($card['card_number'], -4));
+    respond(['card_id' => $card['id'], 'cvv' => $card['cvv']]);
+}
+
 function route_manage_card(array $d): void
 {
     global $pdo;
@@ -486,7 +517,7 @@ function route_manage_card(array $d): void
     if (!$card) {
         fail(404, 'Debit card not found.');
     }
-    // Hotlisting is permanent (FastAPI let a hotlisted card be unfrozen again).
+    // Hotlisting is permanent.
     if ($card['status'] === 'hotlisted') {
         fail(400, 'This card is permanently hotlisted and can no longer be changed.');
     }
@@ -536,10 +567,11 @@ function route_manage_card(array $d): void
         'card' => public_card(row('SELECT * FROM cards WHERE id = ?', [$card['id']]))]);
 }
 
+// The account number travels in the JSON body, never the URL, so it stays out of logs.
 function route_request_physical_card(array $d): void
 {
     $user = current_user();
-    $account = owned_account($user, $_GET['account_number'] ?? '');
+    $account = owned_account($user, $d['account_number'] ?? '');
     if (!$account) {
         fail(404, 'Account not found.');
     }
@@ -605,9 +637,7 @@ function route_upi_qr(array $d): void
 
 // --- Router ------------------------------------------------------------------------------
 $routes = [
-    'GET /upi/status' => 'route_upi_status',
-    'POST /upi/link-card' => 'route_upi_link_card',
-    'GET /upi/qr' => 'route_upi_qr',
+    // Auth & accounts
     'POST /auth/register' => 'route_register',
     'POST /auth/login' => 'route_login',
     'GET /auth/me' => 'route_me',
@@ -617,20 +647,91 @@ $routes = [
     'GET /accounts/transactions' => 'route_transactions',
     'POST /accounts/transfer' => 'route_transfer',
     'POST /accounts/bulk-transfer' => 'route_bulk_transfer',
+    // Cards & UPI
     'GET /cards' => 'route_cards',
     'POST /cards/manage' => 'route_manage_card',
     'POST /cards/request-physical' => 'route_request_physical_card',
+    'POST /cards/reveal-cvv' => 'route_reveal_cvv',
+    'GET /upi/status' => 'route_upi_status',
+    'POST /upi/link-card' => 'route_upi_link_card',
+    'GET /upi/qr' => 'route_upi_qr',
+    // Banking services (modules/banking.php)
+    'POST /services/cheque-book' => 'route_cheque_book',
+    'POST /services/stop-cheque' => 'route_stop_cheque',
+    'POST /services/demand-draft' => 'route_demand_draft',
+    'POST /deposits/book' => 'route_book_deposit',
+    'POST /loans/apply' => 'route_apply_loan',
+    'GET /loans/my-applications' => 'route_my_loans',
+    'GET /investments/catalog' => 'route_investment_catalog',
+    'POST /investments/invest' => 'route_invest',
+    'GET /investments/my-portfolio' => 'route_portfolio',
+    'POST /support/complaint' => 'route_complaint',
+    'GET /support/my-tickets' => 'route_my_tickets',
+    'POST /support/chat' => 'route_chat',
+    'GET /branches/locator' => 'route_branches',
+    'GET /referrals/my-code' => 'route_referral_code',
+    'GET /referrals/history' => 'route_referral_history',
+    'GET /standing-instructions' => 'route_si_list',
+    'POST /standing-instructions' => 'route_si_create',
+    // Statements (modules/statements.php)
+    'POST /statements/pdf' => 'route_statement_pdf',
+    'POST /statements/excel' => 'route_statement_excel',
+    // OTP & passkeys (modules/security.php)
+    'POST /otp/send' => 'route_otp_send',
+    'POST /otp/verify' => 'route_otp_verify',
+    'POST /passkey/register/challenge' => 'route_passkey_register_challenge',
+    'POST /passkey/register/complete' => 'route_passkey_register_complete',
+    'POST /passkey/login/challenge' => 'route_passkey_login_challenge',
+    'POST /passkey/login/complete' => 'route_passkey_login_complete',
+    'GET /passkey/list' => 'route_passkey_list',
+    // Staff, admin & KYC (modules/staff.php)
+    'GET /panel/bank-owner' => 'route_panel_bank_owner',
+    'GET /panel/staff' => 'route_panel_staff',
+    'GET /panel/collection' => 'route_panel_collection',
+    'POST /panel/collection/action' => 'route_collection_action',
+    'GET /panel/loan-dept' => 'route_panel_loan_dept',
+    'POST /panel/loan-dept/decision' => 'route_loan_decision',
+    'GET /admin/overview' => 'route_admin_overview',
+    'POST /admin/kyc-action' => 'route_admin_kyc_action',
+    'GET /admin/rbi-reports' => 'route_rbi_reports',
+    'GET /admin/config' => 'route_admin_config_get',
+    'PUT /admin/config' => 'route_admin_config_set',
+    'POST /kyc/video/submit' => 'route_kyc_submit',
+    'GET /kyc/video/queue' => 'route_kyc_queue',
+    'POST /kyc/video/decision' => 'route_kyc_decision',
+    'GET /hostinger/package' => 'route_hostinger_package',
+    'GET /hostinger/download-zip' => 'route_hostinger_zip',
+];
+// Routes with an id in the path. Exact routes above are matched first.
+$paramRoutes = [
+    ['PATCH', '#^/standing-instructions/([\w-]{1,64})$#', 'route_si_update'],
+    ['DELETE', '#^/standing-instructions/([\w-]{1,64})$#', 'route_si_delete'],
+    ['POST', '#^/standing-instructions/([\w-]{1,64})/pause$#', 'route_si_pause'],
+    ['POST', '#^/standing-instructions/([\w-]{1,64})/resume$#', 'route_si_resume'],
+    ['DELETE', '#^/passkey/([\w-]{1,64})$#', 'route_passkey_delete'],
+    ['GET', '#^/kyc/video/([\w-]{1,64})/face-match$#', 'route_kyc_face_match'],
+    ['GET', '#^/kyc/video/([\w-]{1,64})$#', 'route_kyc_detail'],
 ];
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $apiAt = strpos($path, '/api/');
-$handler = $apiAt === false ? null : ($routes[$method . ' ' . rtrim(substr($path, $apiAt + 4), '/')] ?? null);
+$route = $apiAt === false ? '' : rtrim(substr($path, $apiAt + 4), '/');
+$handler = $routes["$method $route"] ?? null;
+$param = '';
+if ($handler === null) {
+    foreach ($paramRoutes as [$routeMethod, $pattern, $fn]) {
+        if ($routeMethod === $method && preg_match($pattern, $route, $match)) {
+            [$handler, $param] = [$fn, $match[1]];
+            break;
+        }
+    }
+}
 if ($handler === null) {
     fail(404, 'Not Found');
 }
 try {
-    $handler(in_array($method, ['POST', 'PUT', 'PATCH'], true) ? body() : []);
+    $handler(in_array($method, ['POST', 'PUT', 'PATCH'], true) ? body() : [], $param);
 } catch (Throwable $e) {
     error_log('AJSPay API error: ' . $e);
     fail(500, 'Something went wrong. Please try again.');

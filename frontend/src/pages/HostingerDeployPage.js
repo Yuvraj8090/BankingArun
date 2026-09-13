@@ -27,9 +27,14 @@ export default function HostingerDeployPage() {
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
-  const handleDownloadZip = () => {
-    window.open(`${BACKEND_URL}/api/hostinger/download-zip`, '_blank');
-    toast.success("Downloading hostinger_banking_php_mysql_package.zip");
+  // Authenticated download: the export is restricted to admins and the bank owner.
+  const handleDownloadZip = async () => {
+    try {
+      await api.downloadHostingerZip();
+      toast.success('Downloading hostinger_banking_php_mysql_package.zip');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Download failed');
+    }
   };
 
   const copyCode = (text) => {
@@ -37,7 +42,7 @@ export default function HostingerDeployPage() {
     toast.success("Copied to clipboard!");
   };
 
-  // What the PHP/MySQL port in /hostinger covers today. FastAPI serves every module.
+  // Every module now runs on the PHP/MySQL backend in /hostinger.
   const capabilityData = [
     { module: "Login, Registration & Sessions", ported: true },
     { module: "Accounts, Balances & Transaction History", ported: true },
@@ -45,13 +50,13 @@ export default function HostingerDeployPage() {
     { module: "Corporate Bulk CMS Batch Transfers", ported: true },
     { module: "Debit Cards: Freeze, Hotlist, Limits & PIN", ported: true },
     { module: "UPI VPA & QR Payments", ported: true },
-    { module: "Online FD / RD Booking", ported: false },
-    { module: "Loans & EMI Applications", ported: false },
-    { module: "Mutual Funds & Insurance", ported: false },
-    { module: "Cheque Book, Stop Payment & Demand Drafts", ported: false },
-    { module: "Support Chatbot & Complaints", ported: false },
-    { module: "KYC, Passkeys, OTP & Statements", ported: false },
-    { module: "Admin, RBI Reports & Staff Panels", ported: false }
+    { module: "Online FD / RD Booking", ported: true },
+    { module: "Loans & EMI Applications", ported: true },
+    { module: "Mutual Funds & Insurance", ported: true },
+    { module: "Cheque Book, Stop Payment & Demand Drafts", ported: true },
+    { module: "Support Chatbot & Complaints", ported: true },
+    { module: "Statements (PDF/Excel), Video KYC, Passkeys & OTP", ported: true },
+    { module: "Admin, Compliance Reports & Staff Panels", ported: true }
   ];
   const portedCount = capabilityData.filter(row => row.ported).length;
 

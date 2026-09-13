@@ -56,7 +56,7 @@ export default function AdminPortal() {
   const tabs = [
     { key: 'overview', label: 'Branch Overview', icon: BarChart3 },
     { key: 'kyc', label: `Pending KYC (${overview?.stats?.pending_kyc_count || 0})`, icon: UserCheck },
-    { key: 'rbi', label: 'RBI Reports (CTR/STR)', icon: FileText },
+    { key: 'rbi', label: 'Regulatory Reports (CTR/STR)', icon: FileText },
     { key: 'audits', label: 'Audit Trails', icon: ShieldCheck }
   ];
 
@@ -73,10 +73,10 @@ export default function AdminPortal() {
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                  Branch Manager &amp; RBI Compliance Portal
+                  Branch Manager &amp; Compliance Portal
                 </h1>
                 <p className="text-[11px] text-slate-500">
-                  Nariman Point Main Branch (AJSP-MUM-042) · RBI Master Direction KYC · PMLA Section 12
+                  Nariman Point Main Branch (AJSP-MUM-042) · PAN/Aadhaar KYC · PMLA Section 12
                 </p>
               </div>
             </div>
@@ -212,10 +212,10 @@ export default function AdminPortal() {
         <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Reserve Bank of India — Statutory Reporting</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Statutory Reporting — PMLA / FIU-IND</h2>
               <p className="text-[11px] text-slate-500">PMLA Sec 12 &amp; Master Direction KYC 2016 formats</p>
             </div>
-            <button data-testid="export-rbi-csv" onClick={() => toast.success("RBI Statutory Report CSV downloaded")}
+            <button data-testid="export-rbi-csv" onClick={() => toast.success("Statutory report CSV downloaded")}
               className="px-3 py-1.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold flex items-center gap-1.5">
               <Download className="w-3.5 h-3.5" /> Export CSV
             </button>
@@ -229,10 +229,10 @@ export default function AdminPortal() {
           </div>
 
           <div className="p-5 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <ComplianceItem label="Cash Reserve Ratio (CRR)" value={rbiReports?.statutory_compliance?.crr_cash_reserve_ratio} />
-            <ComplianceItem label="Statutory Liquidity (SLR)" value={rbiReports?.statutory_compliance?.slr_statutory_liquidity_ratio} />
-            <ComplianceItem label="Liquidity Coverage (LCR)" value={rbiReports?.statutory_compliance?.lcr_liquidity_coverage_ratio} />
-            <ComplianceItem label="Capital Adequacy (CAR)" value={rbiReports?.statutory_compliance?.car_capital_adequacy_ratio} />
+            <ComplianceItem label="Net Owned Funds (NOF)" value={rbiReports?.statutory_compliance?.net_owned_funds} />
+            <ComplianceItem label="NOF : Deposits ratio" value={rbiReports?.statutory_compliance?.nof_to_deposits_ratio} />
+            <ComplianceItem label="Unencumbered term deposits" value={rbiReports?.statutory_compliance?.unencumbered_term_deposits} />
+            <ComplianceItem label="Deposits from members only" value={rbiReports?.statutory_compliance?.member_only_deposits} />
           </div>
         </div>
       )}

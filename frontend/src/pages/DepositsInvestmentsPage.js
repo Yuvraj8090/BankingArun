@@ -150,7 +150,7 @@ export default function DepositsInvestmentsPage() {
           <div className="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex justify-between items-center">
               <span>Book Online Fixed / Recurring Deposit</span>
-              <span className="text-cyan-400 text-xs font-mono">DICGC Insured up to ₹5 Lakh</span>
+              <span className="text-cyan-400 text-xs font-mono">Member deposits · Not DICGC insured</span>
             </h2>
 
             <form onSubmit={handleBookDeposit} className="space-y-4 text-xs">
@@ -269,7 +269,7 @@ export default function DepositsInvestmentsPage() {
 
             <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/20 text-[11px] text-cyan-300 space-y-1">
               <p className="font-semibold">Senior Citizen Benefit:</p>
-              <p>Additional 0.50% interest auto-applied for customers aged 60+ as per RBI regulations.</p>
+              <p>Additional 0.50% interest auto-applied for customers aged 60+ as per our deposit policy.</p>
             </div>
           </div>
 

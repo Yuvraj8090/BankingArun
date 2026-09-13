@@ -95,7 +95,7 @@ def test_branch_locator_and_admin_reports_permissions():
     overview = admin.get(f"{BASE_URL}/api/admin/overview", timeout=20)
     reports = admin.get(f"{BASE_URL}/api/admin/rbi-reports", timeout=20)
     assert overview.status_code == 200 and overview.json()["stats"]["total_customers"] >= 3
-    assert reports.status_code == 200 and reports.json()["regulatory_authority"] == "Reserve Bank of India (RBI)"
+    assert reports.status_code == 200 and "FIU-IND" in reports.json()["regulatory_authority"]
 
 
 def test_hostinger_package_and_download_zip():

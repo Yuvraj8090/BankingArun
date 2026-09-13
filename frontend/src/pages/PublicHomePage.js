@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ShieldCheck, ArrowRight, Lock, UserPlus, Calculator, PiggyBank,
-  Banknote, CreditCard, CheckCircle2, Globe, Award, Home as HomeIcon,
+  Banknote, CreditCard, CheckCircle2, Fingerprint, HomeIcon,
   Car, GraduationCap, Briefcase, TrendingUp, Umbrella, ChevronRight,
-  Phone, HelpCircle
+  Phone, HelpCircle, MapPin, Video
 } from 'lucide-react';
 
-export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
+export default function PublicHomePage() {
   // Calculators
   const [calcType, setCalcType] = useState('emi');
   const [emiAmount, setEmiAmount] = useState(500000);
@@ -32,21 +33,27 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
     { label: 'RBI Repo Rate', value: '6.50%' }
   ];
 
+  // Every product tile is its own page at its own URL.
   const products = [
-    { icon: PiggyBank, label: 'Savings Account', desc: 'Zero balance, up to 4% p.a.', color: 'text-blue-800' },
-    { icon: HomeIcon, label: 'Home Loan', desc: 'From 8.40% p.a. · 30 yrs', color: 'text-emerald-700' },
-    { icon: Car, label: 'Vehicle Loan', desc: 'Instant approval · 8.75%', color: 'text-slate-700' },
-    { icon: CreditCard, label: 'Debit / Credit Card', desc: 'Reward points, offers', color: 'text-[#c8102e]' },
-    { icon: TrendingUp, label: 'Fixed Deposit', desc: 'Up to 7.75% for seniors', color: 'text-blue-800' },
-    { icon: Briefcase, label: 'Corporate Banking', desc: 'Bulk NEFT · Trade finance', color: 'text-slate-700' },
-    { icon: GraduationCap, label: 'Education Loan', desc: 'Study in India / Abroad', color: 'text-emerald-700' },
-    { icon: Umbrella, label: 'Insurance', desc: 'Term · Health · Motor', color: 'text-[#c8102e]' }
+    { icon: PiggyBank, label: 'Savings Account', desc: 'Zero balance, 4.00% p.a.', to: '/personal/savings-account', color: 'text-blue-800' },
+    { icon: HomeIcon, label: 'Home Loan', desc: 'From 8.40% p.a. · 30 yrs', to: '/loans/home-loan', color: 'text-emerald-700' },
+    { icon: Car, label: 'Vehicle Loan', desc: 'From 8.75% p.a.', to: '/loans/vehicle-loan', color: 'text-slate-700' },
+    { icon: CreditCard, label: 'Debit & Credit Cards', desc: 'Freeze, limits, UPI', to: '/personal/debit-cards', color: 'text-[#c8102e]' },
+    { icon: TrendingUp, label: 'Fixed Deposit', desc: 'Up to 7.75% for seniors', to: '/personal/fixed-deposits', color: 'text-blue-800' },
+    { icon: Briefcase, label: 'Corporate Banking', desc: 'Bulk NEFT · Trade finance', to: '/corporate/current-account', color: 'text-slate-700' },
+    { icon: GraduationCap, label: 'Education Loan', desc: 'Study in India or abroad', to: '/loans/education-loan', color: 'text-emerald-700' },
+    { icon: Umbrella, label: 'Insurance', desc: 'Term · Health · Motor', to: '/investments/insurance', color: 'text-[#c8102e]' }
   ];
 
   const quickLinks = [
-    'Open Savings Account', 'Apply for Loan', 'Book a Fixed Deposit',
-    'Get a Credit Card', 'Pay Bills / Recharge', 'Fund Transfer (NEFT/RTGS/IMPS/UPI)',
-    'Cheque Book Request', 'Update KYC / Aadhaar'
+    ['Open Savings Account', '/personal/savings-account'],
+    ['Apply for a Loan', '/loans/personal-loan'],
+    ['Book a Fixed Deposit', '/personal/fixed-deposits'],
+    ['Get a Debit Card', '/personal/debit-cards'],
+    ['Start a SIP', '/investments/mutual-funds'],
+    ['Bulk NEFT / RTGS', '/corporate/bulk-neft-rtgs'],
+    ['Branch & ATM Locator', '/branches'],
+    ['Rates & Charges', '/rates']
   ];
 
   return (
@@ -70,40 +77,41 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
 
           <div className="lg:col-span-7 space-y-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-800 text-[11px] font-semibold border border-blue-100">
-              <Award className="w-3.5 h-3.5" />
-              Rated India's Simplest Digital Banking Experience
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Trust · Growth · Prosperity
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 leading-tight tracking-tight">
               Banking made <span className="text-[#0b3b8c]">simple</span>,
-              <br className="hidden sm:inline" /> secure & <span className="text-[#c8102e]">India-ready</span>.
+              <br className="hidden sm:inline" /> secure &amp; <span className="text-[#c8102e]">India-ready</span>.
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 max-w-2xl leading-relaxed">
-              Open an account in minutes, transfer funds through NEFT · RTGS · IMPS · UPI, book FDs at industry-leading rates, and manage cards, cheques and loans — all from one modern portal designed for every Indian.
+              Open an account in minutes, transfer funds through NEFT · RTGS · IMPS · UPI, book FDs at competitive rates,
+              and manage cards, cheques and loans — all from one modern portal designed for every Indian.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 pt-1">
-              <button
+              <Link
+                to="/open-account"
                 data-testid="hero-open-account-btn"
-                onClick={() => onOpenAuth(true)}
                 className="px-6 py-3 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-sm font-semibold shadow-sm flex items-center gap-2 transition"
               >
                 <UserPlus className="w-4 h-4" /> Open Instant Account
-              </button>
-              <button
+              </Link>
+              <Link
+                to="/login"
                 data-testid="hero-login-btn"
-                onClick={() => onOpenAuth(false)}
                 className="px-6 py-3 rounded-md border border-slate-300 bg-white hover:border-[#0b3b8c] hover:text-[#0b3b8c] text-slate-800 text-sm font-semibold flex items-center gap-2 transition"
               >
                 <Lock className="w-4 h-4" /> NetBanking Login
-              </button>
+              </Link>
             </div>
 
             <div className="pt-6 flex flex-wrap items-center gap-6 text-xs text-slate-600 border-t border-slate-100 mt-4">
-              <div className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600" /> 256-bit SSL Encryption</div>
-              <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-blue-800" /> RBI Compliant</div>
-              <div className="flex items-center gap-2"><Globe className="w-4 h-4 text-slate-700" /> Hostinger cPanel Ready</div>
+              <div className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-600" /> 256-bit SSL encryption</div>
+              <div className="flex items-center gap-2"><Fingerprint className="w-4 h-4 text-blue-800" /> Passkey sign-in</div>
+              <div className="flex items-center gap-2"><Video className="w-4 h-4 text-slate-700" /> Video KYC, no branch visit</div>
             </div>
           </div>
 
@@ -115,16 +123,16 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
                 <span className="text-[11px] text-slate-500">No login needed</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {quickLinks.map((q, idx) => (
-                  <button
-                    key={idx}
+                {quickLinks.map(([label, to], idx) => (
+                  <Link
+                    key={to}
+                    to={to}
                     data-testid={`quicklink-${idx}`}
-                    onClick={() => onOpenAuth(true)}
                     className="text-left px-3 py-2.5 rounded-md border border-slate-200 hover:border-[#0b3b8c] hover:bg-blue-50/60 text-xs text-slate-700 hover:text-[#0b3b8c] transition flex items-center justify-between gap-1"
                   >
-                    <span className="line-clamp-2">{q}</span>
+                    <span className="line-clamp-2">{label}</span>
                     <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                  </button>
+                  </Link>
                 ))}
               </div>
 
@@ -132,14 +140,14 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
                 <div className="flex items-center gap-2 text-slate-600">
                   <Phone className="w-3.5 h-3.5" /> 24×7 Toll-Free
                 </div>
-                <span className="font-semibold text-[#0b3b8c]">1800-123-4567</span>
+                <a href="tel:18001234567" className="font-semibold text-[#0b3b8c]">1800-123-4567</a>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Product Grid — sober bank cards */}
+      {/* Product Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-900">Explore our banking products</h2>
@@ -148,11 +156,11 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {products.map((p, idx) => (
-            <button
-              key={idx}
+            <Link
+              key={p.to}
+              to={p.to}
               data-testid={`product-card-${idx}`}
-              onClick={() => onOpenAuth(true)}
-              className="bg-white border border-slate-200 rounded-lg p-5 text-left hover:border-[#0b3b8c] hover:shadow-md transition group"
+              className="bg-white border border-slate-200 rounded-lg p-5 text-left hover:border-[#0b3b8c] hover:shadow-md transition group block"
             >
               <div className={`w-10 h-10 rounded-md bg-slate-50 border border-slate-100 flex items-center justify-center ${p.color} group-hover:scale-105 transition`}>
                 <p.icon className="w-5 h-5" />
@@ -162,12 +170,12 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
               <div className="flex items-center gap-1 mt-3 text-[11px] text-[#0b3b8c] font-semibold">
                 Know more <ChevronRight className="w-3 h-3" />
               </div>
-            </button>
+            </Link>
           ))}
         </div>
       </section>
 
-      {/* Calculator Section — subtle bg */}
+      {/* Calculators */}
       <section className="bg-white border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
 
@@ -187,7 +195,7 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" /> No paperwork · Instant results
               </div>
               <div className="flex items-center gap-2 text-slate-700">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Transparent AJSPay repayment formulas
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> The same formulas used on your statements
               </div>
               <div className="flex items-center gap-2 text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Apply online after previewing your EMI
@@ -276,87 +284,82 @@ export default function PublicHomePage({ onOpenAuth, onNavigatePublic }) {
               </div>
             )}
 
-            <button
-              onClick={() => onOpenAuth(true)}
+            <Link
+              to="/open-account"
               data-testid="calc-apply-btn"
-              className="w-full mt-4 py-2.5 rounded-md bg-[#c8102e] hover:bg-[#a30d25] text-white text-xs font-semibold"
+              className="block text-center w-full mt-4 py-2.5 rounded-md bg-[#c8102e] hover:bg-[#a30d25] text-white text-xs font-semibold"
             >
               Apply Online in 2 Minutes →
-            </button>
+            </Link>
           </div>
 
         </div>
       </section>
 
-      {/* Trust / Awards strip */}
+      {/* What you actually get — product facts, not marketing numbers */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { n: '1 Cr+', l: 'Active Customers' },
-            { n: '5000+', l: 'Branches & ATMs' },
-            { n: '₹1.5 Lakh Cr', l: 'Total Deposits Managed' },
-            { n: 'AAA', l: 'CRISIL / ICRA Rating' }
-          ].map((s, i) => (
-            <div key={i} className="bg-white border border-slate-200 rounded-lg p-5 text-center">
+            { n: '4.00%', l: 'Savings interest p.a.', to: '/personal/savings-account' },
+            { n: '7.75%', l: 'Peak FD rate for seniors', to: '/personal/fixed-deposits' },
+            { n: '24×7', l: 'IMPS & UPI transfers', to: '/personal/savings-account' },
+            { n: '₹0', l: 'Minimum balance', to: '/personal/salary-account' }
+          ].map((s) => (
+            <Link key={s.l} to={s.to} className="bg-white border border-slate-200 rounded-lg p-5 text-center hover:border-[#0b3b8c] transition">
               <div className="text-2xl font-bold text-[#0b3b8c]">{s.n}</div>
               <div className="text-xs text-slate-600 mt-1">{s.l}</div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
 
-      {/* Hostinger deployment banner — sober */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <div className="bg-white border border-slate-200 rounded-lg p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-blue-50 border border-blue-100 text-blue-800 text-[11px] font-semibold">
-              <Globe className="w-3.5 h-3.5" /> Deploy anywhere
-            </div>
-            <h3 className="text-xl font-bold text-slate-900">Ready-to-deploy PHP + MySQL package for Hostinger</h3>
-            <p className="text-xs text-slate-600 max-w-2xl">
-              Download a cPanel-ready bundle with schema.sql, api.php, db.php, .htaccess and a step-by-step INSTALL guide — the entire banking stack running on Hostinger shared hosting.
-            </p>
-          </div>
-          <button
-            data-testid="public-hostinger-btn"
-            onClick={() => onNavigatePublic('hostinger')}
-            className="px-5 py-3 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold whitespace-nowrap flex items-center gap-2 shadow-sm"
-          >
-            View Deployment Package <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </section>
-
-      {/* FAQ / support strip */}
+      {/* Support strip */}
       <section className="bg-white border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-          <div className="flex items-start gap-3">
+          <Link to="/support/grievance-redressal" className="flex items-start gap-3 group">
             <div className="w-10 h-10 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0b3b8c]">
               <HelpCircle className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-semibold text-slate-900">Need help?</div>
-              <div className="text-xs text-slate-600">FAQs · Grievance redressal · Chatbot support</div>
+              <div className="font-semibold text-slate-900 group-hover:text-[#0b3b8c]">Need help?</div>
+              <div className="text-xs text-slate-600">Grievance redressal · Complaint tracking · Chatbot</div>
             </div>
-          </div>
-          <div className="flex items-start gap-3">
+          </Link>
+          <a href="tel:18001234567" className="flex items-start gap-3 group">
             <div className="w-10 h-10 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0b3b8c]">
               <Phone className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-semibold text-slate-900">Talk to us</div>
+              <div className="font-semibold text-slate-900 group-hover:text-[#0b3b8c]">Talk to us</div>
               <div className="text-xs text-slate-600">Toll-free 1800-123-4567 · 24×7</div>
             </div>
-          </div>
-          <div className="flex items-start gap-3">
+          </a>
+          <Link to="/branches" className="flex items-start gap-3 group">
             <div className="w-10 h-10 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0b3b8c]">
-              <Banknote className="w-5 h-5" />
+              <MapPin className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-semibold text-slate-900">Secure banking</div>
-              <div className="text-xs text-slate-600">Report fraud · Block card · Freeze account</div>
+              <div className="font-semibold text-slate-900 group-hover:text-[#0b3b8c]">Find a branch or ATM</div>
+              <div className="text-xs text-slate-600">Locations, timings and services</div>
             </div>
+          </Link>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-14">
+        <div className="bg-white border border-slate-200 rounded-lg p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-slate-900">Open your account today</h3>
+            <p className="text-xs text-slate-600 max-w-2xl">
+              PAN and Aadhaar are all you need to start. Finish verification with video KYC and begin transacting the same day.
+            </p>
           </div>
+          <Link
+            to="/open-account"
+            className="px-5 py-3 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold whitespace-nowrap flex items-center gap-2 shadow-sm"
+          >
+            Open Instant Account <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </section>
 

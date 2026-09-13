@@ -43,7 +43,7 @@ export default function StatementsPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Account Statements</h1>
-            <p className="text-xs text-slate-500">RBI-compliant format · PDF or Excel · One-tap download</p>
+            <p className="text-xs text-slate-500">Standard statement format · PDF or Excel · One-tap download</p>
           </div>
         </div>
       </div>

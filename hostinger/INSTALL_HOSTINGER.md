@@ -1,49 +1,62 @@
 # AJSPay on Hostinger (PHP + MySQL)
 
-This package runs the AJSPay React app on standard Hostinger web hosting with a PHP/MySQL backend. `api.php` serves the same `/api/...` routes and JSON as the FastAPI backend, so the frontend works unchanged.
-
-## What's ported so far
-
-| Module | PHP/MySQL |
-|---|---|
-| Login, registration, sessions, transaction-password check | ✅ |
-| Accounts, balances, transaction history | ✅ |
-| Transfers (IMPS/NEFT/RTGS/UPI), scheduled transfers, corporate bulk payouts | ✅ |
-| Debit cards: list, freeze/unfreeze, hotlist, limits, set PIN, order a physical card | ✅ |
-| UPI on debit card: status, link a card, payment QR | ✅ |
-| Deposits, loans, investments, cheques/DDs, support, KYC, passkeys, OTP, statements, referrals, standing instructions, admin and staff panels | ⏳ Not yet. These features show "Not Found" on this deployment |
+This package runs the AJSPay React app on standard Hostinger web hosting with a PHP/MySQL backend. `api.php` serves the same `/api/...` routes and JSON as the original FastAPI backend, so the frontend works unchanged. Every screen in the app is supported: accounts, transfers, cards, UPI, deposits, loans, investments, cheques, statements, video KYC, passkeys, OTP, referrals, standing instructions, support and all the staff and admin panels.
 
 ## Requirements
 
 - Hostinger Premium or Business web hosting (or any Apache/LiteSpeed host)
-- PHP 8.1 or newer with `pdo_mysql` and `mbstring` (both on by default at Hostinger)
+- PHP 8.1 or newer with `pdo_mysql`, `mbstring`, `gd`, `zip`, `openssl`, `sodium` and `curl` (all standard on Hostinger)
 - MySQL 5.7+ or MariaDB 10.3+
 - SSL enabled for your domain (free at Hostinger)
+
+## What's in the package
+
+| File | Purpose |
+|---|---|
+| `api.php` | Front controller and core banking routes |
+| `db.php` | Configuration defaults, database connection, shared helpers |
+| `modules/` | Banking services, statements, security (OTP/passkeys), staff and admin |
+| `assets/` | Logo used in generated PDF statements |
+| `schema.sql` | Database tables and demo data |
+| `.htaccess` | Routing, HTTPS, security headers, file protection |
 
 ## Deploy
 
 ### 1. Create the database
 
-hPanel → **Databases → Management** → create a database and a user with a strong password.
+hPanel → **Databases → Management** → create a database and user with a strong password.
 
 ### 2. Import the schema
 
 Open **phpMyAdmin** for that database → **Import** → choose `schema.sql` → **Go**.
 
-### 3. Configure `db.php`
+### 3. Create `config.local.php`
 
-Edit the `$config` block at the top:
+Create a file called `config.local.php` next to `db.php`. Secrets live only in this file, never in `db.php`:
 
-- `db_name`, `db_user`, `db_pass`: from step 1.
-- `allowed_origins`: your site, e.g. `['https://yourdomain.com']`. Never `*`.
-- `token_secret`: a fresh random value. The API refuses to run until it's set.
+```php
+<?php
+return [
+    'db_name'           => 'u123456789_banking_db',
+    'db_user'           => 'u123456789_bank_user',
+    'db_pass'           => 'your-mysql-password',
+    'allowed_origins'   => ['https://yourdomain.com'],
+    'token_secret'      => 'paste-64-random-hex-characters-here',
+    'public_app_url'    => 'https://yourdomain.com',
+    'webauthn_rp_id'    => 'yourdomain.com',
+    'webauthn_origin'   => 'https://yourdomain.com',
+];
+```
 
-  ```bash
-  php -r "echo bin2hex(random_bytes(32));"
-  ```
+Generate the token secret with:
 
-  Anyone who has this value can forge logins, so keep it private and out of git.
-- Leave `cookie_secure` as `true`. Leave `trust_proxy` as `false` unless the site sits behind a CDN you control, such as Cloudflare.
+```bash
+php -r "echo bin2hex(random_bytes(32));"
+```
+
+It signs every login session and encrypts stored API keys, so anyone who has it can forge logins. Keep it private, and never commit it. The API refuses to start until it is set.
+
+`allowed_origins` must list your exact site address. Never use `*`. `webauthn_rp_id` is your bare domain (no `https://`), and passkeys only work over HTTPS.
 
 ### 4. Build the frontend
 
@@ -56,13 +69,14 @@ REACT_APP_BACKEND_URL=https://yourdomain.com INLINE_RUNTIME_CHUNK=false npm run 
 
 ### 5. Upload
 
-In hPanel **File Manager**, open `public_html` and upload `api.php`, `db.php` and `.htaccess`, plus everything inside `frontend/build/`. Don't upload `schema.sql`, this guide, or `config.local.php`. `.htaccess` blocks them anyway, but they don't belong on a web server.
+In hPanel **File Manager**, open `public_html` and upload `api.php`, `db.php`, `.htaccess`, your `config.local.php`, the `modules/` and `assets/` folders, and everything inside `frontend/build/`. Don't upload `schema.sql` or this guide; `.htaccess` blocks them, but they don't belong on a web server.
 
 ### 6. Check it
 
-- `https://yourdomain.com/api/auth/me` should return `{"detail":"Authentication token required. Please login."}`.
-- `https://yourdomain.com/db.php` should return **403 Forbidden**.
-- Log in with a demo account below, then **change every demo password**. They are public.
+- `https://yourdomain.com/api/auth/me` returns `{"detail":"Authentication token required. Please login."}`
+- `https://yourdomain.com/db.php` returns **403 Forbidden**
+- `https://yourdomain.com/modules/staff.php` returns **403 Forbidden**
+- Open the site, log in with a demo account below, then **change every demo password**. They are public.
 
 | Role | Email | Password | Transaction password |
 |---|---|---|---|
@@ -74,6 +88,10 @@ In hPanel **File Manager**, open `public_html` and upload `api.php`, `db.php` an
 | Collections | collections@ajspay.in | Collect@123 | Txn@1234 |
 | Loan officer | loans@ajspay.in | Loan@123 | Txn@1234 |
 
+### 7. Turn on live OTP (optional)
+
+Sign in as the bank owner and open **System Config**. Enter your Twilio and SendGrid keys and switch on live OTP. The keys are encrypted before they are stored, and only ever shown back masked. Until you do this, the app runs in demo mode and shows the OTP on screen.
+
 ## Security built in
 
 1. Passwords and transaction passwords are hashed with bcrypt and only ever checked with `password_verify`.
@@ -84,38 +102,44 @@ In hPanel **File Manager**, open `public_html` and upload `api.php`, `db.php` an
 6. The session cookie is `HttpOnly`, `Secure` and `SameSite=Lax`.
 7. Login lockout: 5 failures per IP and email within 15 minutes returns 429.
 8. Transaction-password lockout: 5 wrong attempts within 15 minutes blocks money movement.
-9. `X-Forwarded-For` is ignored by default, so the lockouts can't be dodged by faking IPs.
+9. `X-Forwarded-For` is ignored by default, so lockouts can't be dodged by faking IPs.
 10. CORS allows only the exact origins you list, never `*`.
 11. Write requests must be JSON, which blocks form-based CSRF.
 12. Every query uses real prepared statements, so no SQL injection.
-13. Every lookup is scoped to the logged-in user: nobody can read or move another customer's money or cards by guessing an ID.
-14. Transfers run in a database transaction with row locks taken in a fixed order, so there's no double-spending, race or deadlock.
-15. Amounts must be positive numbers, rounded to paise. Bulk payouts reject zero or negative lines.
-16. A `CHECK` constraint stops any balance going negative (MySQL 8.0.16+ / MariaDB 10.2+).
-17. Frozen or closed accounts can't send money, and inactive accounts can't receive it.
-18. Hotlisting a card is permanent.
-19. Card PINs are stored only as bcrypt hashes and are never returned. New cards have no usable default PIN.
-20. Card limits are capped at ₹10,00,000.
-21. Bulk payouts are for corporate customers only, at most 500 lines per batch.
-22. Aadhaar numbers are masked to the last 4 digits before storage. PAN format is validated.
-23. Self-declared opening deposits are clamped between ₹1,000 and ₹10,00,000.
-24. An audit log records logins, logouts, sign-ups, transfers and card changes, with IP addresses.
-25. Clients get generic error messages. Details go only to the server error log, and PHP never displays errors.
-26. The API refuses to run while `token_secret` is still the placeholder.
-27. HTTPS is forced, with HSTS.
-28. Headers set: Content-Security-Policy, `X-Frame-Options: DENY` (blocks clickjacking), `nosniff`, `Referrer-Policy` and `Permissions-Policy`.
-29. API responses are sent with `Cache-Control: no-store`, so banking data isn't cached.
-30. `.htaccess` blocks `db.php`, config files, SQL, docs and dotfiles, and turns off directory listing. The server signature and `X-Powered-By` are hidden.
-31. Request bodies are capped at 8 MB.
+13. Every lookup is scoped to the logged-in user: nobody can read or move another customer's money, cards, statements or standing instructions by guessing an ID.
+14. Staff, admin, loan, collections and bank-owner APIs each check the caller's role.
+15. Transfers run in a database transaction with row locks taken in a fixed order: no double-spending, races or deadlocks.
+16. Amounts must be positive numbers rounded to paise; bulk payouts reject zero or negative lines.
+17. A `CHECK` constraint stops any balance going negative (MySQL 8.0.16+ / MariaDB 10.2+).
+18. Frozen or closed accounts can't send money, and inactive accounts can't receive it.
+19. Hotlisting a card is permanent.
+20. Card PINs are stored only as bcrypt hashes and never returned; new cards have no usable default PIN.
+21. Card CVVs are never included in the card list: revealing one needs the transaction password, and every reveal is logged.
+22. Account numbers and dates travel in POST bodies, not URLs, so they stay out of browser history, referrers and server logs.
+23. Aadhaar numbers are masked to the last 4 digits before storage, and PAN format is validated.
+24. OTPs are stored as HMAC hashes, expire in 5 minutes, allow 5 wrong guesses, and are rate-limited to 10 sends per 15 minutes.
+25. Passkeys are verified in full: signature, challenge, origin, relying-party hash and a clone-detecting signature counter. Challenges are single-use and expire in 5 minutes.
+26. Passkey sign-in gives the same answer for an unknown email and an account without a passkey, so customers can't be enumerated.
+27. Twilio and SendGrid keys are encrypted before being stored and are only ever displayed masked.
+28. Self-declared opening deposits are clamped between ₹1,000 and ₹10,00,000.
+29. Uploaded KYC photos must be real images under 1.5 MB, and identical selfie/PAN photos can never auto-approve.
+30. An audit log records logins, logouts, sign-ups, transfers, card changes, statement downloads, KYC decisions and config changes, with IP addresses.
+31. Clients get generic error messages; details go only to the server error log, and PHP never displays errors.
+32. The API refuses to run until `token_secret` is configured.
+33. HTTPS is forced, with HSTS.
+34. Content-Security-Policy, `X-Frame-Options: DENY` (clickjacking), `nosniff`, `Referrer-Policy` and `Permissions-Policy` headers are set.
+35. API responses are sent with `Cache-Control: no-store`, so banking data isn't cached.
+36. `.htaccess` blocks `db.php`, `config.local.php`, `modules/`, `assets/`, SQL, docs and dotfiles, and turns off directory listing. The server signature and `X-Powered-By` are hidden.
+37. Request bodies are capped at 8 MB.
 
 ## Known limitations
 
-- Scheduled transfers are stored, but nothing executes them yet. The same is true in FastAPI; a cPanel cron job is the planned fix.
-- Referral codes entered at sign-up are ignored until the referrals module is ported.
+- Scheduled transfers and standing instructions are stored, but nothing executes them yet. Add a cPanel cron job when you want them to run.
 - Card CVVs are stored so the virtual-card screen can show them. That's fine for a demo, but PCI DSS forbids storing CVVs in a real card system.
-- Bulk payouts only debit the corporate account (they're outbound interbank transfers), matching FastAPI.
+- Video KYC face-match compares colour histograms. It is an image heuristic, not a biometric identity check, and should never be the only KYC control in production.
+- Bulk payouts only debit the corporate account, matching the original backend.
 - Logging out ends the session on every device.
-- This is demo banking software. Running a real bank or taking real deposits in India requires RBI authorisation.
+- This is demo banking software. Running a real bank or deposit-taking business in India requires the appropriate RBI or MCA authorisation.
 
 ## Local development
 
@@ -124,4 +148,4 @@ mysql -u root -e "CREATE DATABASE ajspay_php" && mysql -u root ajspay_php < sche
 php -S 127.0.0.1:8002 api.php
 ```
 
-Put local settings in `config.local.php`. It returns an array that overrides `$config` in `db.php`, and it's gitignored.
+Put local settings in `config.local.php` (`cookie_secure => false` for plain http). The file is gitignored.

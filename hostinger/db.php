@@ -8,25 +8,38 @@ ini_set('log_errors', '1');      // log them to the server error log instead
 header_remove('X-Powered-By');
 
 // ---------------------------------------------------------------------------
-// CONFIGURATION: set these before going live (see INSTALL_HOSTINGER.md).
-// For local development, put overrides in config.local.php (it returns an
-// array), so real secrets never have to live in this file or in git.
+// CONFIGURATION DEFAULTS. Don't put real values here: create config.local.php
+// next to this file (see INSTALL_HOSTINGER.md) and override them there. Keeping
+// secrets out of this file means it can be shared or displayed without leaking.
 // ---------------------------------------------------------------------------
 $config = [
-    'db_host'         => 'localhost',
-    'db_name'         => 'u123456789_banking_db',
-    'db_user'         => 'u123456789_bank_user',
-    'db_pass'         => 'Your_Hostinger_MySQL_Password_Here',
+    'db_host'             => 'localhost',
+    'db_name'             => '',
+    'db_user'             => '',
+    'db_pass'             => '',
     // Exact frontend origin(s). Never "*": that would let any website make
     // logged-in requests on a visitor's behalf.
-    'allowed_origins' => ['https://yourdomain.com'],
-    // Signs session tokens. Generate with: php -r "echo bin2hex(random_bytes(32));"
-    'token_secret'    => 'CHANGE_ME',
-    'token_ttl'       => 1800,  // session lifetime in seconds (30 minutes)
-    'cookie_secure'   => true,  // false only for local http:// development
+    'allowed_origins'     => [],
+    // Signs session tokens and encrypts stored API keys. Generate with:
+    //   php -r "echo bin2hex(random_bytes(32));"
+    'token_secret'        => '',
+    'token_ttl'           => 1800,  // session lifetime in seconds (30 minutes)
+    'cookie_secure'       => true,  // false only for local http:// development
     // Enable only behind a proxy/CDN you control (e.g. Cloudflare). Otherwise
     // X-Forwarded-For is attacker-controlled and would defeat login lockouts.
-    'trust_proxy'     => false,
+    'trust_proxy'         => false,
+    'public_app_url'      => '',        // e.g. https://yourdomain.com (referral links)
+    'webauthn_rp_id'      => '',        // your domain, e.g. yourdomain.com (passkeys)
+    'webauthn_rp_name'    => 'AJS Pay Nidhi Limited',
+    'webauthn_origin'     => '',        // e.g. https://yourdomain.com
+    // OTP delivery. With live_otp false the API runs in demo mode and shows the OTP.
+    // The bank owner can also set these from the System Config screen.
+    'live_otp'            => false,
+    'twilio_account_sid'  => '',
+    'twilio_auth_token'   => '',
+    'twilio_from_number'  => '',
+    'sendgrid_api_key'    => '',
+    'sendgrid_from_email' => 'alerts@ajspay.in',
 ];
 if (is_file(__DIR__ . '/config.local.php')) {
     $config = array_merge($config, require __DIR__ . '/config.local.php');
@@ -73,9 +86,18 @@ function fail(int $code, string $detail): never
     respond(['detail' => $detail], $code);
 }
 
-// Fail closed with the placeholder secret: anyone could forge sessions with it.
+function send_download(string $bytes, string $mime, string $filename): never
+{
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', $filename) . '"');
+    header('Content-Length: ' . strlen($bytes));
+    echo $bytes;
+    exit;
+}
+
+// Fail closed with a missing or short secret: anyone could forge sessions with it.
 if (strlen($config['token_secret']) < 32) {
-    error_log('AJSPay: token_secret is not configured in db.php');
+    error_log('AJSPay: token_secret is not configured (see config.local.php)');
     fail(500, 'Server is not configured yet.');
 }
 
@@ -109,15 +131,22 @@ function row(string $sql, array $params = []): ?array
     return rows($sql, $params)[0] ?? null;
 }
 
+function scalar(string $sql, array $params = []): mixed
+{
+    $r = row($sql, $params);
+    return $r ? reset($r) : null;
+}
+
 // --- Type normalisation ---------------------------------------------------------
 // MySQL returns DECIMAL as strings, TINYINT as 0/1 and DATETIME as "Y-m-d H:i:s".
-// Convert rows to the JSON types FastAPI returns, so the React app behaves the
-// same against either backend.
-const FLOAT_COLUMNS = ['balance', 'amount', 'balance_after', 'online_limit', 'atm_limit',
-    'principal_amount', 'interest_rate', 'maturity_amount'];
-const BOOL_COLUMNS = ['is_virtual', 'international_enabled', 'contactless_enabled', 'ecom_enabled',
-    'upi_linked', 'is_joint', 'mfa_enabled'];
-const TIME_COLUMNS = ['created_at', 'timestamp'];
+// Convert rows to the JSON types FastAPI returned, so the React app behaves the same.
+const FLOAT_COLUMNS = ['balance', 'amount', 'balance_after', 'online_limit', 'atm_limit', 'principal_amount',
+    'interest_rate', 'maturity_amount', 'fee', 'invested_amount', 'current_value', 'units', 'outstanding', 'roi',
+    'face_match_score', 'lat', 'lng', 'credit_amount', 'sum_assured', 'annual_premium', 'amount_requested',
+    'calculated_emi', 'monthly_income'];
+const BOOL_COLUMNS = ['is_virtual', 'international_enabled', 'contactless_enabled', 'ecom_enabled', 'upi_linked',
+    'is_joint', 'mfa_enabled', 'has_atm', 'has_cdm', 'has_locker', 'verified'];
+const TIME_COLUMNS = ['created_at', 'timestamp', 'submitted_at', 'reviewed_at', 'verified_at'];
 
 function iso(string $datetime): string
 {
@@ -215,4 +244,14 @@ function digits(int $count): string
 function now_utc(): string
 {
     return gmdate('Y-m-d H:i:s');
+}
+
+function valid_date(mixed $value, string $field): string
+{
+    $s = clip($value, 10);
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $s);
+    if (!$date || $date->format('Y-m-d') !== $s) {
+        fail(422, "$field must be a date in YYYY-MM-DD format.");
+    }
+    return $s;
 }

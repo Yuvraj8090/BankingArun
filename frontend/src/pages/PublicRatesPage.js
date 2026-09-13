@@ -1,7 +1,8 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Percent, FileText, Info, ChevronRight } from 'lucide-react';
 
-export default function PublicRatesPage({ onOpenAuth }) {
+export default function PublicRatesPage() {
   const depositRates = [
     { tenure: "7 days to 45 days", general: "3.50%", senior: "4.00%" },
     { tenure: "46 days to 179 days", general: "5.25%", senior: "5.75%" },
@@ -45,16 +46,16 @@ export default function PublicRatesPage({ onOpenAuth }) {
                 Interest Rates &amp; Service Charges
               </h1>
               <p className="text-xs text-slate-600 mt-1">
-                Effective from June 2026 · Governed by RBI Master Directions on Interest Rates on Deposits and External Benchmark Lending Rates (EBLR).
+                Effective from June 2026 · Set by the board under the Nidhi Rules, 2014. Indicative and subject to change.
               </p>
             </div>
-            <button
+            <Link
               data-testid="rates-book-fd-btn"
-              onClick={() => onOpenAuth(true)}
+              to="/personal/fixed-deposits"
               className="px-5 py-2.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold shadow-sm"
             >
               Book High-Yield FD Now
-            </button>
+            </Link>
           </div>
         </div>
       </div>

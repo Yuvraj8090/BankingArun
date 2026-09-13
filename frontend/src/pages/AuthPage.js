@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Building2, ShieldCheck, Lock, User, Mail, Phone, CreditCard,
   ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, Gift
 } from 'lucide-react';
+import Brand from '../components/Brand';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
@@ -50,9 +52,9 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
     if (!email || !password) return toast.error('Enter email and password');
     setLoading(true);
     try {
-      await login(email, password);
+      const r = await login(email, password);
       toast.success('Welcome back');
-      onSuccess?.();
+      onSuccess?.(r.user?.role);
     } catch (err) { toast.error(err.response?.data?.detail || 'Login failed'); }
     finally { setLoading(false); }
   };
@@ -72,7 +74,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
       });
       if (r.referral_bonus) toast.success(`Welcome bonus ₹${r.referral_bonus} credited!`);
       else toast.success('Account created successfully');
-      onSuccess?.();
+      onSuccess?.(r.user?.role || 'retail');
     } catch (err) { toast.error(err.response?.data?.detail || 'Registration failed'); }
     finally { setLoading(false); }
   };
@@ -108,14 +110,8 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
   return (
     <div className="min-h-[80vh] bg-slate-50 grid grid-cols-1 lg:grid-cols-5 gap-0">
       {/* Left panel — brand + trust */}
-      <div className="lg:col-span-2 bg-[#0b3b8c] text-white p-8 lg:p-12 flex flex-col justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-md bg-white/10 flex items-center justify-center"><Building2 className="w-6 h-6 text-white" /></div>
-          <div>
-            <div className="text-xl font-bold">AJSPay</div>
-            <div className="text-[11px] text-white/70">RBI regulated · DICGC insured ₹5 lakh</div>
-          </div>
-        </div>
+      <div className="lg:col-span-2 bg-[#0b3b8c] text-white p-8 lg:p-12 flex flex-col justify-between gap-10">
+        <Brand variant="stacked" height={80} onDark />
         <div className="space-y-4">
           <h2 className="text-2xl lg:text-3xl font-bold leading-tight">
             Secure banking, <br/>reimagined for every Indian.
@@ -129,22 +125,24 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
             <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-300" /> Video KYC — no branch visit</li>
           </ul>
         </div>
-        <div className="text-[11px] text-white/60">© 2026 AJSPay Ltd. · Toll-free 1800-123-4567</div>
+        <div className="text-[11px] text-white/60">
+          © {new Date().getFullYear()} AJS Pay Nidhi Limited · Toll-free 1800-123-4567
+        </div>
       </div>
 
       {/* Right panel — form */}
       <div className="lg:col-span-3 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-sm p-6 lg:p-8">
-          {/* Tabs */}
+          {/* Tabs are real URLs: /login and /open-account */}
           <div className="flex gap-2 p-1 bg-slate-100 rounded-md mb-6 text-xs">
-            <button data-testid="auth-tab-login" onClick={() => setIsRegister(false)}
-              className={`flex-1 py-2 rounded font-semibold transition ${!isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
+            <Link to="/login" data-testid="auth-tab-login"
+              className={`flex-1 py-2 rounded font-semibold transition text-center ${!isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
               NetBanking Login
-            </button>
-            <button data-testid="auth-tab-register" onClick={() => setIsRegister(true)}
-              className={`flex-1 py-2 rounded font-semibold transition ${isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
+            </Link>
+            <Link to="/open-account" data-testid="auth-tab-register"
+              className={`flex-1 py-2 rounded font-semibold transition text-center ${isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
               Open Account
-            </button>
+            </Link>
           </div>
 
           {!isRegister ? (

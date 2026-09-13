@@ -472,7 +472,7 @@ export default function TransferPage() {
         <div className="space-y-5">
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl text-xs space-y-3">
             <h3 className="font-bold text-white text-sm pb-2 border-b border-slate-800">
-              RBI Daily Transfer Limits
+              Daily Transfer Limits
             </h3>
             
             <div className="space-y-2.5 text-slate-300">
@@ -496,7 +496,7 @@ export default function TransferPage() {
 
             <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/20 text-[11px] text-indigo-300 space-y-1">
               <p className="font-semibold">Security Note:</p>
-              <p>Two-factor authentication with separate login password and transaction password is enforced as per RBI Cyber Security Framework.</p>
+              <p>Two-factor authentication with separate login password and transaction password is enforced on every transfer.</p>
             </div>
           </div>
         </div>

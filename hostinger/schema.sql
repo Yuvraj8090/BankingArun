@@ -19,12 +19,14 @@ CREATE TABLE IF NOT EXISTS users (
     pan_number VARCHAR(10),
     aadhaar_number VARCHAR(20),              -- masked (XXXX-XXXX-1234); the full number is never stored
     kyc_status VARCHAR(30) NOT NULL DEFAULT 'pending_approval',
+    kyc_reason VARCHAR(255),
     mfa_enabled TINYINT(1) NOT NULL DEFAULT 1,
     is_joint TINYINT(1) NOT NULL DEFAULT 0,
     joint_holder_name VARCHAR(150),
     nominee_name VARCHAR(150),
     nominee_relation VARCHAR(50),
     designation VARCHAR(100),
+    referral_code VARCHAR(12) UNIQUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -76,7 +78,7 @@ CREATE TABLE IF NOT EXISTS cards (
     card_type VARCHAR(60) NOT NULL,
     network VARCHAR(20),
     expiry_date VARCHAR(5) NOT NULL,
-    cvv VARCHAR(4) NOT NULL,             -- shown to the cardholder on the virtual card (demo only; see INSTALL)
+    cvv VARCHAR(4) NOT NULL,             -- released only via /cards/reveal-cvv (demo only; see INSTALL)
     pin_hash VARCHAR(255) NOT NULL,      -- bcrypt; the PIN itself is never stored or returned
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     is_virtual TINYINT(1) NOT NULL DEFAULT 1,
@@ -97,11 +99,14 @@ CREATE TABLE IF NOT EXISTS deposits (
     user_id VARCHAR(36) NOT NULL,
     deposit_number VARCHAR(30) NOT NULL UNIQUE,
     deposit_type VARCHAR(20) NOT NULL DEFAULT 'fixed',
+    source_account VARCHAR(30),
     principal_amount DECIMAL(15,2) NOT NULL,
     interest_rate DECIMAL(5,2) NOT NULL,
     tenure_months INT NOT NULL,
+    interest_payout VARCHAR(20),
     maturity_amount DECIMAL(15,2) NOT NULL,
     maturity_date DATE NOT NULL,
+    nominee_name VARCHAR(150),
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
@@ -125,6 +130,237 @@ CREATE TABLE IF NOT EXISTS scheduled_payments (
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS standing_instructions (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    from_account_number VARCHAR(30) NOT NULL,
+    beneficiary_name VARCHAR(150) NOT NULL,
+    beneficiary_account VARCHAR(50) NOT NULL,
+    beneficiary_ifsc VARCHAR(11),
+    amount DECIMAL(15,2) NOT NULL,
+    frequency VARCHAR(20) NOT NULL DEFAULT 'monthly',
+    category VARCHAR(20) NOT NULL DEFAULT 'generic',
+    start_date DATE NOT NULL,
+    end_date DATE,
+    remarks VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    executions INT NOT NULL DEFAULT 0,
+    next_run DATE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cheque_requests (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    account_number VARCHAR(30) NOT NULL,
+    leaves INT NOT NULL DEFAULT 25,
+    delivery_address VARCHAR(255) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'APPROVED_DISPATCH',
+    tracking_id VARCHAR(30),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS stopped_cheques (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    account_number VARCHAR(30) NOT NULL,
+    cheque_number VARCHAR(10) NOT NULL,
+    reason VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'STOPPED',
+    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS demand_drafts (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    dd_number VARCHAR(30) NOT NULL,
+    account_number VARCHAR(30) NOT NULL,
+    beneficiary_name VARCHAR(150) NOT NULL,
+    payable_at VARCHAR(100) NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    fee DECIMAL(10,2) NOT NULL DEFAULT 50.00,
+    status VARCHAR(20) NOT NULL DEFAULT 'ISSUED',
+    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Customer loan applications and the loan department's pipeline share one table,
+-- so an application a customer submits actually reaches the loan officer.
+CREATE TABLE IF NOT EXISTS loan_applications (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36),
+    applicant VARCHAR(150) NOT NULL,
+    loan_application_no VARCHAR(30),
+    loan_type VARCHAR(50) NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    tenure_months INT NOT NULL,
+    roi DECIMAL(5,2) NOT NULL,
+    calculated_emi DECIMAL(15,2),
+    monthly_income DECIMAL(15,2),
+    employment_type VARCHAR(50),
+    purpose VARCHAR(255),
+    eligibility_status VARCHAR(30),
+    credit_score INT,
+    status VARCHAR(30) NOT NULL DEFAULT 'under_review',
+    decision_note VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS collection_cases (
+    id VARCHAR(36) PRIMARY KEY,
+    borrower VARCHAR(150) NOT NULL,
+    loan_ref VARCHAR(30) NOT NULL,
+    outstanding DECIMAL(15,2) NOT NULL,
+    dpd_days INT NOT NULL DEFAULT 0,
+    last_contact DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'reminder_sent',
+    phone VARCHAR(30)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS investments (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    folio_no VARCHAR(30) NOT NULL,
+    scheme_id VARCHAR(20) NOT NULL,
+    scheme_name VARCHAR(150) NOT NULL,
+    investment_type VARCHAR(10) NOT NULL DEFAULT 'SIP',
+    invested_amount DECIMAL(15,2) NOT NULL,
+    current_value DECIMAL(15,2) NOT NULL,
+    units DECIMAL(15,3) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS insurance_policies (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    plan_id VARCHAR(20) NOT NULL,
+    plan_name VARCHAR(150) NOT NULL,
+    sum_assured DECIMAL(15,2) NOT NULL,
+    annual_premium DECIMAL(12,2) NOT NULL,
+    nominee_name VARCHAR(150),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id VARCHAR(36) PRIMARY KEY,
+    ticket_id VARCHAR(40) NOT NULL UNIQUE,
+    user_id VARCHAR(36) NOT NULL,
+    user_email VARCHAR(150),
+    user_name VARCHAR(150),
+    category VARCHAR(50),
+    account_number VARCHAR(30),
+    subject VARCHAR(200) NOT NULL,
+    description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    priority VARCHAR(10) NOT NULL DEFAULT 'MEDIUM',
+    assigned_to VARCHAR(100),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    INDEX idx_status (status),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS referrals (
+    id VARCHAR(36) PRIMARY KEY,
+    referrer_id VARCHAR(36) NOT NULL,
+    referrer_email VARCHAR(150),
+    referee_id VARCHAR(36) NOT NULL,
+    referee_name VARCHAR(150),
+    referee_email VARCHAR(150),
+    code VARCHAR(12) NOT NULL,
+    credit_amount DECIMAL(12,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'paid',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_referrer (referrer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS otps (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    purpose VARCHAR(20) NOT NULL,
+    otp_hash VARCHAR(64) NOT NULL,       -- HMAC-SHA256; the code itself is never stored
+    channel VARCHAR(10) NOT NULL DEFAULT 'sms',
+    attempts INT NOT NULL DEFAULT 0,
+    verified TINYINT(1) NOT NULL DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    verified_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_purpose (user_id, purpose, verified),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS passkeys (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    credential_id VARCHAR(255) NOT NULL UNIQUE,
+    public_key TEXT NOT NULL,            -- PEM public key; no private material exists server-side
+    sign_count INT UNSIGNED NOT NULL DEFAULT 0,
+    label VARCHAR(100),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS passkey_challenges (
+    user_id VARCHAR(36) NOT NULL,
+    type VARCHAR(10) NOT NULL,           -- register | login
+    challenge VARCHAR(100) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS kyc_video_submissions (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    user_email VARCHAR(150),
+    user_name VARCHAR(150),
+    selfie_b64 MEDIUMTEXT,
+    pan_b64 MEDIUMTEXT,
+    aadhaar_b64 MEDIUMTEXT,
+    liveness_words VARCHAR(255),
+    device_info VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending_review',
+    face_match_score DECIMAL(5,2),
+    face_match_verdict VARCHAR(30),
+    face_match_algo VARCHAR(30),
+    reviewer VARCHAR(150),
+    review_reason VARCHAR(255),
+    reviewed_at DATETIME,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status (status, submitted_at),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS branches (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    bank VARCHAR(50) NOT NULL DEFAULT 'AJSPay',
+    code VARCHAR(11) NOT NULL,
+    address VARCHAR(255),
+    lat DECIMAL(9,6),
+    lng DECIMAL(9,6),
+    phone VARCHAR(30),
+    has_atm TINYINT(1) NOT NULL DEFAULT 1,
+    has_cdm TINYINT(1) NOT NULL DEFAULT 1,
+    has_locker TINYINT(1) NOT NULL DEFAULT 0,
+    timing VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36),
@@ -133,20 +369,30 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     details VARCHAR(255),
     ip VARCHAR(45),
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user_time (user_id, timestamp)
+    INDEX idx_user_time (user_id, timestamp),
+    INDEX idx_action (action, timestamp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS login_attempts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    identifier VARCHAR(191) NOT NULL,    -- "ip:email" for logins, "txn:<user id>" for transaction passwords
+    identifier VARCHAR(191) NOT NULL,    -- "ip:email" for logins, "txn:<user id>" / "otp-send:<user id>" for the rest
     email VARCHAR(150) NOT NULL,
     ip VARCHAR(45) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_identifier_time (identifier, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Runtime settings the bank owner edits from the System Config screen.
+-- API keys inside `data` are encrypted with the app's token_secret.
+CREATE TABLE IF NOT EXISTS system_config (
+    id VARCHAR(20) PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_by VARCHAR(150),
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ---------------------------------------------------------------------------
--- Demo data (mirrors the FastAPI seed)
+-- Demo data
 -- ---------------------------------------------------------------------------
 INSERT IGNORE INTO users (id, name, email, phone, role, password_hash, transaction_password_hash, branch,
     pan_number, aadhaar_number, kyc_status, nominee_name, nominee_relation, designation) VALUES
@@ -204,3 +450,27 @@ INSERT IGNORE INTO transactions (id, user_id, account_number, type, mode, amount
     'amazonpay@ajspay', 'UPI-6192837491', 'Electronics Purchase Order #9812', UTC_TIMESTAMP() - INTERVAL 4 DAY),
 ('txn-seed-003', 'retail-001', 'AJSP00984521098', 'debit', 'IMPS', 15000.00, 53300.00, 'Ananya Sharma',
     'AJSP000492109', 'IMPS-9921849102', 'Family Maintenance', UTC_TIMESTAMP() - INTERVAL 7 DAY);
+
+INSERT IGNORE INTO branches (id, name, bank, code, address, lat, lng, phone, has_atm, has_cdm, has_locker, timing) VALUES
+('b1', 'Nariman Point Main Branch', 'AJSPay', 'AJSP0000042', 'Air India Building, Nariman Point, Mumbai 400021',
+    18.928100, 72.822800, '022-22024100', 1, 1, 1, '10:00 AM - 4:00 PM'),
+('b2', 'Bandra Kurla Complex Branch', 'AJSPay', 'AJSP0000001', 'G Block, BKC, Bandra East, Mumbai 400051',
+    19.066200, 72.868800, '022-66521000', 1, 1, 1, '9:30 AM - 4:30 PM'),
+('b3', 'Connaught Place Flagship', 'AJSPay', 'AJSP0000007', '9A, Inner Circle, Connaught Place, New Delhi 110001',
+    28.631500, 77.216700, '011-41512000', 1, 1, 1, '9:30 AM - 5:00 PM'),
+('b4', 'Koramangala 80 Feet Road', 'AJSPay', 'AJSP0004081', '80 Feet Road, 4th Block, Koramangala, Bengaluru 560034',
+    12.935200, 77.624500, '080-25539800', 1, 0, 1, '10:00 AM - 4:00 PM'),
+('b5', 'Hitech City Madhapur', 'AJSPay', 'AJSP0001928', 'Cyber Towers, Hitech City, Hyderabad 500081',
+    17.450400, 78.380800, '040-67891200', 1, 1, 0, '9:30 AM - 4:30 PM');
+
+INSERT IGNORE INTO loan_applications (id, user_id, applicant, loan_type, amount, tenure_months, roi, credit_score, status) VALUES
+('app-001', 'retail-001', 'Rahul Sharma', 'Personal', 500000.00, 36, 10.50, 782, 'under_review'),
+('app-002', 'corp-001', 'Tata Digital Solutions Ltd', 'Working Capital', 2500000.00, 60, 9.25, 810, 'approved'),
+('app-003', NULL, 'Anjali Kapoor', 'Home', 3500000.00, 240, 8.40, 745, 'documentation'),
+('app-004', NULL, 'Kabir Malhotra', 'Vehicle', 850000.00, 60, 8.75, 720, 'disbursed');
+
+INSERT IGNORE INTO collection_cases (id, borrower, loan_ref, outstanding, dpd_days, last_contact, status, phone) VALUES
+('col-001', 'Prakash Yadav', 'PL-99281', 148500.00, 45, '2026-01-25', 'npa_risk', '+91 98111 22334'),
+('col-002', 'Sunita Deshmukh', 'HL-33112', 892000.00, 15, '2026-02-05', 'follow_up', '+91 98222 55667'),
+('col-003', 'Kavita Rao', 'VL-77401', 45250.00, 90, '2026-01-10', 'legal_notice', '+91 98333 88991'),
+('col-004', 'Amit Sinha', 'PL-88203', 22500.00, 5, '2026-02-12', 'reminder_sent', '+91 98444 12345');

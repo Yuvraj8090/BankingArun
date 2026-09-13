@@ -1,0 +1,445 @@
+<?php
+// AJSPay: staff and back-office APIs. Role panels, branch admin, RBI reports,
+// video KYC review, the bank owner's runtime config and the Hostinger export.
+declare(strict_types=1);
+
+const ADMIN_ROLES = ['admin', 'branch_manager', 'bank_owner'];
+const KYC_FRAME_MAX = 2000000;  // base64 characters per photo (~1.5 MB image)
+const PACKAGE_FILES = ['db_php' => 'db.php', 'api_php' => 'api.php', 'schema_sql' => 'schema.sql',
+    'htaccess' => '.htaccess', 'deploy_guide' => 'INSTALL_HOSTINGER.md'];
+
+function staff_user(array $roles): array
+{
+    $user = current_user();
+    if (!in_array($user['role'], $roles, true)) {
+        fail(403, 'Access restricted. Required role: ' . implode(', ', $roles));
+    }
+    return $user;
+}
+
+// --- Role panels ----------------------------------------------------------------------
+function route_panel_bank_owner(array $d): void
+{
+    staff_user(['bank_owner']);
+    $loans = out_all(rows('SELECT * FROM loan_applications ORDER BY created_at DESC LIMIT 50'));
+    $branches = out_all(rows('SELECT * FROM branches ORDER BY id'));
+    respond([
+        'kpis' => ['total_users' => (int)scalar('SELECT COUNT(*) FROM users'),
+            'total_liquidity' => (float)scalar('SELECT COALESCE(SUM(balance), 0) FROM accounts'),
+            'total_transactions' => (int)scalar('SELECT COUNT(*) FROM transactions'),
+            'active_branches' => count($branches), 'loan_pipeline_count' => count($loans),
+            'credit_rating' => 'AAA (CRISIL / ICRA)', 'car_ratio' => '17.8%'],
+        'loan_pipeline' => $loans,
+        'branches' => $branches,
+        'policies' => [
+            ['key' => 'savings_roi', 'label' => 'Savings Account Interest Rate', 'value' => '4.00% p.a.'],
+            ['key' => 'fd_max_roi', 'label' => 'FD Peak Rate (Senior 2-3 Yr)', 'value' => '8.00% p.a.'],
+            ['key' => 'home_loan_min', 'label' => 'Home Loan Starting Rate', 'value' => '8.40% p.a.'],
+            ['key' => 'crr', 'label' => 'Cash Reserve Ratio', 'value' => '4.50%'],
+            ['key' => 'slr', 'label' => 'Statutory Liquidity Ratio', 'value' => '18.00%'],
+        ],
+    ]);
+}
+
+function route_panel_staff(array $d): void
+{
+    staff_user(['staff', ...ADMIN_ROLES]);
+    $tickets = out_all(rows("SELECT id, ticket_id, user_name, category, subject, priority, status, created_at
+        FROM support_tickets WHERE status = 'OPEN' ORDER BY created_at DESC LIMIT 20"));
+    respond([
+        'kpis' => [
+            'customers_served_today' => (int)scalar("SELECT COUNT(DISTINCT user_id) FROM audit_logs
+                WHERE action = 'USER_LOGIN' AND timestamp >= UTC_DATE()"),
+            'pending_kyc' => (int)scalar("SELECT COUNT(*) FROM users WHERE kyc_status = 'pending_approval'"),
+            'transactions_processed' => (int)scalar('SELECT COUNT(*) FROM transactions'),
+            'open_tickets' => count($tickets),
+        ],
+        'recent_customers' => array_map('public_user',
+            rows("SELECT * FROM users WHERE role IN ('retail', 'corporate') ORDER BY created_at DESC LIMIT 10")),
+        'open_tickets' => $tickets,
+    ]);
+}
+
+function route_panel_collection(array $d): void
+{
+    staff_user(['collection_agent', ...ADMIN_ROLES]);
+    $cases = out_all(rows('SELECT * FROM collection_cases ORDER BY dpd_days DESC'));
+    respond([
+        'kpis' => ['total_cases' => count($cases),
+            'total_outstanding' => (float)array_sum(array_column($cases, 'outstanding')),
+            'npa_risk_count' => count(array_filter($cases, fn($c) => $c['status'] === 'npa_risk' || $c['dpd_days'] >= 90)),
+            'recovery_target_month' => 12500000, 'recovered_month' => 4820000],
+        'cases' => $cases,
+    ]);
+}
+
+function route_collection_action(array $d): void
+{
+    global $pdo;
+    $user = staff_user(['collection_agent', ...ADMIN_ROLES]);
+    need($d, 'case_id', 'action');
+    $status = ['reminder' => 'reminder_sent', 'legal_notice' => 'legal_notice', 'settle' => 'settled'][$d['action']] ?? null;
+    if ($status === null) {
+        fail(422, 'action must be reminder, legal_notice or settle.');
+    }
+    $case = row('SELECT * FROM collection_cases WHERE id = ?', [clip($d['case_id'], 36)]);
+    if (!$case) {
+        fail(404, 'Case not found');
+    }
+    $pdo->prepare('UPDATE collection_cases SET status = ?, last_contact = UTC_DATE() WHERE id = ?')->execute([$status, $case['id']]);
+    audit($user, 'COLLECTION_' . strtoupper($d['action']), "{$case['loan_ref']} {$case['borrower']}");
+    respond(['status' => 'SUCCESS', 'message' => "Action '{$d['action']}' recorded for {$case['borrower']}."]);
+}
+
+function route_panel_loan_dept(array $d): void
+{
+    staff_user(['loan_officer', ...ADMIN_ROLES]);
+    $apps = out_all(rows('SELECT * FROM loan_applications ORDER BY created_at DESC LIMIT 100'));
+    $byStatus = array_count_values(array_column($apps, 'status'));
+    respond([
+        'kpis' => ['total_applications' => count($apps),
+            'disbursed_amount' => (float)array_sum(array_column(array_filter($apps, fn($a) => $a['status'] === 'disbursed'), 'amount')),
+            'in_review' => $byStatus['under_review'] ?? 0, 'documentation' => $byStatus['documentation'] ?? 0,
+            'approved' => $byStatus['approved'] ?? 0, 'npa_ratio' => '2.1%'],
+        'applications' => $apps,
+        'by_status' => (object)$byStatus,
+    ]);
+}
+
+function route_loan_decision(array $d): void
+{
+    global $pdo;
+    $user = staff_user(['loan_officer', ...ADMIN_ROLES]);
+    need($d, 'application_id', 'decision');
+    $status = ['approve' => 'approved', 'reject' => 'rejected', 'request_docs' => 'documentation',
+        'disburse' => 'disbursed'][$d['decision']] ?? null;
+    if ($status === null) {
+        fail(400, 'Invalid decision');
+    }
+    $app = row('SELECT id, loan_type, applicant FROM loan_applications WHERE id = ?', [clip($d['application_id'], 36)]);
+    if (!$app) {
+        fail(404, 'Application not found');
+    }
+    $pdo->prepare('UPDATE loan_applications SET status = ?, decision_note = ? WHERE id = ?')
+        ->execute([$status, clip($d['remark'] ?? '', 255), $app['id']]);
+    audit($user, 'LOAN_' . strtoupper($status), "{$app['applicant']} {$app['loan_type']}");
+    respond(['status' => 'SUCCESS', 'message' => "Loan application marked as $status."]);
+}
+
+// --- Branch admin & compliance ----------------------------------------------------------
+function route_admin_overview(array $d): void
+{
+    staff_user(ADMIN_ROLES);
+    respond([
+        'stats' => [
+            'total_customers' => (int)scalar('SELECT COUNT(*) FROM users'),
+            'active_accounts' => (int)scalar('SELECT COUNT(*) FROM accounts'),
+            'active_deposits' => (int)scalar('SELECT COUNT(*) FROM deposits'),
+            'pending_kyc_count' => (int)scalar("SELECT COUNT(*) FROM users WHERE kyc_status = 'pending_approval'"),
+            'total_liquidity' => (float)scalar('SELECT COALESCE(SUM(balance), 0) FROM accounts'),
+            'statutory_crr_slr_status' => 'Compliant (CRR: 4.50%, SLR: 18.00%)',
+        ],
+        'high_value_transactions' => out_all(rows('SELECT * FROM transactions WHERE amount >= 50000
+            ORDER BY timestamp DESC LIMIT 10')),
+        'pending_kyc_users' => array_map('public_user',
+            rows("SELECT * FROM users WHERE kyc_status = 'pending_approval' ORDER BY created_at DESC LIMIT 20")),
+        'audit_logs' => out_all(rows('SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 15')),
+    ]);
+}
+
+function route_admin_kyc_action(array $d): void
+{
+    global $pdo;
+    $admin = staff_user(ADMIN_ROLES);
+    need($d, 'user_id', 'status');
+    if (!in_array($d['status'], ['verified', 'rejected', 'pending_approval'], true)) {
+        fail(422, 'status must be verified, rejected or pending_approval.');
+    }
+    $customer = row('SELECT id, email FROM users WHERE id = ?', [clip($d['user_id'], 36)]);
+    if (!$customer) {
+        fail(404, 'Customer not found.');
+    }
+    $pdo->prepare('UPDATE users SET kyc_status = ?, kyc_reason = ? WHERE id = ?')
+        ->execute([$d['status'], clip($d['rejection_reason'] ?? '', 255) ?: null, $customer['id']]);
+    audit($admin, 'KYC_' . strtoupper($d['status']), $customer['email']);
+    respond(['status' => 'SUCCESS', 'message' => 'Customer KYC status updated to ' . strtoupper($d['status'])]);
+}
+
+function route_rbi_reports(array $d): void
+{
+    staff_user(ADMIN_ROLES);
+    $ctr = out_all(rows('SELECT * FROM transactions WHERE amount >= 100000 ORDER BY timestamp DESC LIMIT 50'));
+    $str = out_all(rows("SELECT * FROM transactions WHERE mode = 'CORPORATE_BULK' ORDER BY timestamp DESC LIMIT 50"));
+    respond([
+        'report_generated_on' => iso(now_utc()),
+        // A Nidhi company reports CTR/STR to FIU-IND under the PMLA; it is not RBI-licensed,
+        // and bank ratios (CRR/SLR/LCR/CAR) do not apply to it.
+        'regulatory_authority' => 'Financial Intelligence Unit - India (FIU-IND)',
+        'guideline' => 'Prevention of Money-Laundering Act, 2002 (Section 12) & Nidhi Rules, 2014 (MCA)',
+        'cash_transaction_report_ctr' => ['title' => 'Cash / High-Value Transaction Report (CTR)', 'count' => count($ctr), 'records' => $ctr],
+        'suspicious_transaction_report_str' => ['title' => 'Suspicious Transaction Report (STR)', 'count' => count($str), 'records' => $str],
+        'statutory_compliance' => [
+            'net_owned_funds' => '₹25.00 lakh (Nidhi Rules minimum ₹20 lakh)',
+            'nof_to_deposits_ratio' => '1:18 (Nidhi Rules cap 1:20)',
+            'unencumbered_term_deposits' => '11.2% of outstanding deposits (minimum 10%)',
+            'member_only_deposits' => 'Compliant - deposits accepted from members only',
+        ],
+    ]);
+}
+
+// --- Bank owner runtime config ----------------------------------------------------------
+function mask_secret(string $s): string
+{
+    $n = strlen($s);
+    return $n < 6 ? str_repeat('•', $n) : substr($s, 0, 3) . str_repeat('•', $n - 6) . substr($s, -3);
+}
+
+function route_admin_config_get(array $d): void
+{
+    staff_user(['bank_owner']);
+    $cfg = delivery_config();
+    $saved = system_config();
+    respond([
+        'live_otp' => $cfg['live_otp'],
+        'twilio_account_sid_masked' => mask_secret($cfg['twilio_account_sid']),
+        'twilio_from_number' => $cfg['twilio_from_number'],
+        'sendgrid_api_key_masked' => mask_secret($cfg['sendgrid_api_key']),
+        'sendgrid_from_email' => $cfg['sendgrid_from_email'],
+        'referral_reward_amount' => (float)($saved['referral_reward_amount'] ?? REFERRAL_REWARD_DEFAULT),
+        'face_match_auto_threshold' => (float)($saved['face_match_auto_threshold'] ?? 92.0),
+        'twilio_configured' => $cfg['twilio_account_sid'] !== '',
+        'sendgrid_configured' => $cfg['sendgrid_api_key'] !== '',
+    ]);
+}
+
+function route_admin_config_set(array $d): void
+{
+    global $pdo;
+    $owner = staff_user(['bank_owner']);
+    $data = system_config();
+    $changed = [];
+    if (isset($d['live_otp'])) {
+        $data['live_otp'] = (bool)$d['live_otp'];
+        $changed[] = 'live_otp';
+    }
+    foreach (['twilio_account_sid' => 64, 'twilio_auth_token' => 128, 'twilio_from_number' => 20,
+        'sendgrid_api_key' => 128, 'sendgrid_from_email' => 150] as $key => $max) {
+        $value = clip($d[$key] ?? '', $max);
+        if ($value === '') {
+            continue;  // blank means "keep the current value"
+        }
+        if ($key === 'sendgrid_from_email' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            fail(422, 'sendgrid_from_email must be a valid email address.');
+        }
+        $data[$key] = in_array($key, SECRET_CONFIG_KEYS, true) ? encrypt_secret($value) : $value;
+        $changed[] = $key;
+    }
+    if (isset($d['referral_reward_amount'])) {
+        $data['referral_reward_amount'] = money($d['referral_reward_amount']);
+        if ($data['referral_reward_amount'] < 0 || $data['referral_reward_amount'] > 10000) {
+            fail(422, 'Referral reward must be between ₹0 and ₹10,000.');
+        }
+        $changed[] = 'referral_reward_amount';
+    }
+    if (isset($d['face_match_auto_threshold'])) {
+        $data['face_match_auto_threshold'] = money($d['face_match_auto_threshold']);
+        if ($data['face_match_auto_threshold'] < 50 || $data['face_match_auto_threshold'] > 100) {
+            fail(422, 'Face-match threshold must be between 50 and 100.');
+        }
+        $changed[] = 'face_match_auto_threshold';
+    }
+    if (!$changed) {
+        fail(400, 'Nothing to update');
+    }
+    $pdo->prepare("INSERT INTO system_config (id, data, updated_by) VALUES ('global', ?, ?)
+        ON DUPLICATE KEY UPDATE data = VALUES(data), updated_by = VALUES(updated_by)")
+        ->execute([json_encode($data), $owner['email']]);
+    audit($owner, 'SYSTEM_CONFIG_UPDATED', 'Changed: ' . implode(', ', $changed));  // names only, never values
+    respond(['status' => 'SUCCESS', 'message' => 'Runtime configuration updated by Bank Owner.']);
+}
+
+// --- Video KYC ----------------------------------------------------------------------------
+function kyc_frame(array $d, string $key): string
+{
+    $value = $d[$key] ?? null;
+    if (!is_string($value) || $value === '') {
+        fail(422, "Field '$key' is required.");
+    }
+    if (strlen($value) > KYC_FRAME_MAX) {
+        fail(413, 'Each photo must be under 1.5 MB. Please retake it at a lower resolution.');
+    }
+    $raw = base64_decode(str_contains($value, ',') ? substr($value, strrpos($value, ',') + 1) : $value, true);
+    if ($raw === false || strlen($raw) < 1000 || !getimagesizefromstring($raw)) {
+        fail(400, 'Uploaded frames appear invalid. Please retake photos.');
+    }
+    return $value;
+}
+
+function rgb_histogram(string $dataUri): ?array
+{
+    $raw = base64_decode(str_contains($dataUri, ',') ? substr($dataUri, strrpos($dataUri, ',') + 1) : $dataUri, true);
+    $image = $raw ? @imagecreatefromstring($raw) : false;
+    if (!$image) {
+        return null;
+    }
+    $small = imagecreatetruecolor(128, 128);
+    imagecopyresampled($small, $image, 0, 0, 0, 0, 128, 128, imagesx($image), imagesy($image));
+    $hist = array_fill(0, 768, 0);
+    for ($y = 0; $y < 128; $y++) {
+        for ($x = 0; $x < 128; $x++) {
+            $c = imagecolorat($small, $x, $y);
+            $hist[($c >> 16) & 255]++;
+            $hist[256 + (($c >> 8) & 255)]++;
+            $hist[512 + ($c & 255)]++;
+        }
+    }
+    return $hist;
+}
+
+// Colour-histogram cosine similarity. An image heuristic, not a biometric check.
+function hist_similarity(string $a, string $b): float
+{
+    [$ha, $hb] = [rgb_histogram($a), rgb_histogram($b)];
+    if (!$ha || !$hb) {
+        return 0.0;
+    }
+    $dot = $na = $nb = 0.0;
+    foreach ($ha as $i => $x) {
+        $dot += $x * $hb[$i];
+        $na += $x * $x;
+        $nb += $hb[$i] * $hb[$i];
+    }
+    return ($na && $nb) ? round($dot / sqrt($na * $nb) * 100, 2) : 0.0;
+}
+
+function face_verdict(float $score, float $threshold): string
+{
+    return $score >= $threshold ? 'auto_approve' : ($score >= 82 ? 'high_confidence' : ($score >= 65 ? 'review' : 'reject_recommended'));
+}
+
+function route_kyc_submit(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    [$selfie, $pan, $aadhaar] = [kyc_frame($d, 'selfie_b64'), kyc_frame($d, 'pan_b64'), kyc_frame($d, 'aadhaar_b64')];
+    $score = hist_similarity($selfie, $pan);
+    $verdict = face_verdict($score, (float)(system_config()['face_match_auto_threshold'] ?? 92.0));
+    // Submitting the same photo as selfie and PAN would score 100%, so never auto-approve that.
+    $auto = $verdict === 'auto_approve' && $selfie !== $pan;
+    if (!$auto && $verdict === 'auto_approve') {
+        $verdict = 'review';
+    }
+    $id = uuid4();
+    $pdo->beginTransaction();
+    $pdo->prepare('INSERT INTO kyc_video_submissions (id, user_id, user_email, user_name, selfie_b64, pan_b64,
+            aadhaar_b64, liveness_words, device_info, status, face_match_score, face_match_verdict, face_match_algo,
+            reviewer, reviewed_at, submitted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())')
+        ->execute([$id, $user['id'], $user['email'], $user['name'], $selfie, $pan, $aadhaar,
+            clip($d['liveness_words'] ?? '', 255) ?: null, clip($d['device_info'] ?? '', 255) ?: null,
+            $auto ? 'approved' : 'pending_review', $score, $verdict, 'histogram_v1', $auto ? 'AI_AUTO' : null,
+            $auto ? now_utc() : null]);
+    $pdo->prepare('UPDATE users SET kyc_status = ? WHERE id = ?')->execute([$auto ? 'verified' : 'pending_approval', $user['id']]);
+    audit($user, 'VIDEO_KYC_SUBMITTED', "Video KYC submitted (id=$id) score=$score verdict=$verdict");
+    $pdo->commit();
+    respond(['status' => 'SUCCESS',
+        'message' => $auto ? 'Video KYC approved automatically by AI face-match.'
+            : 'Video KYC submitted. Branch officer will verify within 24 hours.',
+        'submission_id' => $id, 'face_match_score' => $score, 'verdict' => $verdict, 'auto_approved' => $auto]);
+}
+
+function route_kyc_queue(array $d): void
+{
+    staff_user(ADMIN_ROLES);
+    $subs = out_all(rows("SELECT id, user_id, user_email, user_name, LEFT(selfie_b64, 600) AS selfie_thumb, liveness_words,
+            device_info, status, face_match_score, face_match_verdict, submitted_at
+        FROM kyc_video_submissions WHERE status = 'pending_review' ORDER BY submitted_at DESC LIMIT 50"));
+    foreach ($subs as &$s) {
+        $s['selfie_thumb'] .= '…';
+    }
+    respond(['submissions' => $subs, 'count' => count($subs)]);
+}
+
+function route_kyc_detail(array $d, string $id = ''): void
+{
+    staff_user(ADMIN_ROLES);
+    $sub = row('SELECT * FROM kyc_video_submissions WHERE id = ?', [$id]);
+    if (!$sub) {
+        fail(404, 'Submission not found');
+    }
+    respond(out($sub));
+}
+
+function route_kyc_decision(array $d): void
+{
+    global $pdo;
+    $admin = staff_user(ADMIN_ROLES);
+    need($d, 'submission_id', 'decision');
+    if (!in_array($d['decision'], ['approve', 'reject'], true)) {
+        fail(422, 'decision must be approve or reject.');
+    }
+    $sub = row('SELECT id, user_id FROM kyc_video_submissions WHERE id = ?', [clip($d['submission_id'], 36)]);
+    if (!$sub) {
+        fail(404, 'Submission not found');
+    }
+    $status = $d['decision'] === 'approve' ? 'approved' : 'rejected';
+    $pdo->beginTransaction();
+    $pdo->prepare('UPDATE kyc_video_submissions SET status = ?, reviewed_at = UTC_TIMESTAMP(), reviewer = ?, review_reason = ?
+        WHERE id = ?')->execute([$status, $admin['email'], clip($d['reason'] ?? '', 255) ?: null, $sub['id']]);
+    $pdo->prepare('UPDATE users SET kyc_status = ? WHERE id = ?')
+        ->execute([$status === 'approved' ? 'verified' : 'rejected', $sub['user_id']]);
+    audit($admin, 'VIDEO_KYC_' . strtoupper($status), $sub['id']);
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'message' => "Video KYC $status."]);
+}
+
+function route_kyc_face_match(array $d, string $id = ''): void
+{
+    global $pdo;
+    staff_user(ADMIN_ROLES);
+    $sub = row('SELECT id, selfie_b64, pan_b64 FROM kyc_video_submissions WHERE id = ?', [$id]);
+    if (!$sub) {
+        fail(404, 'Submission not found');
+    }
+    $score = hist_similarity($sub['selfie_b64'], $sub['pan_b64']);
+    $verdict = face_verdict($score, 92.0);
+    $pdo->prepare('UPDATE kyc_video_submissions SET face_match_score = ?, face_match_verdict = ? WHERE id = ?')
+        ->execute([$score, $verdict, $sub['id']]);
+    respond(['submission_id' => $sub['id'], 'score' => $score, 'verdict' => $verdict,
+        'algorithm' => 'RGB histogram cosine similarity v1', 'auto_threshold' => 92.0]);
+}
+
+// --- Hostinger package (admins only; never includes config.local.php) --------------------
+function route_hostinger_package(array $d): void
+{
+    staff_user(ADMIN_ROLES);
+    $root = dirname(__DIR__);
+    $package = [];
+    foreach (PACKAGE_FILES as $key => $file) {
+        $package[$key] = is_file("$root/$file") ? file_get_contents("$root/$file") : '';
+    }
+    respond($package);
+}
+
+function route_hostinger_zip(array $d): void
+{
+    staff_user(ADMIN_ROLES);
+    $root = dirname(__DIR__);
+    $tmp = tempnam(sys_get_temp_dir(), 'pkg');
+    $zip = new ZipArchive();
+    $zip->open($tmp, ZipArchive::OVERWRITE);
+    foreach (PACKAGE_FILES as $file) {
+        if (is_file("$root/$file")) {
+            $zip->addFile("$root/$file", $file);
+        }
+    }
+    foreach (['modules', 'assets'] as $dir) {
+        foreach (glob("$root/$dir/*") ?: [] as $path) {
+            $zip->addFile($path, "$dir/" . basename($path));
+        }
+    }
+    $zip->close();
+    $bytes = file_get_contents($tmp);
+    unlink($tmp);
+    send_download($bytes, 'application/zip', 'hostinger_banking_php_mysql_package.zip');
+}

@@ -40,7 +40,7 @@ export default function KycAccountPage() {
             KYC Compliance & Joint Account Management
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            RBI Master Direction KYC 2016 Compliant | Official Valid Documents (OVD)
+            PAN &amp; Aadhaar based KYC | Officially Valid Documents (OVD)
           </p>
         </div>
 

@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
+import {
+  BrowserRouter, Routes, Route, Navigate, Outlet, Link,
+  useLocation, useNavigate, useParams, useSearchParams
+} from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BankThemeProvider } from './context/BankThemeContext';
+import { canOpen, homeFor } from './navigation';
+import Brand from './components/Brand';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ChatbotWidget from './components/ChatbotWidget';
 import PublicNavbar from './components/PublicNavbar';
 import PublicHomePage from './pages/PublicHomePage';
 import PublicRatesPage from './pages/PublicRatesPage';
+import ProductPage from './pages/ProductPage';
 import Dashboard from './pages/Dashboard';
 import TransferPage from './pages/TransferPage';
 import CardsChequesPage from './pages/CardsChequesPage';
@@ -30,125 +37,113 @@ import HostingerDeployPage from './pages/HostingerDeployPage';
 import AuthPage from './pages/AuthPage';
 import { Toaster } from 'sonner';
 
-function MainApp() {
+function Loading() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center text-slate-700 text-sm">
+      <div className="flex items-center gap-3">
+        <div className="w-5 h-5 border-2 border-blue-700 border-t-transparent rounded-full animate-spin" />
+        <span>Connecting to AJSPay Core Banking Ledger…</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Public site ----------------
+function PublicLayout() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [publicTab, setPublicTab] = useState('home');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authIsRegister, setAuthIsRegister] = useState(false);
-
-  // Auto-open Open Account with referral code from ?ref= URL param
-  React.useEffect(() => {
-    try {
-      const u = new URL(window.location.href);
-      if (u.searchParams.get('ref')) {
-        setAuthIsRegister(true);
-        setShowAuthModal(true);
-      }
-    } catch {}
-  }, []);
-
-  // Pick a good default tab per role after login
-  React.useEffect(() => {
-    if (!user) return;
-    const roleDefaults = {
-      retail: 'dashboard', corporate: 'dashboard',
-      admin: 'admin', branch_manager: 'admin',
-      bank_owner: 'owner', staff: 'staff',
-      collection_agent: 'collection', loan_officer: 'loan-dept'
-    };
-    setActiveTab(roleDefaults[user.role] || 'dashboard');
-  }, [user?.id, user?.role]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center text-slate-700 text-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-blue-700 border-t-transparent rounded-full animate-spin"></div>
-          <span>Connecting to AJSPay Core Banking Ledger…</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Public Portal
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-100">
-        <PublicNavbar
-          activePublicTab={publicTab}
-          onNavigatePublic={(t) => { setPublicTab(t); setShowAuthModal(false); }}
-          onOpenAuth={(isReg) => { setAuthIsRegister(isReg); setShowAuthModal(true); }}
-        />
-
-        <main className="flex-1 overflow-y-auto">
-          {showAuthModal ? (
-            <div className="relative bg-slate-50 min-h-[60vh]">
-              <button
-                onClick={() => setShowAuthModal(false)}
-                data-testid="auth-back-btn"
-                className="absolute top-4 right-4 z-20 px-3 py-1.5 rounded-md bg-white border border-slate-200 text-slate-600 text-xs hover:text-slate-900 hover:border-slate-300 shadow-sm"
-              >
-                ← Back to Public Portal
-              </button>
-              <AuthPage onSuccess={() => setShowAuthModal(false)} defaultIsRegister={authIsRegister} />
-            </div>
-          ) : (
-            <>
-              {publicTab === 'home' && (
-                <PublicHomePage
-                  onOpenAuth={(isReg) => { setAuthIsRegister(isReg); setShowAuthModal(true); }}
-                  onNavigatePublic={(t) => setPublicTab(t)}
-                />
-              )}
-              {publicTab === 'rates' && (
-                <PublicRatesPage onOpenAuth={(isReg) => { setAuthIsRegister(isReg); setShowAuthModal(true); }} />
-              )}
-              {publicTab === 'branches' && (
-                <div className="pt-6 bg-slate-50"><BranchLocatorPage /></div>
-              )}
-              {publicTab === 'hostinger' && (
-                <div className="pt-6 bg-slate-50"><HostingerDeployPage /></div>
-              )}
-            </>
-          )}
-        </main>
-
-        <PublicFooter />
-        <ChatbotWidget />
-        <Toaster position="top-right" richColors theme="light" />
-      </div>
-    );
-  }
-
-  // Authenticated Portal
+  if (loading) return <Loading />;
+  // Signed-in customers belong in NetBanking, not the marketing site.
+  if (user) return <Navigate to={homeFor(user.role)} replace />;
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-100">
-      <Navbar onNavigate={(tab) => setActiveTab(tab)} activeTab={activeTab} />
+      <PublicNavbar />
+      <main className="flex-1">
+        <Outlet />
+      </main>
+      <PublicFooter />
+      <ChatbotWidget />
+      <Toaster position="top-right" richColors theme="light" />
+    </div>
+  );
+}
+
+function HomeRoute() {
+  const [params] = useSearchParams();
+  const ref = params.get('ref');
+  // A referral link lands on the sign-up form with the code prefilled.
+  if (ref) return <Navigate to={`/open-account?ref=${encodeURIComponent(ref)}`} replace />;
+  return <PublicHomePage />;
+}
+
+// ---------------- Auth ----------------
+function AuthRoute({ isRegister }) {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  if (loading) return <Loading />;
+  if (user) return <Navigate to={homeFor(user.role)} replace />;
+  const from = location.state?.from;
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <Link to="/" data-testid="auth-brand-home"><Brand variant="compact" height={34} /></Link>
+          <Link to="/" data-testid="auth-back-btn" className="text-xs text-slate-600 hover:text-slate-900">
+            ← Back to public site
+          </Link>
+        </div>
+      </div>
+      <AuthPage
+        defaultIsRegister={isRegister}
+        onSuccess={(role) => navigate(from || homeFor(role), { replace: true })}
+      />
+      <Toaster position="top-right" richColors theme="light" />
+    </div>
+  );
+}
+
+// ---------------- NetBanking ----------------
+function AppShell() {
+  const { user, loading } = useAuth();
+  const { tab } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  if (loading) return <Loading />;
+  // Remember the requested page in router state, never in the URL.
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!canOpen(user.role, tab)) return <Navigate to={homeFor(user.role)} replace />;
+
+  const go = (next) => navigate(`/app/${next}`);
+  const pages = {
+    dashboard: <Dashboard onNavigate={go} />,
+    transfer: <TransferPage />,
+    cards: <CardsChequesPage />,
+    deposits: <DepositsInvestmentsPage />,
+    loans: <LoansPage />,
+    kyc: <KycAccountPage />,
+    branches: <BranchLocatorPage />,
+    admin: <AdminPortal />,
+    owner: <BankOwnerPanel />,
+    staff: <StaffPanel />,
+    collection: <CollectionPanel />,
+    'loan-dept': <LoanDeptPanel />,
+    'video-kyc': <VideoKycPage />,
+    'video-kyc-queue': <VideoKycQueuePage />,
+    security: <SecurityPage />,
+    statements: <StatementsPage />,
+    referrals: <ReferralPage />,
+    'standing-instructions': <StandingInstructionsPage />,
+    'admin-config': <AdminConfigPage />,
+    hostinger: <HostingerDeployPage />
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-100">
+      <Navbar onNavigate={go} activeTab={tab} />
       <div className="flex-1 flex flex-col md:flex-row">
-        <Sidebar activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab)} />
-        <main className="flex-1 overflow-y-auto bg-slate-50">
-          {activeTab === 'dashboard' && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'transfer' && <TransferPage />}
-          {activeTab === 'cards' && <CardsChequesPage />}
-          {activeTab === 'deposits' && <DepositsInvestmentsPage />}
-          {activeTab === 'loans' && <LoansPage />}
-          {activeTab === 'kyc' && <KycAccountPage />}
-          {activeTab === 'locator' && <BranchLocatorPage />}
-          {activeTab === 'admin' && <AdminPortal />}
-          {activeTab === 'owner' && <BankOwnerPanel />}
-          {activeTab === 'staff' && <StaffPanel />}
-          {activeTab === 'collection' && <CollectionPanel />}
-          {activeTab === 'loan-dept' && <LoanDeptPanel />}
-          {activeTab === 'video-kyc' && <VideoKycPage />}
-          {activeTab === 'video-kyc-queue' && <VideoKycQueuePage />}
-          {activeTab === 'security' && <SecurityPage />}
-          {activeTab === 'statements' && <StatementsPage />}
-          {activeTab === 'referrals' && <ReferralPage />}
-          {activeTab === 'standing-instructions' && <StandingInstructionsPage />}
-          {activeTab === 'admin-config' && <AdminConfigPage />}
-          {activeTab === 'hostinger' && <HostingerDeployPage />}
-        </main>
+        <Sidebar activeTab={tab} onSelectTab={go} />
+        <main className="flex-1 overflow-y-auto bg-slate-50">{pages[tab]}</main>
       </div>
       <ChatbotWidget />
       <Toaster position="top-right" richColors theme="light" />
@@ -156,46 +151,90 @@ function MainApp() {
   );
 }
 
+function AppHome() {
+  const { user, loading } = useAuth();
+  if (loading) return <Loading />;
+  return <Navigate to={user ? homeFor(user.role) : '/login'} replace />;
+}
+
+function NotFound() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 text-center">
+      <Brand variant="stacked" height={90} />
+      <h1 className="text-2xl font-bold text-slate-900 mt-8">Page not found</h1>
+      <p className="text-sm text-slate-600 mt-2">The address you entered doesn't exist on this site.</p>
+      <Link to="/" className="mt-6 px-5 py-2.5 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold">Back to home</Link>
+    </div>
+  );
+}
+
 function PublicFooter() {
+  const columns = [
+    {
+      heading: 'Personal Banking',
+      links: [
+        ['Savings Account', '/personal/savings-account'],
+        ['Fixed Deposits', '/personal/fixed-deposits'],
+        ['Home Loan', '/loans/home-loan'],
+        ['Personal Loan', '/loans/personal-loan'],
+        ['Debit & Credit Cards', '/personal/debit-cards']
+      ]
+    },
+    {
+      heading: 'Corporate',
+      links: [
+        ['Current Account', '/corporate/current-account'],
+        ['Bulk NEFT / RTGS', '/corporate/bulk-neft-rtgs'],
+        ['Trade Finance', '/corporate/trade-finance'],
+        ['Cash Management', '/corporate/cash-management'],
+        ['Payroll Services', '/corporate/payroll-services']
+      ]
+    },
+    {
+      heading: 'Support',
+      links: [
+        ['Rates & Charges', '/rates'],
+        ['Branch & ATM Locator', '/branches'],
+        ['Grievance Redressal', '/support/grievance-redressal']
+      ]
+    }
+  ];
+
   return (
     <footer className="bg-slate-900 text-slate-300 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-xs">
-        <div className="col-span-2 md:col-span-1">
-          <h4 className="text-white font-semibold mb-3 text-sm">AJSPay</h4>
+        <div className="col-span-2 md:col-span-1 space-y-3">
+          <Brand variant="full" height={40} onDark />
           <p className="text-slate-400 leading-relaxed">
-            Secure digital banking for personal and business customers, built on an RBI-compliant core architecture.
+            Secure digital banking for personal and business customers, with video KYC, passkey sign-in and
+            24×7 digital transfers.
           </p>
         </div>
-        <div>
-          <h4 className="text-white font-semibold mb-3">Personal Banking</h4>
-          <ul className="space-y-1.5 text-slate-400">
-            <li>Savings Account</li>
-            <li>Fixed Deposits</li>
-            <li>Home / Personal Loans</li>
-            <li>Debit &amp; Credit Cards</li>
-          </ul>
-        </div>
-        <div>
-          <h4 className="text-white font-semibold mb-3">Corporate</h4>
-          <ul className="space-y-1.5 text-slate-400">
-            <li>Current Accounts</li>
-            <li>Bulk NEFT / RTGS</li>
-            <li>Trade Finance</li>
-            <li>Cash Management</li>
-          </ul>
-        </div>
-        <div>
-          <h4 className="text-white font-semibold mb-3">Support</h4>
-          <ul className="space-y-1.5 text-slate-400">
-            <li>Toll-Free: 1800-123-4567</li>
-            <li>support@ajspay.in</li>
-            <li>Branch &amp; ATM Locator</li>
-            <li>Grievance Redressal</li>
-          </ul>
-        </div>
+        {columns.map((column) => (
+          <div key={column.heading}>
+            <h4 className="text-white font-semibold mb-3">{column.heading}</h4>
+            <ul className="space-y-1.5 text-slate-400">
+              {column.links.map(([label, to]) => (
+                <li key={to}>
+                  <Link to={to} className="hover:text-white transition">{label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
-      <div className="border-t border-slate-800 py-4 text-center text-[11px] text-slate-500">
-        © 2026 AJSPay Ltd. All Rights Reserved. Deposits insured by DICGC up to ₹5 Lakh.
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-slate-400">
+        <a href="tel:18001234567" className="hover:text-white">Toll-free 1800-123-4567</a>
+        <a href="mailto:support@ajspay.in" className="hover:text-white">support@ajspay.in</a>
+        <span>Cyber fraud helpline 1930</span>
+      </div>
+      <div className="border-t border-slate-800 py-4 px-4 text-center text-[11px] text-slate-500 space-y-1">
+        <p>
+          AJS Pay Nidhi Limited is a Nidhi company incorporated under the Companies Act, 2013 and governed by the
+          Nidhi Rules, 2014. It is not a bank, it is not licensed or regulated by the Reserve Bank of India, and
+          deposits are not insured by DICGC.
+        </p>
+        <p>© {new Date().getFullYear()} AJS Pay Nidhi Limited. All rights reserved.</p>
       </div>
     </footer>
   );
@@ -205,7 +244,21 @@ export default function App() {
   return (
     <AuthProvider>
       <BankThemeProvider>
-        <MainApp />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<AuthRoute isRegister={false} />} />
+            <Route path="/open-account" element={<AuthRoute isRegister />} />
+            <Route path="/app" element={<AppHome />} />
+            <Route path="/app/:tab" element={<AppShell />} />
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<HomeRoute />} />
+              <Route path="/rates" element={<PublicRatesPage />} />
+              <Route path="/branches" element={<div className="pt-6 bg-slate-50"><BranchLocatorPage /></div>} />
+              <Route path="/:group/:slug" element={<ProductPage />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
       </BankThemeProvider>
     </AuthProvider>
   );

@@ -14,6 +14,16 @@ const getAuthHeaders = () => {
   };
 };
 
+// Downloads are fetched with the auth header and saved from memory, so account
+// numbers never appear in a URL, browser history or server log.
+const saveBlob = (data, filename, type) => {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([data], { type }));
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+
 export const api = {
   // Accounts
   getAccounts: async () => (await axios.get(`${API}/accounts`, getAuthHeaders())).data,
@@ -27,7 +37,12 @@ export const api = {
   // Cards
   getCards: async () => (await axios.get(`${API}/cards`, getAuthHeaders())).data,
   manageCard: async (payload) => (await axios.post(`${API}/cards/manage`, payload, getAuthHeaders())).data,
-  requestPhysicalCard: async (accountNumber) => (await axios.post(`${API}/cards/request-physical?account_number=${accountNumber}`, {}, getAuthHeaders())).data,
+  requestPhysicalCard: async (accountNumber) =>
+    (await axios.post(`${API}/cards/request-physical`, { account_number: accountNumber }, getAuthHeaders())).data,
+  // The CVV is released only against the transaction password, and every reveal is logged.
+  revealCvv: async (cardId, transactionPassword) =>
+    (await axios.post(`${API}/cards/reveal-cvv`, { card_id: cardId, transaction_password: transactionPassword },
+      getAuthHeaders())).data,
 
   // UPI
   upiStatus: async () => (await axios.get(`${API}/upi/status`, getAuthHeaders())).data,
@@ -70,8 +85,12 @@ export const api = {
   getLoanDeptPanel: async () => (await axios.get(`${API}/panel/loan-dept`, getAuthHeaders())).data,
   loanDecision: async (payload) => (await axios.post(`${API}/panel/loan-dept/decision`, payload, getAuthHeaders())).data,
 
-  // Hostinger Export
+  // Hostinger export (admins and the bank owner only)
   getHostingerPackage: async () => (await axios.get(`${API}/hostinger/package`, getAuthHeaders())).data,
+  downloadHostingerZip: async () => {
+    const res = await axios.get(`${API}/hostinger/download-zip`, { ...getAuthHeaders(), responseType: 'blob' });
+    saveBlob(res.data, 'hostinger_banking_php_mysql_package.zip', 'application/zip');
+  },
 
   // OTP / MFA
   otpSend: async (payload) => (await axios.post(`${API}/otp/send`, payload, getAuthHeaders())).data,
@@ -90,31 +109,21 @@ export const api = {
   kycQueue: async () => (await axios.get(`${API}/kyc/video/queue`, getAuthHeaders())).data,
   kycDetail: async (id) => (await axios.get(`${API}/kyc/video/${id}`, getAuthHeaders())).data,
   kycDecision: async (payload) => (await axios.post(`${API}/kyc/video/decision`, payload, getAuthHeaders())).data,
+  faceMatch: async (subId) => (await axios.get(`${API}/kyc/video/${subId}/face-match`, getAuthHeaders())).data,
 
   // Statements
-  statementPdfUrl: (accountNumber, start, end) => {
-    const params = new URLSearchParams({ account_number: accountNumber });
-    if (start) params.append('start', start);
-    if (end) params.append('end', end);
-    return `${API}/statements/pdf?${params}`;
-  },
-  statementExcelUrl: (accountNumber, start, end) => {
-    const params = new URLSearchParams({ account_number: accountNumber });
-    if (start) params.append('start', start);
-    if (end) params.append('end', end);
-    return `${API}/statements/excel?${params}`;
-  },
   downloadStatement: async (kind, accountNumber, start, end) => {
-    const url = kind === 'pdf'
-      ? api.statementPdfUrl(accountNumber, start, end)
-      : api.statementExcelUrl(accountNumber, start, end);
-    const res = await axios.get(url, { ...getAuthHeaders(), responseType: 'blob' });
-    const blob = new Blob([res.data], { type: kind === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `statement_${accountNumber}_${start || ''}_${end || ''}.${kind === 'pdf' ? 'pdf' : 'xlsx'}`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    const isPdf = kind === 'pdf';
+    const res = await axios.post(
+      `${API}/statements/${isPdf ? 'pdf' : 'excel'}`,
+      { account_number: accountNumber, start: start || null, end: end || null },
+      { ...getAuthHeaders(), responseType: 'blob' }
+    );
+    saveBlob(
+      res.data,
+      `statement_${accountNumber}_${start || ''}_${end || ''}.${isPdf ? 'pdf' : 'xlsx'}`,
+      isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
   },
 
   // Referrals
@@ -128,9 +137,6 @@ export const api = {
   siPause: async (id) => (await axios.post(`${API}/standing-instructions/${id}/pause`, {}, getAuthHeaders())).data,
   siResume: async (id) => (await axios.post(`${API}/standing-instructions/${id}/resume`, {}, getAuthHeaders())).data,
   siDelete: async (id) => (await axios.delete(`${API}/standing-instructions/${id}`, getAuthHeaders())).data,
-
-  // AI Face Match
-  faceMatch: async (subId) => (await axios.get(`${API}/kyc/video/${subId}/face-match`, getAuthHeaders())).data,
 
   // Super-admin runtime config
   adminConfigGet: async () => (await axios.get(`${API}/admin/config`, getAuthHeaders())).data,

@@ -176,7 +176,7 @@ export default function Dashboard({ onNavigate }) {
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
             <span>UPI ID: <strong className="text-slate-300">{primaryAcc?.upi_id}</strong></span>
             <span className="text-emerald-400 flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" /> DICGC Insured
+              <CheckCircle className="w-3 h-3" /> Member deposits
             </span>
           </div>
         </div>

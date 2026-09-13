@@ -8,6 +8,9 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+# Server-side only: PHP modules and assets are never fetched over HTTP
+RewriteRule ^(modules|assets)/ - [F,L]
+
 # Hand the Authorization header to PHP (CGI/FastCGI setups strip it otherwise)
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
@@ -15,6 +18,7 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^api/ api.php [L,QSA]
 
 # React single-page app: serve real files, send every other path to index.html
+# so /loans, /app/transfer and every other route survives a refresh.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [L]
@@ -24,7 +28,7 @@ RewriteRule ^ index.html [L]
     Require all denied
 </FilesMatch>
 
-# Cap request bodies at 8 MB to blunt oversized-upload abuse
+# Cap request bodies at 8 MB (video KYC photos are the largest upload)
 LimitRequestBody 8388608
 
 <IfModule mod_headers.c>
