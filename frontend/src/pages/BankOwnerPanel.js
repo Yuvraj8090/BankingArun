@@ -30,14 +30,14 @@ export default function BankOwnerPanel() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Kpi icon={Users} label="Total Customers" value={k.total_users} color="text-[#0b3b8c]" />
+        {/* Only figures derived from our own ledger — no invented ratings or ratios. */}
+        <Kpi icon={Users} label="Total Users" value={k.total_users} color="text-[#0b3b8c]" />
+        <Kpi icon={BadgeCheck} label="Members" value={k.members} color="text-slate-800" />
         <Kpi icon={Wallet} label="Total Liquidity" value={`₹${Number(k.total_liquidity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} color="text-emerald-700" />
+        <Kpi icon={Award} label="Deposits (FD/RD)" value={`₹${Number(k.total_deposits).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} color="text-emerald-700" />
         <Kpi icon={TrendingUp} label="Transactions" value={k.total_transactions} color="text-[#c8102e]" />
         <Kpi icon={Building2} label="Active Branches" value={k.active_branches} color="text-slate-800" />
         <Kpi icon={Landmark} label="Loan Pipeline" value={k.loan_pipeline_count} color="text-[#0b3b8c]" />
-        <Kpi icon={Award} label="Rating" value={k.credit_rating} color="text-emerald-700" small />
-        <Kpi icon={BadgeCheck} label="Capital Adequacy" value={k.car_ratio} color="text-slate-800" />
-        <Kpi icon={BadgeCheck} label="NPA Ratio" value="2.10%" color="text-[#c8102e]" />
       </div>
 
       {/* Policies */}

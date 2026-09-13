@@ -24,19 +24,22 @@ function route_panel_bank_owner(array $d): void
     $loans = out_all(rows('SELECT * FROM loan_applications ORDER BY created_at DESC LIMIT 50'));
     $branches = out_all(rows('SELECT * FROM branches ORDER BY id'));
     respond([
+        // Only figures this system can actually derive. No credit rating or
+        // capital-adequacy claims: those are bank measures and were invented.
         'kpis' => ['total_users' => (int)scalar('SELECT COUNT(*) FROM users'),
             'total_liquidity' => (float)scalar('SELECT COALESCE(SUM(balance), 0) FROM accounts'),
             'total_transactions' => (int)scalar('SELECT COUNT(*) FROM transactions'),
             'active_branches' => count($branches), 'loan_pipeline_count' => count($loans),
-            'credit_rating' => 'AAA (CRISIL / ICRA)', 'car_ratio' => '17.8%'],
+            'total_deposits' => (float)scalar('SELECT COALESCE(SUM(principal_amount), 0) FROM deposits'),
+            'members' => (int)scalar("SELECT COUNT(*) FROM users WHERE role IN ('retail', 'corporate')")],
         'loan_pipeline' => $loans,
         'branches' => $branches,
         'policies' => [
             ['key' => 'savings_roi', 'label' => 'Savings Account Interest Rate', 'value' => '4.00% p.a.'],
             ['key' => 'fd_max_roi', 'label' => 'FD Peak Rate (Senior 2-3 Yr)', 'value' => '8.00% p.a.'],
             ['key' => 'home_loan_min', 'label' => 'Home Loan Starting Rate', 'value' => '8.40% p.a.'],
-            ['key' => 'crr', 'label' => 'Cash Reserve Ratio', 'value' => '4.50%'],
-            ['key' => 'slr', 'label' => 'Statutory Liquidity Ratio', 'value' => '18.00%'],
+            ['key' => 'personal_loan_min', 'label' => 'Personal Loan Starting Rate', 'value' => '10.50% p.a.'],
+            ['key' => 'nof_deposit_cap', 'label' => 'NOF : Deposits cap (Nidhi Rules)', 'value' => '1:20'],
         ],
     ]);
 }
