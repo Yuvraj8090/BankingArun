@@ -190,6 +190,28 @@ function body(): array
     return $data;
 }
 
+// --- Pagination -------------------------------------------------------------------
+// Every list endpoint goes through this, so no screen can silently truncate.
+// $sql is our own SQL with no user-supplied text in it; $perPage and $offset are
+// cast to int before interpolation, and the caller's values stay bound.
+function paginate(string $sql, array $params = [], int $defaultPerPage = 25, int $maxPerPage = 100): array
+{
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = max(1, min((int)($_GET['per_page'] ?? $defaultPerPage), $maxPerPage));
+    $total = (int)scalar("SELECT COUNT(*) FROM ($sql) AS paged_count", $params);
+    $pages = max(1, (int)ceil($total / $perPage));
+    if ($page > $pages) {
+        $page = $pages;  // a stale link to page 9 of 3 lands on the last page
+    }
+    $offset = ($page - 1) * $perPage;
+    $rows = rows("$sql LIMIT $perPage OFFSET $offset", $params);
+    return [$rows, [
+        'page' => $page, 'per_page' => $perPage, 'total' => $total, 'pages' => $pages,
+        'has_prev' => $page > 1, 'has_next' => $page < $pages,
+        'from' => $total === 0 ? 0 : $offset + 1, 'to' => min($offset + $perPage, $total),
+    ]];
+}
+
 function need(array $data, string ...$keys): void
 {
     foreach ($keys as $key) {

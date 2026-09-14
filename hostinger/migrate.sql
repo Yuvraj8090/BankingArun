@@ -113,6 +113,13 @@ ALTER TABLE users
     ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT,
     ADD COLUMN IF NOT EXISTS totp_enrolled_at DATETIME;
 
+-- --- Deposit interest and maturity (cron.php) ------------------------------
+ALTER TABLE deposits
+    ADD COLUMN IF NOT EXISTS interest_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS last_payout_date DATE,
+    ADD COLUMN IF NOT EXISTS matured_on DATETIME,
+    ADD INDEX IF NOT EXISTS idx_maturity (status, maturity_date);
+
 -- --- Columns cron.php writes ----------------------------------------------
 -- Without these the cron run fails on its first UPDATE.
 ALTER TABLE standing_instructions

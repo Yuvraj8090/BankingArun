@@ -113,9 +113,14 @@ CREATE TABLE IF NOT EXISTS deposits (
     maturity_amount DECIMAL(15,2) NOT NULL,
     maturity_date DATE NOT NULL,
     nominee_name VARCHAR(150),
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',  -- active | matured | closed
+    -- Written by cron.php when interest is paid or the deposit matures.
+    interest_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    last_payout_date DATE,
+    matured_on DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
+    INDEX idx_maturity (status, maturity_date),
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

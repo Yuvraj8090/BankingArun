@@ -356,14 +356,32 @@ function route_accounts(array $d): void
 function route_transactions(array $d): void
 {
     $user = current_user();
-    $limit = max(1, min((int)($_GET['limit'] ?? 50), 200));
     $sql = 'SELECT * FROM transactions WHERE user_id = ?';
     $params = [$user['id']];
     if (!empty($_GET['account_number'])) {
         $sql .= ' AND account_number = ?';
         $params[] = clip($_GET['account_number'], 30);
     }
-    respond(['transactions' => out_all(rows("$sql ORDER BY timestamp DESC, id LIMIT $limit", $params))]);
+    // Optional filters, all bound as parameters.
+    if (!empty($_GET['type']) && in_array($_GET['type'], ['credit', 'debit'], true)) {
+        $sql .= ' AND type = ?';
+        $params[] = $_GET['type'];
+    }
+    if (!empty($_GET['from_date'])) {
+        $sql .= ' AND timestamp >= ?';
+        $params[] = valid_date($_GET['from_date'], 'from_date') . ' 00:00:00';
+    }
+    if (!empty($_GET['to_date'])) {
+        $sql .= ' AND timestamp <= ?';
+        $params[] = valid_date($_GET['to_date'], 'to_date') . ' 23:59:59';
+    }
+    if (!empty($_GET['q'])) {
+        $sql .= ' AND (counterparty_name LIKE ? OR description LIKE ? OR ref_number LIKE ?)';
+        $like = '%' . clip($_GET['q'], 60) . '%';
+        array_push($params, $like, $like, $like);
+    }
+    [$txns, $meta] = paginate("$sql ORDER BY timestamp DESC, id", $params, 25, 200);
+    respond(['transactions' => out_all($txns), 'pagination' => $meta]);
 }
 
 function route_transfer(array $d): void

@@ -280,8 +280,9 @@ function route_complaint(array $d): void
 function route_my_tickets(array $d): void
 {
     $user = current_user();
-    respond(['tickets' => out_all(rows('SELECT * FROM support_tickets WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
-        [$user['id']]))]);
+    [$tickets, $meta] = paginate('SELECT * FROM support_tickets WHERE user_id = ? ORDER BY created_at DESC',
+        [$user['id']], 20, 100);
+    respond(['tickets' => out_all($tickets), 'pagination' => $meta]);
 }
 
 function route_branches(array $d): void

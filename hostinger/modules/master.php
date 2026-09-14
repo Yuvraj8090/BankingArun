@@ -267,11 +267,13 @@ function route_collections_list(array $d, string $id = ''): void
     if (!$agent) {
         fail(404, 'Agent not found.');
     }
-    $items = out_all(rows('SELECT c.*, s.code AS scheme_code FROM agent_collections c
+    [$rows, $meta] = paginate('SELECT c.*, s.code AS scheme_code FROM agent_collections c
         LEFT JOIN schemes s ON s.id = c.scheme_id
-        WHERE c.agent_id = ? ORDER BY c.collected_on DESC, c.created_at DESC LIMIT 200', [$id]));
-    respond(['agent' => out($agent), 'collections' => $items,
-        'total' => (float)array_sum(array_column($items, 'amount'))]);
+        WHERE c.agent_id = ? ORDER BY c.collected_on DESC, c.created_at DESC', [$id], 25, 100);
+    $items = out_all($rows);
+    // The total is over every collection, not just the page being shown.
+    $total = (float)scalar('SELECT COALESCE(SUM(amount), 0) FROM agent_collections WHERE agent_id = ?', [$id]);
+    respond(['agent' => out($agent), 'collections' => $items, 'pagination' => $meta, 'total' => $total]);
 }
 
 function route_collection_create(array $d): void

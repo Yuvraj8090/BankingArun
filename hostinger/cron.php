@@ -109,6 +109,130 @@ function pay(array $payer, string $from, string $to, float $amount, string $mode
     return [true, $ref];
 }
 
+// Credits a member account and records the ledger entry. The caller is inside a
+// transaction and has not yet locked the account.
+// Returns [true, ref] or [false, reason]; never calls fail(), which would end the run.
+function credit(string $accountNumber, float $amount, string $mode, string $counterparty,
+    string $description, string $ref): array
+{
+    global $pdo;
+    $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$accountNumber]);
+    if (!$account) {
+        return [false, 'Destination account no longer exists.'];
+    }
+    if ($account['status'] !== 'active') {
+        return [false, 'Destination account is not active.'];
+    }
+    $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?')->execute([$amount, $account['id']]);
+    insert_txn(['user_id' => $account['user_id'], 'account_number' => $accountNumber, 'type' => 'credit',
+        'mode' => $mode, 'amount' => $amount, 'balance_after' => round((float)$account['balance'] + $amount, 2),
+        'counterparty_name' => $counterparty, 'counterparty_acc' => $ref, 'ref_number' => $ref,
+        'description' => $description, 'timestamp' => now_utc()]);
+    return [true, $ref];
+}
+
+// --- Deposit interest and maturity ------------------------------------------------
+// Monthly-payout deposits pay simple interest on the principal each month; every
+// deposit pays out its maturity value on or after its maturity date. Both are
+// idempotent: a deposit is paid at most once per month and matures exactly once.
+function run_deposit_interest(string $today, bool $dryRun, bool $verbose): array
+{
+    global $pdo;
+    $paid = $failed = 0;
+    $due = rows("SELECT * FROM deposits
+        WHERE status = 'active' AND interest_payout = 'monthly' AND source_account IS NOT NULL
+          AND maturity_date > ?
+          AND (last_payout_date IS NULL OR last_payout_date <= DATE_SUB(?, INTERVAL 1 MONTH))
+          AND created_at <= DATE_SUB(?, INTERVAL 1 MONTH)
+        ORDER BY created_at LIMIT " . CRON_BATCH, [$today, $today, $today]);
+
+    foreach ($due as $deposit) {
+        $interest = round((float)$deposit['principal_amount'] * (float)$deposit['interest_rate'] / 100 / 12, 2);
+        $label = "Deposit {$deposit['deposit_number']} monthly interest " . rupees($interest);
+        if ($interest <= 0) {
+            continue;
+        }
+        if ($dryRun) {
+            say("  would pay  $label");
+            $paid++;
+            continue;
+        }
+        $pdo->beginTransaction();
+        $locked = row("SELECT * FROM deposits WHERE id = ? AND status = 'active' FOR UPDATE", [$deposit['id']]);
+        if (!$locked || ($locked['last_payout_date'] !== null && $locked['last_payout_date'] > $today)) {
+            $pdo->rollBack();
+            continue;
+        }
+        $ref = 'INT-' . $locked['deposit_number'] . '-' . str_replace('-', '', $today);
+        [$ok, $result] = credit($locked['source_account'], $interest, 'DEPOSIT_INTEREST',
+            'AJSPay Deposit Interest', "Monthly interest on deposit {$locked['deposit_number']}", $ref);
+        if (!$ok) {
+            $pdo->rollBack();
+            $failed++;
+            say("  FAILED     $label — $result");
+            continue;
+        }
+        $pdo->prepare('UPDATE deposits SET interest_paid = interest_paid + ?, last_payout_date = ? WHERE id = ?')
+            ->execute([$interest, $today, $locked['id']]);
+        $pdo->commit();
+        $paid++;
+        if ($verbose) {
+            say("  paid       $label to {$locked['source_account']}");
+        }
+    }
+    return [$paid, $failed];
+}
+
+function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): array
+{
+    global $pdo;
+    $matured = $failed = 0;
+    $due = rows("SELECT * FROM deposits WHERE status = 'active' AND maturity_date <= ?
+        AND source_account IS NOT NULL ORDER BY maturity_date LIMIT " . CRON_BATCH, [$today]);
+
+    foreach ($due as $deposit) {
+        // A monthly-payout deposit has already had its interest paid out along the
+        // way, so only the principal is returned at the end.
+        $payout = $deposit['interest_payout'] === 'monthly'
+            ? (float)$deposit['principal_amount']
+            : (float)$deposit['maturity_amount'];
+        $label = "Deposit {$deposit['deposit_number']} matured, " . rupees($payout);
+        if ($dryRun) {
+            say("  would pay  $label");
+            $matured++;
+            continue;
+        }
+        $pdo->beginTransaction();
+        $locked = row("SELECT * FROM deposits WHERE id = ? AND status = 'active' FOR UPDATE", [$deposit['id']]);
+        if (!$locked) {
+            $pdo->rollBack();
+            continue;  // another run took it
+        }
+        $ref = 'MAT-' . $locked['deposit_number'];
+        [$ok, $result] = credit($locked['source_account'], $payout, 'DEPOSIT_MATURITY',
+            'AJSPay Term Deposit', "Maturity proceeds of deposit {$locked['deposit_number']}", $ref);
+        if (!$ok) {
+            $pdo->rollBack();
+            $failed++;
+            say("  FAILED     $label — $result");
+            continue;
+        }
+        $interestPart = round($payout - (float)$locked['principal_amount'], 2);
+        $pdo->prepare("UPDATE deposits SET status = 'matured', matured_on = ?, interest_paid = interest_paid + ?
+            WHERE id = ?")->execute([now_utc(), max($interestPart, 0), $locked['id']]);
+        $owner = row('SELECT * FROM users WHERE id = ?', [$locked['user_id']]);
+        if ($owner) {
+            audit($owner, 'DEPOSIT_MATURED', "{$locked['deposit_number']} paid " . rupees($payout));
+        }
+        $pdo->commit();
+        $matured++;
+        if ($verbose) {
+            say("  paid       $label to {$locked['source_account']}");
+        }
+    }
+    return [$matured, $failed];
+}
+
 // --- Standing instructions ---------------------------------------------------------
 function run_standing_instructions(string $today, bool $dryRun, bool $verbose): array
 {
@@ -256,6 +380,8 @@ if ((int)scalar('SELECT GET_LOCK(?, 0)', [CRON_LOCK]) !== 1) {
 try {
     [$siDone, $siFailed] = run_standing_instructions($today, $dryRun, $verbose);
     [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
+    [$intDone, $intFailed] = run_deposit_interest($today, $dryRun, $verbose);
+    [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
@@ -268,6 +394,9 @@ try {
 
 scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
 say("Standing instructions: $siDone run, $siFailed failed. "
-    . "Scheduled transfers: $payDone run, $payFailed failed.");
+    . "Scheduled transfers: $payDone run, $payFailed failed. "
+    . "Deposit interest: $intDone paid, $intFailed failed. "
+    . "Maturities: $matDone paid, $matFailed failed.");
 $finished = true;
-exit($siFailed + $payFailed > 0 ? 2 : 0);  // 2 = ran, but something needs a look
+$problems = $siFailed + $payFailed + $intFailed + $matFailed;
+exit($problems > 0 ? 2 : 0);  // 2 = ran, but something needs a look

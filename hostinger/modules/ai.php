@@ -222,11 +222,12 @@ function route_fraud_queue(array $d): void
 {
     staff_user(AML_REVIEW_ROLES);
     $status = in_array($d['status'] ?? '', ['open', 'cleared', 'escalated'], true) ? $d['status'] : 'open';
-    $alerts = rows('SELECT f.*, u.name AS member_name, u.email AS member_email
+    [$alerts, $meta] = paginate('SELECT f.*, u.name AS member_name, u.email AS member_email
         FROM fraud_alerts f LEFT JOIN users u ON u.id = f.user_id
-        WHERE f.status = ? ORDER BY f.score DESC, f.created_at DESC LIMIT 200', [$status]);
+        WHERE f.status = ? ORDER BY f.score DESC, f.created_at DESC', [$status], 25, 100);
     respond([
         'alerts' => array_map('alert_public', $alerts),
+        'pagination' => $meta,
         'counts' => [
             'open' => (int)scalar("SELECT COUNT(*) FROM fraud_alerts WHERE status = 'open'"),
             'escalated' => (int)scalar("SELECT COUNT(*) FROM fraud_alerts WHERE status = 'escalated'"),

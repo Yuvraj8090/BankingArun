@@ -96,10 +96,11 @@ function route_security_events(array $d): void
 {
     staff_user(SECURITY_READ_ROLES);
     $severity = in_array($d['severity'] ?? '', SECURITY_SEVERITIES, true) ? $d['severity'] : null;
-    $events = $severity === null
-        ? rows('SELECT * FROM security_events ORDER BY created_at DESC LIMIT 200')
-        : rows('SELECT * FROM security_events WHERE severity = ? ORDER BY created_at DESC LIMIT 200', [$severity]);
+    [$events, $meta] = $severity === null
+        ? paginate('SELECT * FROM security_events ORDER BY created_at DESC', [], 50, 200)
+        : paginate('SELECT * FROM security_events WHERE severity = ? ORDER BY created_at DESC', [$severity], 50, 200);
     respond([
+        'pagination' => $meta,
         'events' => array_map(fn($e) => ['id' => (int)$e['id'], 'event_type' => $e['event_type'],
             'severity' => $e['severity'], 'email' => $e['email'], 'ip' => $e['ip'], 'route' => $e['route'],
             'details' => $e['details'], 'created_at' => iso($e['created_at'])], $events),
