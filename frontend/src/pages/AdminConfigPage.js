@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle2, Percent } from 'lucide-react';
+import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle2, Percent, UserCheck} from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
@@ -39,10 +39,10 @@ export default function AdminConfigPage() {
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><Settings2 className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Super-Admin Runtime Config</h1>
-            <p className="text-xs text-slate-500">Director only — Twilio SMS, SendGrid Email, Referral rules, Face-match threshold</p>
+            <p className="text-xs text-slate-500">Director only — OTP delivery, compliance officers, referral rules, face-match threshold</p>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded bg-white text-amber-600 text-[10px] font-bold">BANK OWNER</span>
+        <span className="px-2.5 py-1 rounded bg-blue-50 text-[#0b3b8c] border border-blue-200 text-[10px] font-bold">DIRECTOR</span>
       </div>
 
       {/* Live OTP toggle */}
@@ -104,6 +104,38 @@ export default function AdminConfigPage() {
       </Section>
 
       {/* Referral + face match */}
+      {/* Named officers. Members are told who to escalate to, and an inspection
+          asks who holds the PMLA roles by name. */}
+      <Section title="Compliance officers" icon={UserCheck}>
+        {!cfg?.grievance_officer_configured && (
+          <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5 mb-3">
+            No grievance officer is named yet. Until one is, every support ticket and the privacy
+            notice tell members the post is unfilled — which the Consumer Protection Act, 2019 expects
+            you to fill.
+          </p>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <PlainInput label="Grievance officer — name" testId="gro-name"
+            value={form.grievance_officer_name ?? ''} placeholder="e.g. Sunita Verma"
+            onChange={v => setForm(f => ({ ...f, grievance_officer_name: v }))} />
+          <PlainInput label="Grievance officer — email" testId="gro-email"
+            value={form.grievance_officer_email ?? ''} placeholder="grievance@yourdomain.in"
+            onChange={v => setForm(f => ({ ...f, grievance_officer_email: v }))} />
+          <PlainInput label="Grievance officer — phone" testId="gro-phone"
+            value={form.grievance_officer_phone ?? ''} placeholder="+91 ..."
+            onChange={v => setForm(f => ({ ...f, grievance_officer_phone: v }))} />
+          <PlainInput label="Principal officer (PMLA) — name" testId="po-name"
+            value={form.principal_officer_name ?? ''}
+            onChange={v => setForm(f => ({ ...f, principal_officer_name: v }))} />
+          <PlainInput label="Principal officer — email" testId="po-email"
+            value={form.principal_officer_email ?? ''}
+            onChange={v => setForm(f => ({ ...f, principal_officer_email: v }))} />
+          <PlainInput label="Designated director (PMLA)" testId="dd-name"
+            value={form.designated_director_name ?? ''}
+            onChange={v => setForm(f => ({ ...f, designated_director_name: v }))} />
+        </div>
+      </Section>
+
       <Section title="Program parameters" icon={Percent}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <PlainInput label="Referral reward (INR)" type="number"

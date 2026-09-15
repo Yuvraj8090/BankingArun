@@ -44,8 +44,7 @@ export const NAV_BY_ROLE = {
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue' },
-    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' },
-    { id: 'hostinger', label: 'Hostinger Package', icon: Globe, testId: 'tab-hostinger', highlight: true }
+    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
   ],
   branch_manager: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
@@ -72,8 +71,7 @@ export const NAV_BY_ROLE = {
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
     { id: 'collection', label: 'Collections', icon: Wallet, testId: 'tab-collection' },
-    { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue' },
-    { id: 'hostinger', label: 'Hostinger Package', icon: Globe, testId: 'tab-hostinger', highlight: true }
+    { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue' }
   ],
   staff: [
     { id: 'staff', label: 'Customer Console', icon: Users, testId: 'tab-staff' },

@@ -317,6 +317,26 @@ ck "a confirmed match blocks transacting" 403 "$CODE"
 ck "and is logged as critical" "1" "$(Q "SELECT COUNT(*)>0 FROM security_events WHERE event_type='BLOCKED_SANCTIONED_MEMBER'")"
 Q "DELETE FROM screening_hits; DELETE FROM watchlist_entries; DELETE FROM share_allotments; DELETE FROM member_register;" >/dev/null
 
+print "\n-- compliance officers and OTP delivery --"
+call PUT /admin/config "$RETAIL" '{"grievance_officer_name":"X"}'
+ck "only the Director may name officers" 403 "$CODE"
+call PUT /admin/config "$OWNER" '{"grievance_officer_email":"not-an-email"}'
+ck "a malformed officer email is refused" 422 "$CODE"
+call PUT /admin/config "$OWNER" '{"grievance_officer_name":""}'
+ck "a blank officer name is refused" 422 "$CODE"
+call PUT /admin/config "$OWNER" '{"grievance_officer_name":"APITEST Officer","grievance_officer_email":"grievance@example.com","grievance_officer_phone":"+91 90000 00000","principal_officer_name":"APITEST PO","principal_officer_email":"po@example.com","designated_director_name":"APITEST DD"}'
+ck "the Director can name them" 200 "$CODE"
+call GET /privacy/notice ""
+has "the officer reaches the public privacy notice" "$BODY" "APITEST Officer"
+call GET /support/notifications "$RETAIL"
+has "and the member's support view" "$BODY" "APITEST Officer"
+call GET /admin/config "$OWNER"
+ck "the config screen knows it is set" "True" "$(print -r -- "$BODY" | jq_ 'print(d["grievance_officer_configured"])')"
+ck "and that the PMLA roles are filled" "True" "$(print -r -- "$BODY" | jq_ 'print(d["pmla_officers_configured"])')"
+call PUT /admin/config "$OWNER" '{"live_otp":true}'
+ck "live OTP is refused with no way to deliver a code" 422 "$CODE"
+has "and says what is missing" "$BODY" "Twilio"
+
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
    DELETE FROM fraud_alerts; DELETE FROM security_events; DELETE FROM login_attempts;

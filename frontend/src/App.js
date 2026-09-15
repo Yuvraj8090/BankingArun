@@ -41,7 +41,6 @@ import CrmPage from './pages/CrmPage';
 import ReportsPage from './pages/ReportsPage';
 import TutorialOverlay from './components/TutorialOverlay';
 import SecurityCenterPage from './pages/SecurityCenterPage';
-import HostingerDeployPage from './pages/HostingerDeployPage';
 import AuthPage from './pages/AuthPage';
 import { Toaster } from 'sonner';
 
@@ -165,8 +164,7 @@ function AppShell() {
     fraud: <FraudMonitorPage />,
     crm: <CrmPage />,
     reports: <ReportsPage />,
-    'security-center': <SecurityCenterPage />,
-    hostinger: <HostingerDeployPage />
+    'security-center': <SecurityCenterPage />
   };
 
   return (

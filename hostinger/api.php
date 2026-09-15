@@ -811,8 +811,6 @@ $routes = [
     'POST /kyc/video/submit' => 'route_kyc_submit',
     'GET /kyc/video/queue' => 'route_kyc_queue',
     'POST /kyc/video/decision' => 'route_kyc_decision',
-    'GET /hostinger/package' => 'route_hostinger_package',
-    'GET /hostinger/download-zip' => 'route_hostinger_zip',
     // Scheme master & field agents (modules/master.php) — back office only
     'GET /schemes' => 'route_schemes_list',
     'POST /schemes' => 'route_scheme_create',

@@ -85,12 +85,6 @@ export const api = {
   getLoanDeptPanel: async () => (await axios.get(`${API}/panel/loan-dept`, getAuthHeaders())).data,
   loanDecision: async (payload) => (await axios.post(`${API}/panel/loan-dept/decision`, payload, getAuthHeaders())).data,
 
-  // Hostinger export (admins and the bank owner only)
-  getHostingerPackage: async () => (await axios.get(`${API}/hostinger/package`, getAuthHeaders())).data,
-  downloadHostingerZip: async () => {
-    const res = await axios.get(`${API}/hostinger/download-zip`, { ...getAuthHeaders(), responseType: 'blob' });
-    saveBlob(res.data, 'hostinger_banking_php_mysql_package.zip', 'application/zip');
-  },
 
   // OTP / MFA
   otpSend: async (payload) => (await axios.post(`${API}/otp/send`, payload, getAuthHeaders())).data,

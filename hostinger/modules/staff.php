@@ -5,10 +5,6 @@ declare(strict_types=1);
 
 const ADMIN_ROLES = ['admin', 'branch_manager', 'bank_owner'];
 const KYC_FRAME_MAX = 2000000;  // base64 characters per photo (~1.5 MB image)
-const PACKAGE_FILES = ['db_php' => 'db.php', 'api_php' => 'api.php', 'cron_php' => 'cron.php',
-    'schema_sql' => 'schema.sql', 'migrate_sql' => 'migrate.sql', 'htaccess' => '.htaccess',
-    'deploy_guide' => 'INSTALL_HOSTINGER.md'];
-
 function staff_user(array $roles): array
 {
     $user = current_user();
@@ -226,6 +222,18 @@ function route_admin_config_get(array $d): void
         'face_match_auto_threshold' => (float)($saved['face_match_auto_threshold'] ?? 92.0),
         'twilio_configured' => $cfg['twilio_account_sid'] !== '',
         'sendgrid_configured' => $cfg['sendgrid_api_key'] !== '',
+        // Named under the Consumer Protection Act, and published to members on
+        // every ticket and in the privacy notice.
+        'grievance_officer_name' => $saved['grievance_officer_name'] ?? '',
+        'grievance_officer_email' => $saved['grievance_officer_email'] ?? '',
+        'grievance_officer_phone' => $saved['grievance_officer_phone'] ?? '',
+        'grievance_officer_configured' => isset($saved['grievance_officer_name']),
+        // PMLA roles. An inspection asks who holds these by name.
+        'principal_officer_name' => $saved['principal_officer_name'] ?? '',
+        'principal_officer_email' => $saved['principal_officer_email'] ?? '',
+        'designated_director_name' => $saved['designated_director_name'] ?? '',
+        'pmla_officers_configured' => isset($saved['principal_officer_name'])
+            && isset($saved['designated_director_name']),
     ]);
 }
 
@@ -236,6 +244,19 @@ function route_admin_config_set(array $d): void
     $data = system_config();
     $changed = [];
     if (isset($d['live_otp'])) {
+        // Switching this on without a delivery route would silently stop every
+        // OTP reaching anyone, which is worse than demo mode being obvious.
+        if ((bool)$d['live_otp']) {
+            $merged = array_merge(system_config(), $data);
+            $hasSms = !empty($merged['twilio_account_sid']) && !empty($merged['twilio_auth_token'])
+                && !empty($merged['twilio_from_number']);
+            $hasEmail = !empty($merged['sendgrid_api_key']) && !empty($merged['sendgrid_from_email']);
+            if (!$hasSms && !$hasEmail) {
+                fail(422, 'Live OTP needs a way to send the code. Enter the Twilio keys for SMS, or the '
+                    . 'SendGrid key for email, and save those first. Until then members can use an '
+                    . 'authenticator app or a passkey, which need no third party at all.');
+            }
+        }
         $data['live_otp'] = (bool)$d['live_otp'];
         $changed[] = 'live_otp';
     }
@@ -250,6 +271,28 @@ function route_admin_config_set(array $d): void
         }
         $data[$key] = in_array($key, SECRET_CONFIG_KEYS, true) ? encrypt_secret($value) : $value;
         $changed[] = $key;
+    }
+    // Compliance contacts. Validated, because a grievance officer with a
+    // malformed email is the same as not having one.
+    foreach (['grievance_officer_name' => 150, 'grievance_officer_phone' => 30,
+              'principal_officer_name' => 150, 'designated_director_name' => 150] as $key => $max) {
+        if (isset($d[$key])) {
+            $data[$key] = clip($d[$key], $max);
+            if ($data[$key] === '') {
+                fail(422, str_replace('_', ' ', $key) . ' cannot be blank.');
+            }
+            $changed[] = $key;
+        }
+    }
+    foreach (['grievance_officer_email', 'principal_officer_email'] as $key) {
+        if (isset($d[$key])) {
+            $email = strtolower(clip($d[$key], 150));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                fail(422, 'A valid email address is required for ' . str_replace('_', ' ', $key) . '.');
+            }
+            $data[$key] = $email;
+            $changed[] = $key;
+        }
     }
     if (isset($d['referral_reward_amount'])) {
         $data['referral_reward_amount'] = money($d['referral_reward_amount']);
@@ -426,37 +469,7 @@ function route_kyc_face_match(array $d, string $id = ''): void
         'algorithm' => 'RGB histogram cosine similarity v1', 'auto_threshold' => 92.0]);
 }
 
-// --- Hostinger package (admins only; never includes config.local.php) --------------------
-function route_hostinger_package(array $d): void
-{
-    staff_user(ADMIN_ROLES);
-    $root = dirname(__DIR__);
-    $package = [];
-    foreach (PACKAGE_FILES as $key => $file) {
-        $package[$key] = is_file("$root/$file") ? file_get_contents("$root/$file") : '';
-    }
-    respond($package);
-}
-
-function route_hostinger_zip(array $d): void
-{
-    staff_user(ADMIN_ROLES);
-    $root = dirname(__DIR__);
-    $tmp = tempnam(sys_get_temp_dir(), 'pkg');
-    $zip = new ZipArchive();
-    $zip->open($tmp, ZipArchive::OVERWRITE);
-    foreach (PACKAGE_FILES as $file) {
-        if (is_file("$root/$file")) {
-            $zip->addFile("$root/$file", $file);
-        }
-    }
-    foreach (['modules', 'assets'] as $dir) {
-        foreach (glob("$root/$dir/*") ?: [] as $path) {
-            $zip->addFile($path, "$dir/" . basename($path));
-        }
-    }
-    $zip->close();
-    $bytes = file_get_contents($tmp);
-    unlink($tmp);
-    send_download($bytes, 'application/zip', 'hostinger_banking_php_mysql_package.zip');
-}
+// The deployment-package endpoints are gone. They served the full source of
+// db.php and api.php, and a zip of the whole backend, to any administrator —
+// useful while setting the server up, and an unnecessary way to read the
+// application's internals once it is running.
