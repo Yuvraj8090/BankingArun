@@ -2,17 +2,26 @@ import React, { createContext, useContext } from 'react';
 
 const BankThemeContext = createContext();
 
+// White is the primary surface; this blue is the secondary, used for headers,
+// buttons, active states and accents. Anything that needs to stand out earns
+// the blue — the page itself stays white.
+export const BRAND_BLUE = '#0b3b8c';
+export const BRAND_BLUE_DEEP = '#0a2f6f';
+export const BRAND_RED = '#c8102e';
+
 const AJSPAY_THEME = {
   id: 'ajspay',
   name: 'AJSPay',
   badge: 'Secure Digital Banking',
-  primary: 'from-sky-700 via-indigo-900 to-slate-950',
-  headerBg: 'bg-slate-900 border-b border-indigo-500/20',
-  accentColor: 'text-indigo-400',
-  accentBg: 'bg-indigo-600 hover:bg-indigo-700',
-  tagColor: 'bg-indigo-950/80 text-indigo-300 border border-indigo-500/30',
-  cardGlow: 'shadow-[0_0_25px_-5px_rgba(99,102,241,0.25)]',
-  buttonTheme: 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+  // The one blue band on a page: its header.
+  primary: 'from-[#0b3b8c] via-[#123f86] to-[#0b3b8c]',
+  headerBg: 'bg-white border-b border-slate-200',
+  accentColor: 'text-[#0b3b8c]',
+  accentBg: 'bg-[#0b3b8c] hover:bg-[#0a2f6f]',
+  tagColor: 'bg-blue-50 text-[#0b3b8c] border border-blue-200',
+  // On white, a coloured glow reads as a smudge; a plain border is cleaner.
+  cardGlow: 'shadow-sm',
+  buttonTheme: 'bg-[#0b3b8c] hover:bg-[#0a2f6f] text-white'
 };
 
 export const BankThemeProvider = ({ children }) => {

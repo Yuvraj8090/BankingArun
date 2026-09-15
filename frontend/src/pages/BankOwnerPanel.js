@@ -19,13 +19,13 @@ export default function BankOwnerPanel() {
       {/* Header */}
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center"><Crown className="w-5 h-5" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><Crown className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Executive Dashboard</h1>
             <p className="text-xs text-slate-500">Enterprise-wide view · Policy control · Approvals</p>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded bg-slate-900 text-amber-400 text-[10px] font-bold">BANK OWNER</span>
+        <span className="px-2.5 py-1 rounded bg-white text-amber-600 text-[10px] font-bold">BANK OWNER</span>
       </div>
 
       {/* KPI Grid */}

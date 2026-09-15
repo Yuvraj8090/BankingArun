@@ -33,7 +33,7 @@ const label = (k) => FILTER_LABEL[k] || k.replace(/_/g, ' ').replace(/^./, (c) =
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function formatCell(value, format) {
-  if (value === null || value === undefined || value === '') return <span className="text-slate-300">—</span>;
+  if (value === null || value === undefined || value === '') return <span className="text-slate-600">—</span>;
   if (format === 'money') return money(value);
   if (format === 'int') return Number(value).toLocaleString('en-IN');
   if (format === 'date') return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -66,7 +66,7 @@ export default function ReportsPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center gap-3">
-        <div className="w-10 h-10 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center">
           <BarChart3 className="w-5 h-5" />
         </div>
         <div>

@@ -39,7 +39,7 @@ export default function Pagination({ meta, onPage, onPerPage }) {
         >
           <ChevronLeft className="w-3.5 h-3.5" />
         </button>
-        {window[0] > 1 && <span className="px-1 text-slate-400">…</span>}
+        {window[0] > 1 && <span className="px-1 text-slate-500">…</span>}
         {window.map((p) => (
           <button
             key={p}
@@ -54,7 +54,7 @@ export default function Pagination({ meta, onPage, onPerPage }) {
             {p}
           </button>
         ))}
-        {window[window.length - 1] < pages && <span className="px-1 text-slate-400">…</span>}
+        {window[window.length - 1] < pages && <span className="px-1 text-slate-500">…</span>}
         <button
           data-testid="pagination-next"
           disabled={!hasNext}

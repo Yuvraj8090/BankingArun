@@ -8,7 +8,7 @@ const STATUS_STYLE = {
   documentation: 'bg-blue-50 text-[#0b3b8c] border-blue-200',
   approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   rejected: 'bg-rose-50 text-[#c8102e] border-rose-200',
-  disbursed: 'bg-slate-900 text-white border-slate-900'
+  disbursed: 'bg-[#0b3b8c] text-white border-[#0b3b8c]'
 };
 
 export default function LoanDeptPanel() {

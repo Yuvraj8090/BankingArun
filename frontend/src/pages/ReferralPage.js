@@ -42,10 +42,10 @@ export default function ReferralPage() {
           <div className="w-11 h-11 rounded-md bg-white/10 flex items-center justify-center"><Gift className="w-6 h-6 text-white" /></div>
           <div className="flex-1">
             <h1 className="text-2xl font-bold">Refer &amp; Earn</h1>
-            <p className="text-sm text-white/85 mt-1">{data.reward_note}</p>
+            <p className="text-sm text-slate-900/85 mt-1">{data.reward_note}</p>
           </div>
           <div className="text-right">
-            <div className="text-xs text-white/70">Total earned</div>
+            <div className="text-xs text-slate-900/70">Total earned</div>
             <div className="text-2xl font-bold">₹{(history?.total_earned || 0).toLocaleString('en-IN')}</div>
           </div>
         </div>

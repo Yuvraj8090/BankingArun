@@ -87,8 +87,8 @@ export default function PublicHomePage() {
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 max-w-2xl leading-relaxed">
-              Open an account in minutes, transfer funds through NEFT · RTGS · IMPS · UPI, book FDs at competitive rates,
-              and manage cards, cheques and loans — all from one modern portal designed for every Indian.
+              Become a member in minutes, move money between member accounts, book fixed and recurring
+              deposits at competitive rates, and apply for a loan — all from one modern portal.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -131,7 +131,7 @@ export default function PublicHomePage() {
                     className="text-left px-3 py-2.5 rounded-md border border-slate-200 hover:border-[#0b3b8c] hover:bg-blue-50/60 text-xs text-slate-700 hover:text-[#0b3b8c] transition flex items-center justify-between gap-1"
                   >
                     <span className="line-clamp-2">{label}</span>
-                    <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                    <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-500" />
                   </Link>
                 ))}
               </div>

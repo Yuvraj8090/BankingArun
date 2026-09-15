@@ -86,7 +86,7 @@ export default function TutorialOverlay({ state, onClose }) {
     <div className="fixed inset-0 z-[70]" data-testid="tutorial-overlay" role="dialog" aria-modal="true"
       aria-label="Product tour">
       {/* Dim everything, then punch a hole over the target with a ring. */}
-      <div className="absolute inset-0 bg-slate-950/60" onClick={() => setConfirmSkip(true)} />
+      <div className="absolute inset-0 bg-slate-50" onClick={() => setConfirmSkip(true)} />
       {rect && (
         <div
           className="absolute rounded-lg ring-4 ring-amber-400 pointer-events-none transition-all duration-300"
@@ -104,7 +104,7 @@ export default function TutorialOverlay({ state, onClose }) {
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-sm font-bold text-slate-900" data-testid="tutorial-title">{step.title}</h3>
           <button onClick={() => setConfirmSkip(true)} aria-label="Close tour"
-            className="text-slate-300 hover:text-slate-600 shrink-0">
+            className="text-slate-600 hover:text-slate-600 shrink-0">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -116,7 +116,7 @@ export default function TutorialOverlay({ state, onClose }) {
               i === index ? 'w-5 bg-[#0b3b8c]' : i < index ? 'w-1.5 bg-[#0b3b8c]/40' : 'w-1.5 bg-slate-200'
             }`} />
           ))}
-          <span className="ml-auto text-[10px] text-slate-400">{index + 1} of {steps.length}</span>
+          <span className="ml-auto text-[10px] text-slate-500">{index + 1} of {steps.length}</span>
         </div>
 
         <div className="flex items-center justify-between gap-3 mt-4">
@@ -138,7 +138,7 @@ export default function TutorialOverlay({ state, onClose }) {
       </div>
 
       {confirmSkip && (
-        <div className="absolute inset-0 bg-slate-950/40 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl p-5 max-w-sm" data-testid="tutorial-skip-confirm">
             <h3 className="text-sm font-bold text-slate-900">Skip the tour?</h3>
             <p className="text-xs text-slate-600 mt-2">

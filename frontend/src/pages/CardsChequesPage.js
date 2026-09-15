@@ -17,7 +17,7 @@ const NetworkBadge = ({ network }) => {
   };
   const label = { Visa: 'VISA', RuPay: 'RuPay', Mastercard: 'mastercard' };
   return (
-    <span className={`px-2 py-1 rounded text-[10px] font-black tracking-wider ${styles[network] || 'bg-slate-800 text-white'}`}>
+    <span className={`px-2 py-1 rounded text-[10px] font-black tracking-wider ${styles[network] || 'bg-slate-100 text-slate-900'}`}>
       {label[network] || network}
     </span>
   );
@@ -205,12 +205,12 @@ export default function CardsChequesPage() {
                   <div className="relative flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-white/70" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/90">
+                        <Building2 className="w-4 h-4 text-slate-900/70" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900/90">
                           AJSPay
                         </span>
                       </div>
-                      <p className="text-[10px] text-white/70 mt-0.5">A/C {card.account_number}</p>
+                      <p className="text-[10px] text-slate-900/70 mt-0.5">A/C {card.account_number}</p>
                     </div>
                     <NetworkBadge network={card.network} />
                   </div>
@@ -219,32 +219,32 @@ export default function CardsChequesPage() {
                     <div className="w-8 h-6 rounded bg-gradient-to-br from-yellow-200 to-yellow-500/70 flex items-center justify-center">
                       <div className="w-5 h-4 rounded-sm border border-yellow-800/40" />
                     </div>
-                    <Wifi className="w-4 h-4 text-white/80 -rotate-90" />
+                    <Wifi className="w-4 h-4 text-slate-900/80 -rotate-90" />
                   </div>
 
                   {/* Card number */}
-                  <p data-testid={`card-number-${card.id}`} className="relative font-mono text-lg tracking-widest text-white mt-3">
+                  <p data-testid={`card-number-${card.id}`} className="relative font-mono text-lg tracking-widest text-slate-900 mt-3">
                     {card.card_number}
                   </p>
 
                   <div className="relative mt-3 flex justify-between items-end text-[11px]">
                     <div>
-                      <p className="text-[9px] text-white/70 uppercase">Card Holder</p>
+                      <p className="text-[9px] text-slate-900/70 uppercase">Card Holder</p>
                       <p className="font-semibold">{card.card_holder}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-white/70 uppercase">Valid Thru</p>
+                      <p className="text-[9px] text-slate-900/70 uppercase">Valid Thru</p>
                       <p className="font-mono font-semibold">{card.expiry_date}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-white/70 uppercase">CVV</p>
+                      <p className="text-[9px] text-slate-900/70 uppercase">CVV</p>
                       <div className="flex items-center gap-1 font-mono font-semibold">
                         <span data-testid={`cvv-${card.id}`}>{showCvv || '•••'}</span>
                         <button data-testid={`toggle-cvv-${card.id}`}
                           onClick={() => showCvv
                             ? setRevealed(p => ({ ...p, [card.id]: null }))
                             : setCvvPromptFor(card.id)}
-                          className="text-white/80 hover:text-white">
+                          className="text-slate-900/80 hover:text-slate-900">
                           {showCvv ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                         </button>
                       </div>
@@ -287,7 +287,7 @@ export default function CardsChequesPage() {
                   <div className="relative mt-4 pt-3 border-t border-white/20 flex items-center justify-between">
                     <StatusPill status={card.status} />
                     {card.upi_linked && (
-                      <span className="text-[10px] font-semibold text-white bg-white/20 px-2 py-0.5 rounded">
+                      <span className="text-[10px] font-semibold text-slate-900 bg-white/20 px-2 py-0.5 rounded">
                         UPI linked
                       </span>
                     )}
@@ -499,7 +499,7 @@ export default function CardsChequesPage() {
                   setStopChequeNo('');
                 } catch { toast.error('Stop failed'); }
               }}
-              className="w-full py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold transition">
+              className="w-full py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-slate-900 text-xs font-semibold transition">
               Confirm Stop Payment
             </button>
           </div>
@@ -508,7 +508,7 @@ export default function CardsChequesPage() {
 
       {/* Set PIN modal */}
       {showPinModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-xl space-y-4 text-xs border border-slate-200">
             <h3 className="font-semibold text-slate-900 text-sm pb-2 border-b border-slate-100 flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-[#0b3b8c]" /> Green PIN Reset
@@ -540,7 +540,7 @@ export default function CardsChequesPage() {
 
       {/* QR modal */}
       {showQrModal && qrData && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl space-y-4 border border-slate-200">
             <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <QrCode className="w-4 h-4 text-[#0b3b8c]" /> UPI Payment QR

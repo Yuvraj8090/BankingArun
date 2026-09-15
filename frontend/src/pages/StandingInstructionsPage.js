@@ -62,7 +62,7 @@ export default function StandingInstructionsPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Repeat className="w-5 h-5 text-white" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Repeat className="w-5 h-5 text-slate-900" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Standing Instructions</h1>
             <p className="text-xs text-slate-500">Automate rent, SIPs, EMIs and insurance premiums — pause, resume or edit anytime</p>
@@ -99,7 +99,7 @@ export default function StandingInstructionsPage() {
         </div>
         {items.length === 0 ? (
           <div className="p-10 text-center text-xs text-slate-500 space-y-2">
-            <Repeat className="w-8 h-8 mx-auto text-slate-300" />
+            <Repeat className="w-8 h-8 mx-auto text-slate-600" />
             <p>No standing instructions yet. Click <b>New Instruction</b> to automate a recurring payment.</p>
           </div>
         ) : (
@@ -160,11 +160,11 @@ export default function StandingInstructionsPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-lg max-w-lg w-full p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">{editId ? 'Edit Instruction' : 'New Standing Instruction'}</h3>
-              <button onClick={() => setShowModal(false)} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
+              <button onClick={() => setShowModal(false)} className="p-1 text-slate-500 hover:text-slate-700"><X className="w-4 h-4" /></button>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <Select label="From account" value={form.from_account_number} disabled={!!editId}

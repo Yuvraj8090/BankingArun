@@ -6,6 +6,7 @@ import {
 import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 export default function DepositsInvestmentsPage() {
   const { currentTheme } = useBankTheme();
@@ -21,6 +22,10 @@ export default function DepositsInvestmentsPage() {
   const [fdNominee, setFdNominee] = useState('Registered Nominee');
   const [selectedAcc, setSelectedAcc] = useState('');
   const [booking, setBooking] = useState(false);
+  // Which of the three things this page offers are actually authorised.
+  const { features } = useAuth();
+  const canInvest = !!features?.includes('mutual_funds');
+  const canInsure = !!features?.includes('insurance');
 
   useEffect(() => {
     const init = async () => {
@@ -30,16 +35,24 @@ export default function DepositsInvestmentsPage() {
           setAccounts(accRes.accounts);
           setSelectedAcc(accRes.accounts[0].account_number);
         }
-        const catRes = await api.getInvestmentCatalog();
-        setCatalog(catRes);
+      } catch (err) {
+        toast.error('Could not load your accounts');
+        return;
+      }
+      // Mutual funds need a SEBI/AMFI registration. When that capability is off
+      // the endpoints refuse, which is correct — so don't call them, and don't
+      // report a refusal as a failure.
+      if (!canInvest) return;
+      try {
+        setCatalog(await api.getInvestmentCatalog());
         const myRes = await api.getMyPortfolio();
         setMyInvestments(myRes.mutual_funds || []);
       } catch (err) {
-        toast.error("Failed to load investment services");
+        toast.error('Could not load investment services');
       }
     };
     init();
-  }, []);
+  }, [canInvest]);
 
   // FD Maturity Calculator formula: A = P(1 + r/4)^(4*t)
   const calculateMaturity = () => {
@@ -102,44 +115,50 @@ export default function DepositsInvestmentsPage() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       
       {/* Header */}
-      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            Deposits, Mutual Funds & Insurance Hub
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {canInvest || canInsure ? 'Deposits, Mutual Funds & Insurance' : 'Member Deposits'}
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Guaranteed Return FDs | Wealth Builder Mutual Funds | Comprehensive Term Cover
+          <p className="text-xs text-slate-500 mt-1">
+            {canInvest || canInsure
+              ? 'Fixed and recurring deposits, mutual funds and term cover'
+              : 'Fixed and recurring deposits for members · interest credited automatically'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+        <div className="flex items-center gap-2 p-1 rounded-xl bg-white border border-slate-200 text-xs">
           <button
             data-testid="tab-fd-rd"
             onClick={() => setActiveTab('fd')}
             className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeTab === 'fd' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+              activeTab === 'fd' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             Fixed & Recurring Deposits
           </button>
-          <button
-            data-testid="tab-mutual-funds"
-            onClick={() => setActiveTab('mf')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeTab === 'mf' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Mutual Funds
-          </button>
-          <button
-            data-testid="tab-insurance"
-            onClick={() => setActiveTab('insurance')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeTab === 'insurance' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Insurance Products
-          </button>
+          {canInvest && (
+            <button
+              data-testid="tab-mutual-funds"
+              onClick={() => setActiveTab('mf')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition ${
+                activeTab === 'mf' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Mutual Funds
+            </button>
+          )}
+          {canInsure && (
+            <button
+              data-testid="tab-insurance"
+              onClick={() => setActiveTab('insurance')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition ${
+                activeTab === 'insurance' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Insurance Products
+            </button>
+          )}
         </div>
       </div>
 
@@ -147,20 +166,20 @@ export default function DepositsInvestmentsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Booking Form */}
-          <div className="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex justify-between items-center">
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-4">
+            <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex justify-between items-center">
               <span>Book Online Fixed / Recurring Deposit</span>
-              <span className="text-cyan-400 text-xs font-mono">Member deposits · Not DICGC insured</span>
+              <span className="text-[#0b3b8c] text-xs font-mono">Member deposits · Not DICGC insured</span>
             </h2>
 
             <form onSubmit={handleBookDeposit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 mb-1">Debit From Savings Account</label>
+                  <label className="block text-slate-500 mb-1">Debit From Savings Account</label>
                   <select
                     value={selectedAcc}
                     onChange={(e) => setSelectedAcc(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono"
                   >
                     {accounts.map(a => (
                       <option key={a.id} value={a.account_number}>
@@ -171,12 +190,12 @@ export default function DepositsInvestmentsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Deposit Type</label>
+                  <label className="block text-slate-500 mb-1">Deposit Type</label>
                   <select
                     data-testid="deposit-type-select"
                     value={fdType}
                     onChange={(e) => setFdType(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
                   >
                     <option value="fixed">Fixed Deposit (Lumpsum Principal)</option>
                     <option value="recurring">Recurring Deposit (Monthly Installment)</option>
@@ -186,7 +205,7 @@ export default function DepositsInvestmentsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 mb-1">Deposit Principal Amount (₹)</label>
+                  <label className="block text-slate-500 mb-1">Deposit Principal Amount (₹)</label>
                   <input
                     data-testid="fd-amount-input"
                     type="number"
@@ -196,17 +215,17 @@ export default function DepositsInvestmentsPage() {
                     value={fdAmount}
                     onChange={(e) => setFdAmount(e.target.value)}
                     placeholder="e.g. 50000"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Tenure (Months)</label>
+                  <label className="block text-slate-500 mb-1">Tenure (Months)</label>
                   <select
                     data-testid="fd-tenure-select"
                     value={fdTenure}
                     onChange={(e) => setFdTenure(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
                   >
                     <option value={6}>6 Months (6.50% p.a.)</option>
                     <option value={12}>12 Months / 1 Year (7.25% p.a.)</option>
@@ -218,13 +237,13 @@ export default function DepositsInvestmentsPage() {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Nominee Details</label>
+                <label className="block text-slate-500 mb-1">Nominee Details</label>
                 <input
                   type="text"
                   value={fdNominee}
                   onChange={(e) => setFdNominee(e.target.value)}
                   placeholder="Enter Nominee Name"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900"
                 />
               </div>
 
@@ -240,34 +259,34 @@ export default function DepositsInvestmentsPage() {
           </div>
 
           {/* Calculator Card */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl text-xs space-y-4">
-            <h3 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center gap-2">
-              <Calculator className="w-4 h-4 text-cyan-400" />
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl text-xs space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-[#0b3b8c]" />
               Maturity Breakdown Calculator
             </h3>
 
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-              <div className="flex justify-between text-slate-400">
+            <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+              <div className="flex justify-between text-slate-500">
                 <span>Principal Invested:</span>
-                <span className="font-semibold text-white">₹{parseFloat(fdAmount || 0).toLocaleString('en-IN')}</span>
+                <span className="font-semibold text-slate-900">₹{parseFloat(fdAmount || 0).toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-slate-500">
                 <span>Interest Rate:</span>
-                <span className="font-bold text-cyan-400">{maturityCalc.rate}% p.a.</span>
+                <span className="font-bold text-[#0b3b8c]">{maturityCalc.rate}% p.a.</span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-slate-500">
                 <span>Estimated Interest:</span>
-                <span className="font-semibold text-emerald-400">+ ₹{maturityCalc.interest.toLocaleString('en-IN')}</span>
+                <span className="font-semibold text-emerald-700">+ ₹{maturityCalc.interest.toLocaleString('en-IN')}</span>
               </div>
-              <div className="pt-2 border-t border-slate-800 flex justify-between text-sm">
-                <span className="font-bold text-white">Maturity Value:</span>
-                <span data-testid="fd-maturity-value" className="font-extrabold text-emerald-400">
+              <div className="pt-2 border-t border-slate-200 flex justify-between text-sm">
+                <span className="font-bold text-slate-900">Maturity Value:</span>
+                <span data-testid="fd-maturity-value" className="font-extrabold text-emerald-700">
                   ₹{maturityCalc.total.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/20 text-[11px] text-cyan-300 space-y-1">
+            <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/20 text-[11px] text-[#0b3b8c] space-y-1">
               <p className="font-semibold">Senior Citizen Benefit:</p>
               <p>Additional 0.50% interest auto-applied for customers aged 60+ as per our deposit policy.</p>
             </div>
@@ -280,32 +299,32 @@ export default function DepositsInvestmentsPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {catalog.mutual_funds?.map(mf => (
-              <div key={mf.id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
+              <div key={mf.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xl space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="font-bold text-white text-sm">{mf.name}</h3>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 mt-1 inline-block">
+                    <h3 className="font-bold text-slate-900 text-sm">{mf.name}</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 mt-1 inline-block">
                       {mf.category}
                     </span>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] text-slate-400">3Y CAGR</p>
-                    <p className="font-bold text-emerald-400 text-sm">{mf.cagr_3yr}</p>
+                    <p className="text-[10px] text-slate-500">3Y CAGR</p>
+                    <p className="font-bold text-emerald-700 text-sm">{mf.cagr_3yr}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-[11px] p-2.5 rounded-xl bg-slate-950 border border-slate-800/80">
+                <div className="grid grid-cols-3 gap-2 text-[11px] p-2.5 rounded-xl bg-white border border-slate-200">
                   <div>
                     <p className="text-slate-500">NAV</p>
-                    <p className="font-semibold text-slate-200">₹{mf.nav}</p>
+                    <p className="font-semibold text-slate-700">₹{mf.nav}</p>
                   </div>
                   <div>
                     <p className="text-slate-500">Min SIP</p>
-                    <p className="font-semibold text-slate-200">₹{mf.min_sip}</p>
+                    <p className="font-semibold text-slate-700">₹{mf.min_sip}</p>
                   </div>
                   <div>
                     <p className="text-slate-500">Risk</p>
-                    <p className="font-semibold text-amber-400">{mf.risk}</p>
+                    <p className="font-semibold text-amber-600">{mf.risk}</p>
                   </div>
                 </div>
 
@@ -325,34 +344,34 @@ export default function DepositsInvestmentsPage() {
       {activeTab === 'insurance' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {catalog.insurance_plans?.map(ins => (
-            <div key={ins.id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
-              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <div key={ins.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xl space-y-4">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-[#c8102e]">
                 <Shield className="w-5 h-5" />
               </div>
 
               <div>
-                <h3 className="font-bold text-white text-sm">{ins.name}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{ins.type}</p>
+                <h3 className="font-bold text-slate-900 text-sm">{ins.name}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{ins.type}</p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+              <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Sum Assured:</span>
-                  <span className="font-bold text-emerald-400">{ins.cover}</span>
+                  <span className="text-slate-500">Sum Assured:</span>
+                  <span className="font-bold text-emerald-700">{ins.cover}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Annual Premium:</span>
-                  <span className="font-bold text-white">₹{ins.annual_premium.toLocaleString('en-IN')}</span>
+                  <span className="text-slate-500">Annual Premium:</span>
+                  <span className="font-bold text-slate-900">₹{ins.annual_premium.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Claim Settlement:</span>
-                  <span className="font-semibold text-cyan-400">{ins.claim_ratio}</span>
+                  <span className="text-slate-500">Claim Settlement:</span>
+                  <span className="font-semibold text-[#0b3b8c]">{ins.claim_ratio}</span>
                 </div>
               </div>
 
               <button
                 onClick={() => toast.success(`Application initiated for ${ins.name}. Policy documents dispatched!`)}
-                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-semibold text-xs border border-slate-700"
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] font-semibold text-xs border border-slate-200"
               >
                 Apply for Policy Cover
               </button>

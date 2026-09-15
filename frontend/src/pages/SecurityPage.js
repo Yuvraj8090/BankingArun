@@ -107,7 +107,7 @@ export default function SecurityPage() {
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5 text-white" />
+            <ShieldCheck className="w-5 h-5 text-slate-900" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Security &amp; Login</h1>
@@ -140,7 +140,7 @@ export default function SecurityPage() {
             <div className="text-xs text-slate-500 flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…</div>
           ) : passkeys.length === 0 ? (
             <div className="text-center py-8 text-xs text-slate-500 space-y-2">
-              <Key className="w-8 h-8 text-slate-300 mx-auto" />
+              <Key className="w-8 h-8 text-slate-600 mx-auto" />
               <p>You haven't registered any passkey yet.</p>
               <p>Click <b>Register passkey</b> above — your browser will prompt you to use fingerprint, Face-ID or a security key.</p>
             </div>

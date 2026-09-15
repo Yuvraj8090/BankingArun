@@ -70,7 +70,7 @@ export default function AgentsPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center"><Users className="w-5 h-5" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><Users className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Agents &amp; Collections</h1>
             <p className="text-xs text-slate-500">Field agents and the deposits they collected</p>
@@ -122,7 +122,7 @@ export default function AgentsPage() {
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-900">{form.id ? `Edit ${form.code}` : 'New agent'}</h2>
-                <button onClick={() => setForm(null)} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
+                <button onClick={() => setForm(null)} className="text-slate-500 hover:text-slate-700"><X className="w-4 h-4" /></button>
               </div>
               <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label="Agent code" value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} testId="agent-code" />

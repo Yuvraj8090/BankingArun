@@ -10,10 +10,10 @@ const ROLE_BADGE = {
   corporate: { label: 'Corporate', color: 'bg-purple-50 text-purple-700 border-purple-200' },
   admin: { label: 'Branch Manager', color: 'bg-amber-50 text-amber-700 border-amber-200' },
   branch_manager: { label: 'Branch Manager', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  bank_owner: { label: 'Bank Owner', color: 'bg-slate-900 text-white border-slate-900' },
+  bank_owner: { label: 'Bank Owner', color: 'bg-[#0b3b8c] text-white border-[#0b3b8c]' },
   staff: { label: 'Staff', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   collection_agent: { label: 'Collections', color: 'bg-rose-50 text-[#c8102e] border-rose-200' },
-  loan_officer: { label: 'Loan Officer', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' }
+  loan_officer: { label: 'Loan Officer', color: 'bg-indigo-50 text-[#0b3b8c] border-indigo-200' }
 };
 
 export default function Navbar({ onNavigate, activeTab }) {
@@ -38,11 +38,11 @@ export default function Navbar({ onNavigate, activeTab }) {
           {/* Search */}
           <div className="flex-1 max-w-md hidden md:flex">
             <div className="w-full flex items-center border border-slate-200 rounded-md px-3 h-9 focus-within:border-[#0b3b8c] bg-slate-50">
-              <Search className="w-4 h-4 text-slate-400" />
+              <Search className="w-4 h-4 text-slate-500" />
               <input
                 data-testid="global-search"
                 placeholder="Search payees, transactions, services…"
-                className="flex-1 bg-transparent text-xs px-2 outline-none placeholder:text-slate-400"
+                className="flex-1 bg-transparent text-xs px-2 outline-none placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -70,7 +70,7 @@ export default function Navbar({ onNavigate, activeTab }) {
                       {badge.label}
                     </span>
                   </div>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                  <ChevronDown className="w-3 h-3 text-slate-500" />
                 </button>
 
                 {showMenu && (

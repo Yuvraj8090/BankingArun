@@ -44,7 +44,7 @@ export default function FraudMonitorPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center"><ShieldAlert className="w-5 h-5" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><ShieldAlert className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Fraud &amp; AML Review</h1>
             <p className="text-xs text-slate-500">Transfers scored against each member's own behaviour · scoring runs on this server</p>
@@ -90,11 +90,11 @@ export default function FraudMonitorPage() {
                   {alert.reasons.map((r, i) => (
                     <li key={i} className="text-[11px] text-slate-600 flex items-start gap-1.5">
                       <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-600" />
-                      <span>{r.label} <span className="text-slate-400">(+{r.weight})</span></span>
+                      <span>{r.label} <span className="text-slate-500">(+{r.weight})</span></span>
                     </li>
                   ))}
                 </ul>
-                <div className="text-[10px] text-slate-400 mt-2 font-mono">
+                <div className="text-[10px] text-slate-500 mt-2 font-mono">
                   {alert.ref_number} · {new Date(alert.created_at).toLocaleString('en-IN')}
                   {alert.review_note && ` · note: ${alert.review_note}`}
                 </div>

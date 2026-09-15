@@ -141,23 +141,23 @@ export default function TransferPage() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-2xl shadow-xl">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             Fund Transfers & Corporate Payout Hub
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             IMPS (24x7 Instant) | NEFT (Batch Settlement) | RTGS (High Value) | UPI Integration
           </p>
         </div>
 
         {/* Transfer Subtabs */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white border border-slate-200 text-xs">
           <button
             data-testid="subtab-single-transfer"
             onClick={() => setActiveSubTab('single')}
             className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeSubTab === 'single' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+              activeSubTab === 'single' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             Intra/Inter-Bank
@@ -166,7 +166,7 @@ export default function TransferPage() {
             data-testid="subtab-upi-transfer"
             onClick={() => setActiveSubTab('upi')}
             className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeSubTab === 'upi' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+              activeSubTab === 'upi' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             UPI Transfer
@@ -175,7 +175,7 @@ export default function TransferPage() {
             data-testid="subtab-bulk-transfer"
             onClick={() => setActiveSubTab('bulk')}
             className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeSubTab === 'bulk' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+              activeSubTab === 'bulk' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             Corporate Bulk Payout
@@ -186,23 +186,23 @@ export default function TransferPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Transfer Form Box */}
-        <div className="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl">
           
           {activeSubTab === 'single' && (
             <form onSubmit={handleSingleTransfer} className="space-y-4 text-xs">
-              <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center justify-between">
+              <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">
                 <span>Inter-Bank & Intra-Bank Transfer</span>
-                <span className="text-emerald-400 text-[11px] font-mono">256-Bit Encrypted UTR</span>
+                <span className="text-emerald-700 text-[11px] font-mono">256-Bit Encrypted UTR</span>
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 mb-1">Debit From Account</label>
+                  <label className="block text-slate-500 mb-1">Debit From Account</label>
                   <select
                     data-testid="transfer-from-account"
                     value={fromAcc}
                     onChange={(e) => setFromAcc(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono"
                   >
                     {accounts.map(a => (
                       <option key={a.id} value={a.account_number}>
@@ -213,12 +213,12 @@ export default function TransferPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Payment Mode</label>
+                  <label className="block text-slate-500 mb-1">Payment Mode</label>
                   <select
                     data-testid="transfer-mode-select"
                     value={transferType}
                     onChange={(e) => setTransferType(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
                   >
                     <option value="IMPS">IMPS (Instant 24x7 - Max ₹5 Lakh)</option>
                     <option value="NEFT">NEFT (National Clearing - No Limit)</option>
@@ -229,7 +229,7 @@ export default function TransferPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 mb-1">Beneficiary Account Number</label>
+                  <label className="block text-slate-500 mb-1">Beneficiary Account Number</label>
                   <input
                     data-testid="beneficiary-account-input"
                     type="text"
@@ -237,12 +237,12 @@ export default function TransferPage() {
                     value={toAcc}
                     onChange={(e) => setToAcc(e.target.value)}
                     placeholder="e.g. AJSP00129845612"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Beneficiary Full Name</label>
+                  <label className="block text-slate-500 mb-1">Beneficiary Full Name</label>
                   <input
                     data-testid="beneficiary-name-input"
                     type="text"
@@ -250,14 +250,14 @@ export default function TransferPage() {
                     value={beneficiaryName}
                     onChange={(e) => setBeneficiaryName(e.target.value)}
                     placeholder="e.g. Ramesh Chandra"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 mb-1">Beneficiary Bank IFSC Code</label>
+                  <label className="block text-slate-500 mb-1">Beneficiary Bank IFSC Code</label>
                   <input
                     data-testid="beneficiary-ifsc-input"
                     type="text"
@@ -265,12 +265,12 @@ export default function TransferPage() {
                     value={ifsc}
                     onChange={(e) => setIfsc(e.target.value)}
                     placeholder="AJSP0000042"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono uppercase"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono uppercase"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Amount to Transfer (₹)</label>
+                  <label className="block text-slate-500 mb-1">Amount to Transfer (₹)</label>
                   <input
                     data-testid="transfer-amount-input"
                     type="number"
@@ -279,32 +279,32 @@ export default function TransferPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="e.g. 25000"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Payment Remarks / Purpose</label>
+                <label className="block text-slate-500 mb-1">Payment Remarks / Purpose</label>
                 <input
                   data-testid="transfer-remarks-input"
                   type="text"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="e.g. Monthly Rent / Supplier Invoice #98"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900"
                 />
               </div>
 
               {/* Scheduled Toggle */}
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+              <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300 font-medium">Schedule for future date?</span>
+                  <span className="text-slate-600 font-medium">Schedule for future date?</span>
                   <input
                     type="checkbox"
                     checked={isScheduled}
                     onChange={(e) => setIsScheduled(e.target.checked)}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                    className="w-4 h-4 rounded text-[#0b3b8c] focus:ring-[#0b3b8c]"
                   />
                 </div>
                 {isScheduled && (
@@ -312,7 +312,7 @@ export default function TransferPage() {
                     type="date"
                     value={scheduleDate}
                     onChange={(e) => setScheduleDate(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-900"
                   />
                 )}
               </div>
@@ -329,7 +329,7 @@ export default function TransferPage() {
                   value={txnPwd}
                   onChange={(e) => setTxnPwd(e.target.value)}
                   placeholder="Enter Transaction Password (e.g. Txn@1234)"
-                  className="w-full bg-slate-950 border border-rose-500/40 focus:border-rose-500 rounded-xl px-3 py-2.5 text-white"
+                  className="w-full bg-white border border-rose-500/40 focus:border-rose-500 rounded-xl px-3 py-2.5 text-slate-900"
                 />
               </div>
 
@@ -346,13 +346,13 @@ export default function TransferPage() {
 
           {activeSubTab === 'upi' && (
             <form onSubmit={handleSingleTransfer} className="space-y-4 text-xs">
-              <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center justify-between">
+              <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">
                 <span>Unified Payments Interface (UPI 2.0)</span>
-                <span className="text-cyan-400 font-mono">NPCI Verified</span>
+                <span className="text-[#0b3b8c] font-mono">NPCI Verified</span>
               </h2>
 
               <div>
-                <label className="block text-slate-400 mb-1">Virtual Payment Address (VPA / UPI ID)</label>
+                <label className="block text-slate-500 mb-1">Virtual Payment Address (VPA / UPI ID)</label>
                 <input
                   data-testid="upi-id-input"
                   type="text"
@@ -360,17 +360,17 @@ export default function TransferPage() {
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
                   placeholder="e.g. merchant@ajspay, friend@ajspay"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 mb-1">Debit From Account</label>
+                  <label className="block text-slate-500 mb-1">Debit From Account</label>
                   <select
                     value={fromAcc}
                     onChange={(e) => setFromAcc(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono"
                   >
                     {accounts.map(a => (
                       <option key={a.id} value={a.account_number}>
@@ -381,7 +381,7 @@ export default function TransferPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Amount (₹)</label>
+                  <label className="block text-slate-500 mb-1">Amount (₹)</label>
                   <input
                     data-testid="upi-amount-input"
                     type="number"
@@ -390,7 +390,7 @@ export default function TransferPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="e.g. 1500"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
                   />
                 </div>
               </div>
@@ -404,7 +404,7 @@ export default function TransferPage() {
                   value={txnPwd}
                   onChange={(e) => setTxnPwd(e.target.value)}
                   placeholder="Enter Transaction Password"
-                  className="w-full bg-slate-950 border border-rose-500/40 rounded-xl px-3 py-2.5 text-white"
+                  className="w-full bg-white border border-rose-500/40 rounded-xl px-3 py-2.5 text-slate-900"
                 />
               </div>
 
@@ -421,13 +421,13 @@ export default function TransferPage() {
 
           {activeSubTab === 'bulk' && (
             <form onSubmit={handleBulkTransfer} className="space-y-4 text-xs">
-              <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center justify-between">
+              <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">
                 <span>Corporate Multi-Beneficiary Bulk Batch Upload</span>
-                <span className="text-amber-400 font-mono">AJSPay Corporate CMS</span>
+                <span className="text-amber-600 font-mono">AJSPay Corporate CMS</span>
               </h2>
 
-              <p className="text-slate-400 text-[11px]">
-                Format: <strong className="text-slate-200">BeneficiaryName, AccountNumber, IFSC, Amount, Remarks</strong> (one per line)
+              <p className="text-slate-500 text-[11px]">
+                Format: <strong className="text-slate-700">BeneficiaryName, AccountNumber, IFSC, Amount, Remarks</strong> (one per line)
               </p>
 
               <div>
@@ -436,7 +436,7 @@ export default function TransferPage() {
                   rows={6}
                   value={bulkText}
                   onChange={(e) => setBulkText(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-slate-200 font-mono text-xs leading-relaxed focus:border-amber-500"
+                  className="w-full bg-white border border-slate-200 rounded-xl p-3 text-slate-700 font-mono text-xs leading-relaxed focus:border-amber-500"
                 />
               </div>
 
@@ -451,7 +451,7 @@ export default function TransferPage() {
                   value={txnPwd}
                   onChange={(e) => setTxnPwd(e.target.value)}
                   placeholder="Enter Corporate Transaction Password"
-                  className="w-full bg-slate-950 border border-rose-500/40 rounded-xl px-3 py-2.5 text-white"
+                  className="w-full bg-white border border-rose-500/40 rounded-xl px-3 py-2.5 text-slate-900"
                 />
               </div>
 
@@ -470,31 +470,31 @@ export default function TransferPage() {
 
         {/* Transfer Limits & Info Panel */}
         <div className="space-y-5">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl text-xs space-y-3">
-            <h3 className="font-bold text-white text-sm pb-2 border-b border-slate-800">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl text-xs space-y-3">
+            <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200">
               Daily Transfer Limits
             </h3>
             
-            <div className="space-y-2.5 text-slate-300">
-              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950/60">
-                <span className="font-medium text-cyan-400">IMPS (Instant)</span>
-                <span className="font-mono text-white">₹5,00,000 / day</span>
+            <div className="space-y-2.5 text-slate-600">
+              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
+                <span className="font-medium text-[#0b3b8c]">IMPS (Instant)</span>
+                <span className="font-mono text-slate-900">₹5,00,000 / day</span>
               </div>
-              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950/60">
-                <span className="font-medium text-blue-400">NEFT (Batch)</span>
-                <span className="font-mono text-white">No Upper Limit</span>
+              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
+                <span className="font-medium text-[#0b3b8c]">NEFT (Batch)</span>
+                <span className="font-mono text-slate-900">No Upper Limit</span>
               </div>
-              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950/60">
+              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
                 <span className="font-medium text-purple-400">RTGS (High Value)</span>
-                <span className="font-mono text-white">Min ₹2 Lakh</span>
+                <span className="font-mono text-slate-900">Min ₹2 Lakh</span>
               </div>
-              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950/60">
-                <span className="font-medium text-emerald-400">UPI (NPCI)</span>
-                <span className="font-mono text-white">₹1,00,000 / day</span>
+              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
+                <span className="font-medium text-emerald-700">UPI (NPCI)</span>
+                <span className="font-mono text-slate-900">₹1,00,000 / day</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/20 text-[11px] text-indigo-300 space-y-1">
+            <div className="p-3 rounded-xl bg-blue-50/40 border border-slate-200 text-[11px] text-[#0b3b8c] space-y-1">
               <p className="font-semibold">Security Note:</p>
               <p>Two-factor authentication with separate login password and transaction password is enforced on every transfer.</p>
             </div>
@@ -504,11 +504,11 @@ export default function TransferPage() {
       </div>
 
       {/* Transaction History Table */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <h3 className="font-bold text-white text-base mb-4">Complete Account Passbook</h3>
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl">
+        <h3 className="font-bold text-slate-900 text-base mb-4">Complete Account Passbook</h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="text-[11px] uppercase bg-slate-950 text-slate-400 border-b border-slate-800">
+          <table className="w-full text-left text-xs text-slate-600">
+            <thead className="text-[11px] uppercase bg-white text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="p-3">UTR / Reference</th>
                 <th className="p-3">Mode</th>
@@ -518,19 +518,19 @@ export default function TransferPage() {
                 <th className="p-3 text-right">Amount (₹)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100/60">
               {transactions.map(t => (
-                <tr key={t.id} className="hover:bg-slate-800/40 transition">
-                  <td className="p-3 font-mono text-cyan-300">{t.ref_number}</td>
-                  <td className="p-3 font-semibold text-slate-200">{t.mode}</td>
+                <tr key={t.id} className="hover:bg-slate-50 transition">
+                  <td className="p-3 font-mono text-[#0b3b8c]">{t.ref_number}</td>
+                  <td className="p-3 font-semibold text-slate-700">{t.mode}</td>
                   <td className="p-3">{t.counterparty_name || t.description}</td>
-                  <td className="p-3 text-slate-400">{new Date(t.timestamp).toLocaleString('en-IN')}</td>
+                  <td className="p-3 text-slate-500">{new Date(t.timestamp).toLocaleString('en-IN')}</td>
                   <td className="p-3">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
                       {t.status}
                     </span>
                   </td>
-                  <td className={`p-3 text-right font-bold ${t.type === 'credit' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <td className={`p-3 text-right font-bold ${t.type === 'credit' ? 'text-emerald-700' : 'text-[#c8102e]'}`}>
                     {t.type === 'credit' ? '+' : '-'} ₹{t.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>

@@ -36,13 +36,13 @@ export default function AdminConfigPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center"><Settings2 className="w-5 h-5" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><Settings2 className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Super-Admin Runtime Config</h1>
             <p className="text-xs text-slate-500">Bank Owner only — Twilio SMS, SendGrid Email, Referral rules, Face-match threshold</p>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded bg-slate-900 text-amber-400 text-[10px] font-bold">BANK OWNER</span>
+        <span className="px-2.5 py-1 rounded bg-white text-amber-600 text-[10px] font-bold">BANK OWNER</span>
       </div>
 
       {/* Live OTP toggle */}
@@ -161,7 +161,7 @@ function SecretInput({ label, value, onChange, show, onToggle, placeholder, test
         <input type={show ? 'text' : 'password'} value={value} placeholder={placeholder} data-testid={testId}
           onChange={e => onChange(e.target.value)}
           className="w-full border border-slate-200 rounded-md px-3 py-2 pr-10 text-sm text-slate-900 font-mono" />
-        <button type="button" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700">
+        <button type="button" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-700">
           {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         </button>
       </div>

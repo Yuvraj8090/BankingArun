@@ -68,18 +68,18 @@ export default function PublicNavbar() {
   return (
     <header className="bg-white shadow-sm sticky top-0 z-40 border-b border-slate-200">
       {/* Top utility strip */}
-      <div className="bg-slate-900 text-slate-200 text-[11px]">
+      <div className="bg-white text-slate-700 text-[11px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="hidden sm:inline">Trust · Growth · Prosperity</span>
-            <span className="hidden md:inline text-slate-400">|</span>
+            <span className="hidden md:inline text-slate-500">|</span>
             <span className="hidden md:inline">Video KYC · Passkey sign-in · 24×7 transfers</span>
           </div>
           <div className="flex items-center gap-4">
-            <a href="tel:18001234567" className="hidden sm:flex items-center gap-1 hover:text-white">
+            <a href="tel:18001234567" className="hidden sm:flex items-center gap-1 hover:text-slate-900">
               <Phone className="w-3 h-3" /> 1800-123-4567
             </a>
-            <Link to="/branches" data-testid="public-nav-locator" className="flex items-center gap-1 hover:text-white">
+            <Link to="/branches" data-testid="public-nav-locator" className="flex items-center gap-1 hover:text-slate-900">
               <MapPin className="w-3 h-3" /> Locate Us
             </Link>
           </div>
@@ -95,12 +95,12 @@ export default function PublicNavbar() {
 
           <div className="hidden lg:flex flex-1 max-w-md">
             <div className="w-full flex items-center border border-slate-300 rounded-md px-3 h-9 focus-within:border-blue-800">
-              <Search className="w-4 h-4 text-slate-400" />
+              <Search className="w-4 h-4 text-slate-500" />
               <input
                 data-testid="public-search-input"
                 type="text"
                 placeholder="Search products, services, FAQs…"
-                className="flex-1 bg-transparent text-xs px-2 outline-none placeholder:text-slate-400"
+                className="flex-1 bg-transparent text-xs px-2 outline-none placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -109,7 +109,7 @@ export default function PublicNavbar() {
             <Link
               to="/open-account"
               data-testid="public-open-account-cta"
-              className="hidden md:inline-flex px-4 py-2 rounded-md border border-[#0b3b8c] text-[#0b3b8c] text-xs font-semibold hover:bg-[#0b3b8c] hover:text-white transition items-center gap-1.5"
+              className="hidden md:inline-flex px-4 py-2 rounded-md border border-[#0b3b8c] text-[#0b3b8c] text-xs font-semibold hover:bg-[#0b3b8c] hover:text-slate-900 transition items-center gap-1.5"
             >
               <UserPlus className="w-3.5 h-3.5" /> Open Account
             </Link>
@@ -188,7 +188,7 @@ export default function PublicNavbar() {
           ))}
           {NAV_GROUPS.map((group) => (
             <div key={group.key} className="pt-2">
-              <p className="px-3 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{group.label}</p>
+              <p className="px-3 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{group.label}</p>
               {group.items.map(([label, to]) => (
                 <Link
                   key={to}

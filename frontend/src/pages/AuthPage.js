@@ -116,16 +116,16 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
           <h2 className="text-2xl lg:text-3xl font-bold leading-tight">
             Secure banking, <br/>reimagined for every Indian.
           </h2>
-          <p className="text-sm text-white/80">
+          <p className="text-sm text-slate-900/80">
             Open a savings account in minutes, transfer via NEFT/RTGS/IMPS/UPI, manage cards, book FDs, apply for loans — all in one place.
           </p>
           <ul className="space-y-2 text-sm">
-            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-300" /> 256-bit SSL end-to-end</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-300" /> Passkey / biometric login</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-300" /> Video KYC — no branch visit</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-700" /> 256-bit SSL end-to-end</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-700" /> Passkey / biometric login</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-700" /> Video KYC — no branch visit</li>
           </ul>
         </div>
-        <div className="text-[11px] text-white/60">
+        <div className="text-[11px] text-slate-900/60">
           © {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited · Toll-free 1800-123-4567
         </div>
       </div>
@@ -160,7 +160,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                     placeholder="••••••••"
                     className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
                   <button type="button" onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700">
                     {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -250,7 +250,7 @@ function Field({ icon: Icon, label, children }) {
     <div>
       <label className="block text-[11px] text-slate-600 mb-1 font-medium">{label}</label>
       <div className="relative">
-        <Icon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <Icon className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
         {children}
       </div>
     </div>

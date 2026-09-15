@@ -68,24 +68,24 @@ export default function LoansPage() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       
       {/* Header */}
-      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Loans & EMI Eligibility Calculator
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Personal, Home, Car Loans | Instant Pre-Approval Assessment | Low Interest Rates
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+        <div className="flex items-center gap-2 p-1 rounded-xl bg-white border border-slate-200 text-xs">
           {['personal', 'home', 'vehicle', 'gold'].map(t => (
             <button
               key={t}
               data-testid={`loan-type-${t}`}
               onClick={() => { setLoanType(t); setApplicationResult(null); }}
               className={`px-3 py-1.5 rounded-lg font-medium capitalize transition ${
-                loanType === t ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+                loanType === t ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               {t} Loan
@@ -97,19 +97,19 @@ export default function LoansPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Interactive Loan Sliders & Application Form */}
-        <div className="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
-          <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex justify-between items-center">
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-5">
+          <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex justify-between items-center">
             <span>Calculate EMI & Submit Instant Application</span>
-            <span className="text-emerald-400 text-xs font-mono">Interest Rate: {rate}% p.a.</span>
+            <span className="text-emerald-700 text-xs font-mono">Interest Rate: {rate}% p.a.</span>
           </h2>
 
           <form onSubmit={handleApplyLoan} className="space-y-4 text-xs">
             
             {/* Amount Slider */}
             <div>
-              <div className="flex justify-between text-slate-300 mb-1">
+              <div className="flex justify-between text-slate-600 mb-1">
                 <span>Loan Principal Amount</span>
-                <span className="font-extrabold text-cyan-300 text-sm">₹{amount.toLocaleString('en-IN')}</span>
+                <span className="font-extrabold text-[#0b3b8c] text-sm">₹{amount.toLocaleString('en-IN')}</span>
               </div>
               <input
                 data-testid="loan-amount-slider"
@@ -125,9 +125,9 @@ export default function LoansPage() {
 
             {/* Tenure Slider */}
             <div>
-              <div className="flex justify-between text-slate-300 mb-1">
+              <div className="flex justify-between text-slate-600 mb-1">
                 <span>Tenure in Months</span>
-                <span className="font-extrabold text-cyan-300 text-sm">{tenure} Months ({(tenure/12).toFixed(1)} Yrs)</span>
+                <span className="font-extrabold text-[#0b3b8c] text-sm">{tenure} Months ({(tenure/12).toFixed(1)} Yrs)</span>
               </div>
               <input
                 data-testid="loan-tenure-slider"
@@ -143,7 +143,7 @@ export default function LoansPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-slate-400 mb-1">Monthly In-Hand Net Income (₹)</label>
+                <label className="block text-slate-500 mb-1">Monthly In-Hand Net Income (₹)</label>
                 <input
                   data-testid="monthly-income-input"
                   type="number"
@@ -151,16 +151,16 @@ export default function LoansPage() {
                   value={monthlyIncome}
                   onChange={(e) => setMonthlyIncome(Number(e.target.value))}
                   placeholder="e.g. 65000"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Employment Type</label>
+                <label className="block text-slate-500 mb-1">Employment Type</label>
                 <select
                   value={empType}
                   onChange={(e) => setEmpType(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900"
                 >
                   <option>Salaried Private Sector</option>
                   <option>Central / State Govt PSU</option>
@@ -171,13 +171,13 @@ export default function LoansPage() {
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1">Purpose of Loan</label>
+              <label className="block text-slate-500 mb-1">Purpose of Loan</label>
               <input
                 type="text"
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
                 placeholder="e.g. Higher Education / Medical Emergency"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900"
               />
             </div>
 
@@ -193,13 +193,13 @@ export default function LoansPage() {
 
           {/* Application Success Card */}
           {applicationResult && (
-            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 space-y-2 animate-in fade-in">
+            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-700 space-y-2 animate-in fade-in">
               <div className="flex items-center gap-2 font-bold text-sm">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-700" />
                 <span>Application Logged: {applicationResult.application_no}</span>
               </div>
-              <p className="text-xs text-slate-300">
-                Eligibility: <strong className="text-emerald-400">{applicationResult.eligibility}</strong> | Monthly EMI: <strong>₹{applicationResult.calculated_emi?.toLocaleString('en-IN')}</strong>
+              <p className="text-xs text-slate-600">
+                Eligibility: <strong className="text-emerald-700">{applicationResult.eligibility}</strong> | Monthly EMI: <strong>₹{applicationResult.calculated_emi?.toLocaleString('en-IN')}</strong>
               </p>
             </div>
           )}
@@ -208,40 +208,40 @@ export default function LoansPage() {
 
         {/* EMI Summary Card */}
         <div className="space-y-5">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl text-xs space-y-4">
-            <h3 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center gap-2">
-              <Calculator className="w-4 h-4 text-cyan-400" />
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl text-xs space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-[#0b3b8c]" />
               EMI & Interest Summary
             </h3>
 
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+            <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
               <div>
-                <p className="text-slate-400">Monthly EMI:</p>
-                <h3 data-testid="loan-emi-display" className="text-2xl font-extrabold text-cyan-300 mt-1">
+                <p className="text-slate-500">Monthly EMI:</p>
+                <h3 data-testid="loan-emi-display" className="text-2xl font-extrabold text-[#0b3b8c] mt-1">
                   ₹{monthlyEmi.toLocaleString('en-IN')}
                 </h3>
               </div>
 
-              <div className="pt-2 border-t border-slate-800/80 space-y-2 text-slate-300">
+              <div className="pt-2 border-t border-slate-200 space-y-2 text-slate-600">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Total Interest Payable:</span>
-                  <span className="font-semibold text-rose-400">₹{totalInterest.toLocaleString('en-IN')}</span>
+                  <span className="text-slate-500">Total Interest Payable:</span>
+                  <span className="font-semibold text-[#c8102e]">₹{totalInterest.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Total Amount Payable:</span>
-                  <span className="font-bold text-white">₹{totalRepayable.toLocaleString('en-IN')}</span>
+                  <span className="text-slate-500">Total Amount Payable:</span>
+                  <span className="font-bold text-slate-900">₹{totalRepayable.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Eligibility Status:</span>
-                  <span className={`font-bold ${isEligible ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span className="text-slate-500">Eligibility Status:</span>
+                  <span className={`font-bold ${isEligible ? 'text-emerald-700' : 'text-amber-600'}`}>
                     {isEligible ? 'High Approval Chance' : 'Co-Applicant Recommended'}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
-              <p className="font-semibold text-slate-200">Zero Foreclosure Charges:</p>
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 space-y-1">
+              <p className="font-semibold text-slate-700">Zero Foreclosure Charges:</p>
               <p>As per our credit policy, there is no prepayment penalty on floating-rate loans.</p>
             </div>
           </div>

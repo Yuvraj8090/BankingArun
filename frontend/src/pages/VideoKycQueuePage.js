@@ -33,7 +33,7 @@ export default function VideoKycQueuePage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Video className="w-5 h-5 text-white" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Video className="w-5 h-5 text-slate-900" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Video KYC Verification Queue</h1>
             <p className="text-xs text-slate-500">Review customer selfie + PAN + Aadhaar submissions</p>
@@ -74,7 +74,7 @@ export default function VideoKycQueuePage() {
         <div className="lg:col-span-3 bg-white border border-slate-200 rounded-lg shadow-sm">
           {!detail ? (
             <div className="p-16 text-center text-xs text-slate-500 space-y-2">
-              <Eye className="w-8 h-8 mx-auto text-slate-300" />
+              <Eye className="w-8 h-8 mx-auto text-slate-600" />
               <p>Select a submission on the left to review</p>
             </div>
           ) : (
@@ -84,7 +84,7 @@ export default function VideoKycQueuePage() {
                   <h3 className="text-sm font-semibold text-slate-900">{detail.user_name}</h3>
                   <p className="text-[11px] text-slate-500">{detail.user_email}</p>
                 </div>
-                <span className="text-[10px] text-slate-400">Submitted {new Date(detail.submitted_at).toLocaleString('en-IN')}</span>
+                <span className="text-[10px] text-slate-500">Submitted {new Date(detail.submitted_at).toLocaleString('en-IN')}</span>
               </div>
 
               {detail.liveness_words && (
@@ -118,7 +118,7 @@ export default function VideoKycQueuePage() {
                     <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                   </button>
                   <button data-testid={`vkyc-reject-${detail.id}`} onClick={() => decide(detail.id, 'reject')}
-                    className="flex-1 py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition">
+                    className="flex-1 py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 transition">
                     <XCircle className="w-3.5 h-3.5" /> Reject
                   </button>
                 </div>

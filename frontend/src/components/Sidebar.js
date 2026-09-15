@@ -34,7 +34,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
                   : 'text-slate-700 hover:text-[#0b3b8c] hover:bg-slate-50'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-[#0b3b8c]' : 'text-slate-500'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-slate-900' : item.highlight ? 'text-[#0b3b8c]' : 'text-slate-500'}`} />
               <span className="truncate">{item.label}</span>
             </button>
           );

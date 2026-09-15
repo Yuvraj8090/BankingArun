@@ -29,7 +29,7 @@ export default function CrmPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center gap-3">
-        <div className="w-10 h-10 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center">
           <Users className="w-5 h-5" />
         </div>
         <div>
@@ -81,7 +81,7 @@ function MembersTab({ onOpen }) {
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
       <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             data-testid="crm-member-search"
             value={q}
@@ -125,9 +125,9 @@ function MembersTab({ onOpen }) {
                   >
                     <td className="p-3">
                       <div className="font-semibold text-slate-900">{m.name}</div>
-                      <div className="text-[10px] text-slate-400">{m.branch || '—'}</div>
+                      <div className="text-[10px] text-slate-500">{m.branch || '—'}</div>
                     </td>
-                    <td className="p-3 text-slate-600">{m.email}<br /><span className="text-slate-400">{m.phone}</span></td>
+                    <td className="p-3 text-slate-600">{m.email}<br /><span className="text-slate-500">{m.phone}</span></td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                         m.kyc_status === 'verified'
@@ -181,7 +181,7 @@ function Member360({ id, onBack }) {
         <div>
           <h1 className="text-xl font-bold text-slate-900">{member.name}</h1>
           <p className="text-xs text-slate-500">{member.email} · {member.phone} · {member.branch || 'No branch'}</p>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1">
             Member for {rel.days_with_us} days · since {day(rel.member_since)}
           </p>
         </div>
@@ -213,16 +213,16 @@ function Member360({ id, onBack }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Panel title="Accounts">
           {data.accounts.map((a) => (
-            <Row key={a.id} left={<><span className="font-mono">{a.account_number}</span><br /><span className="text-slate-400">{a.account_type}</span></>}
-              right={<><strong>{money(a.balance)}</strong><br /><span className="text-slate-400">{a.status}</span></>} />
+            <Row key={a.id} left={<><span className="font-mono">{a.account_number}</span><br /><span className="text-slate-500">{a.account_type}</span></>}
+              right={<><strong>{money(a.balance)}</strong><br /><span className="text-slate-500">{a.status}</span></>} />
           ))}
         </Panel>
 
         <Panel title="Deposits">
           {data.deposits.map((d) => (
             <Row key={d.deposit_number}
-              left={<><span className="font-mono">{d.deposit_number}</span><br /><span className="text-slate-400">matures {day(d.maturity_date)}</span></>}
-              right={<><strong>{money(d.principal_amount)}</strong><br /><span className="text-slate-400">{d.interest_rate}% · {d.status}</span></>} />
+              left={<><span className="font-mono">{d.deposit_number}</span><br /><span className="text-slate-500">matures {day(d.maturity_date)}</span></>}
+              right={<><strong>{money(d.principal_amount)}</strong><br /><span className="text-slate-500">{d.interest_rate}% · {d.status}</span></>} />
           ))}
           {!data.deposits.length && <Empty>No deposits.</Empty>}
         </Panel>
@@ -230,9 +230,9 @@ function Member360({ id, onBack }) {
         <Panel title="Loans">
           {data.loans.map((l) => (
             <Row key={l.loan_application_no}
-              left={<><span className="font-mono">{l.loan_application_no}</span><br /><span className="text-slate-400">{l.loan_type}</span></>}
+              left={<><span className="font-mono">{l.loan_application_no}</span><br /><span className="text-slate-500">{l.loan_type}</span></>}
               right={<><strong>{money(l.amount)}</strong><br />
-                <span className="text-slate-400">
+                <span className="text-slate-500">
                   {l.risk_grade ? `grade ${l.risk_grade}` : 'ungraded'} · {l.status}
                 </span></>} />
           ))}
@@ -242,9 +242,9 @@ function Member360({ id, onBack }) {
         <Panel title="Standing instructions">
           {data.standing_instructions.map((si, i) => (
             <Row key={i}
-              left={<>{si.beneficiary_name}<br /><span className="text-slate-400">{si.frequency} · next {si.next_run || '—'}</span></>}
+              left={<>{si.beneficiary_name}<br /><span className="text-slate-500">{si.frequency} · next {si.next_run || '—'}</span></>}
               right={<><strong>{money(si.amount)}</strong><br />
-                <span className={si.last_status === 'failed' ? 'text-[#c8102e]' : 'text-slate-400'}>{si.status}</span></>} />
+                <span className={si.last_status === 'failed' ? 'text-[#c8102e]' : 'text-slate-500'}>{si.status}</span></>} />
           ))}
           {!data.standing_instructions.length && <Empty>None set up.</Empty>}
         </Panel>
@@ -252,7 +252,7 @@ function Member360({ id, onBack }) {
         <Panel title="Support tickets">
           {data.tickets.map((t) => (
             <Row key={t.ticket_id}
-              left={<>{t.subject}<br /><span className="text-slate-400 font-mono">{t.ticket_id}</span></>}
+              left={<>{t.subject}<br /><span className="text-slate-500 font-mono">{t.ticket_id}</span></>}
               right={<span className="text-slate-500">{t.status}</span>} />
           ))}
           {!data.tickets.length && <Empty>No tickets raised.</Empty>}
@@ -261,7 +261,7 @@ function Member360({ id, onBack }) {
         <Panel title="Recent activity">
           {data.recent_transactions.map((t, i) => (
             <Row key={i}
-              left={<>{t.counterparty_name || t.mode}<br /><span className="text-slate-400">{day(t.timestamp)}</span></>}
+              left={<>{t.counterparty_name || t.mode}<br /><span className="text-slate-500">{day(t.timestamp)}</span></>}
               right={<span className={t.type === 'credit' ? 'text-emerald-700 font-semibold' : 'text-slate-900 font-semibold'}>
                 {t.type === 'credit' ? '+' : '−'}{money(t.amount)}
               </span>} />
@@ -274,7 +274,7 @@ function Member360({ id, onBack }) {
           <div key={i.id} className="py-2.5 text-xs border-b border-slate-100 last:border-0">
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold text-slate-800">{i.subject}</span>
-              <span className="text-slate-400 text-[10px]">{day(i.created_at)} · {i.recorded_by_name}</span>
+              <span className="text-slate-500 text-[10px]">{day(i.created_at)} · {i.recorded_by_name}</span>
             </div>
             <div className="text-slate-500 mt-0.5">
               <span className="uppercase text-[10px] tracking-wide">{i.channel}</span>
@@ -309,7 +309,7 @@ function LogInteraction({ memberId, onClose, onSaved }) {
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Log a contact</h2>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
+        <button onClick={onClose} className="text-slate-500 hover:text-slate-700"><X className="w-4 h-4" /></button>
       </div>
       <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         <Select label="Channel" value={form.channel} onChange={(v) => setForm({ ...form, channel: v })}
@@ -431,12 +431,12 @@ function LeadsTab() {
                   {data.leads.map((l) => (
                     <tr key={l.id} data-testid={`crm-lead-${l.id}`} className="hover:bg-slate-50">
                       <td className="p-3 font-semibold text-slate-900">{l.name}</td>
-                      <td className="p-3 text-slate-600">{l.phone}<br /><span className="text-slate-400">{l.email || '—'}</span></td>
+                      <td className="p-3 text-slate-600">{l.phone}<br /><span className="text-slate-500">{l.email || '—'}</span></td>
                       <td className="p-3 text-slate-600">{l.source}{l.agent_name ? ` · ${l.agent_name}` : ''}</td>
                       <td className="p-3 text-slate-600">{l.interest || '—'}</td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_STYLE[l.stage]}`}>{l.stage}</span>
-                        {l.lost_reason && <div className="text-[10px] text-slate-400 mt-0.5">{l.lost_reason}</div>}
+                        {l.lost_reason && <div className="text-[10px] text-slate-500 mt-0.5">{l.lost_reason}</div>}
                       </td>
                       <td className="p-3 text-right whitespace-nowrap">
                         {['contacted', 'documents', 'enrolled', 'lost']
@@ -601,7 +601,7 @@ const Row = ({ left, right }) => (
   </div>
 );
 
-const Empty = ({ children }) => <p className="py-6 text-center text-xs text-slate-400">{children}</p>;
+const Empty = ({ children }) => <p className="py-6 text-center text-xs text-slate-500">{children}</p>;
 
 function Field({ label, value, onChange, type = 'text', testId }) {
   return (

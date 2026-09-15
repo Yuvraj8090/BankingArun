@@ -69,7 +69,7 @@ export default function AdminPortal() {
           <div>
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-md bg-[#0b3b8c] flex items-center justify-center">
-                <Lock className="w-4.5 h-4.5 text-white" />
+                <Lock className="w-4.5 h-4.5 text-slate-900" />
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
@@ -164,7 +164,7 @@ export default function AdminPortal() {
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-900">Pending KYC Verification Desk</h2>
             <div className="flex items-center gap-2 border border-slate-200 rounded px-2 h-8 w-full max-w-xs">
-              <Search className="w-3.5 h-3.5 text-slate-400" />
+              <Search className="w-3.5 h-3.5 text-slate-500" />
               <input value={search} onChange={(e) => setSearch(e.target.value)}
                 data-testid="admin-kyc-search"
                 className="flex-1 text-xs outline-none bg-transparent" placeholder="Search by name / PAN…" />
@@ -195,7 +195,7 @@ export default function AdminPortal() {
                         <CheckCircle className="w-3.5 h-3.5" /> Approve
                       </button>
                       <button data-testid={`reject-kyc-${u.id}`} onClick={() => handleKycAction(u.id, 'rejected')}
-                        className="px-3 py-1.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                        className="px-3 py-1.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 transition">
                         <XCircle className="w-3.5 h-3.5" /> Reject
                       </button>
                     </div>

@@ -34,18 +34,18 @@ export default function KycAccountPage() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       
       {/* Header */}
-      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             KYC Compliance & Joint Account Management
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             PAN &amp; Aadhaar based KYC | Officially Valid Documents (OVD)
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+          <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4" /> KYC Status: {user?.kyc_status?.toUpperCase() || 'VERIFIED'}
           </span>
         </div>
@@ -54,57 +54,57 @@ export default function KycAccountPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* KYC Document Upload Section */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h2 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center gap-2">
-            <FileBadge2 className="w-4 h-4 text-cyan-400" />
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-4">
+          <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center gap-2">
+            <FileBadge2 className="w-4 h-4 text-[#0b3b8c]" />
             Upload Verified KYC Documents (Aadhaar / PAN / OVD)
           </h2>
 
           <form onSubmit={handleKycUpload} className="space-y-4 text-xs">
             <div>
-              <label className="block text-slate-400 mb-1">Permanent Account Number (PAN Card)</label>
+              <label className="block text-slate-500 mb-1">Permanent Account Number (PAN Card)</label>
               <div className="flex items-center gap-3">
                 <input
                   type="text"
                   readOnly
                   value={user?.pan_number || 'ABCPS8492K'}
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <label className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 cursor-pointer border border-slate-700">
+                <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] cursor-pointer border border-slate-200">
                   <Upload className="w-3.5 h-3.5 inline mr-1" /> Choose File
                   <input type="file" className="hidden" onChange={() => setPanDoc(true)} />
                 </label>
               </div>
-              {panDoc && <span className="text-[10px] text-emerald-400 mt-1 block">✓ PAN document attached</span>}
+              {panDoc && <span className="text-[10px] text-emerald-700 mt-1 block">✓ PAN document attached</span>}
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1">Aadhaar Card / UIDAI Number (Masked)</label>
+              <label className="block text-slate-500 mb-1">Aadhaar Card / UIDAI Number (Masked)</label>
               <div className="flex items-center gap-3">
                 <input
                   type="text"
                   readOnly
                   value={user?.aadhaar_number || 'XXXX-XXXX-4892'}
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <label className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 cursor-pointer border border-slate-700">
+                <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] cursor-pointer border border-slate-200">
                   <Upload className="w-3.5 h-3.5 inline mr-1" /> Choose File
                   <input type="file" className="hidden" onChange={() => setAadhaarDoc(true)} />
                 </label>
               </div>
-              {aadhaarDoc && <span className="text-[10px] text-emerald-400 mt-1 block">✓ Aadhaar document attached</span>}
+              {aadhaarDoc && <span className="text-[10px] text-emerald-700 mt-1 block">✓ Aadhaar document attached</span>}
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1">Proof of Address (Utility Bill / Passport)</label>
+              <label className="block text-slate-500 mb-1">Proof of Address (Utility Bill / Passport)</label>
               <div className="flex items-center gap-3">
                 <input
                   type="text"
                   readOnly
                   value="Electricity Bill - Nariman Point Apt #402"
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-300"
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-600"
                 />
-                <label className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 cursor-pointer border border-slate-700">
+                <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] cursor-pointer border border-slate-200">
                   <Upload className="w-3.5 h-3.5 inline mr-1" /> Choose File
                   <input type="file" className="hidden" onChange={() => setAddressDoc(true)} />
                 </label>
@@ -126,74 +126,74 @@ export default function KycAccountPage() {
         <div className="space-y-6">
           
           {/* Nominee Form */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3 text-xs">
-            <h3 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-emerald-400" />
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl space-y-3 text-xs">
+            <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-emerald-700" />
               Registered Nominee Details (Banking Regulation Act Sec 45ZA)
             </h3>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1">Nominee Full Name</label>
+                <label className="block text-slate-500 mb-1">Nominee Full Name</label>
                 <input
                   type="text"
                   value={nomineeName}
                   onChange={(e) => setNomineeName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Relationship</label>
+                <label className="block text-slate-500 mb-1">Relationship</label>
                 <input
                   type="text"
                   value={nomineeRelation}
                   onChange={(e) => setNomineeRelation(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                 />
               </div>
             </div>
 
             <button
               onClick={() => toast.success("Nominee updated successfully!")}
-              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold border border-slate-700"
+              className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-emerald-700 font-semibold border border-slate-200"
             >
               Update Nominee Registration
             </button>
           </div>
 
           {/* Joint Account Holder Form */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3 text-xs">
-            <h3 className="font-bold text-white text-sm pb-2 border-b border-slate-800 flex items-center gap-2">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl space-y-3 text-xs">
+            <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center gap-2">
               <Users className="w-4 h-4 text-purple-400" />
               Joint Account Co-Applicant (Either or Survivor Mode)
             </h3>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1">Co-Applicant Name</label>
+                <label className="block text-slate-500 mb-1">Co-Applicant Name</label>
                 <input
                   type="text"
                   value={jointName}
                   onChange={(e) => setJointName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Co-Applicant PAN</label>
+                <label className="block text-slate-500 mb-1">Co-Applicant PAN</label>
                 <input
                   type="text"
                   value={jointPan}
                   onChange={(e) => setJointPan(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono uppercase"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono uppercase"
                 />
               </div>
             </div>
 
             <button
               onClick={() => toast.success("Joint holder authorized on account!")}
-              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 font-semibold border border-slate-700"
+              className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-purple-300 font-semibold border border-slate-200"
             >
               Authorize Joint Co-Signatory
             </button>

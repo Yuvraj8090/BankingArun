@@ -111,7 +111,7 @@ export default function VideoKycPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Video className="w-5 h-5 text-white" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Video className="w-5 h-5 text-slate-900" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Video KYC — Instant Verification</h1>
             <p className="text-xs text-slate-500">PAN &amp; Aadhaar video KYC · No branch visit needed · Reviewed within 24 hours</p>
@@ -132,7 +132,7 @@ export default function VideoKycPage() {
                 <s.icon className="w-3.5 h-3.5" /> {i + 1}. {s.label}
                 {stepDone(i) && <CheckCircle2 className="w-3 h-3" />}
               </button>
-              {i < STEPS.length - 1 && <ChevronRight className="w-3 h-3 text-slate-400" />}
+              {i < STEPS.length - 1 && <ChevronRight className="w-3 h-3 text-slate-500" />}
             </React.Fragment>
           ))}
         </div>
@@ -141,10 +141,10 @@ export default function VideoKycPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* Camera */}
         <div className="lg:col-span-3 bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
-          <div className="aspect-video bg-slate-900 rounded-md overflow-hidden relative flex items-center justify-center">
+          <div className="aspect-video bg-white rounded-md overflow-hidden relative flex items-center justify-center">
             <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${streamOn ? '' : 'hidden'}`} />
             {!streamOn && (
-              <div className="text-center text-slate-300 space-y-2">
+              <div className="text-center text-slate-600 space-y-2">
                 <Camera className="w-10 h-10 mx-auto" />
                 <p className="text-sm">Camera preview will appear here</p>
                 <button data-testid="vkyc-start-cam-btn" onClick={startCam}
@@ -210,7 +210,7 @@ export default function VideoKycPage() {
             <div key={s.key} className={`p-3 rounded-md border ${captures[s.key] ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-slate-50'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <s.icon className={`w-4 h-4 ${captures[s.key] ? 'text-emerald-700' : 'text-slate-400'}`} />
+                  <s.icon className={`w-4 h-4 ${captures[s.key] ? 'text-emerald-700' : 'text-slate-500'}`} />
                   <span className="text-xs font-semibold text-slate-800">{s.label}</span>
                 </div>
                 {captures[s.key] && <CheckCircle2 className="w-4 h-4 text-emerald-700" />}

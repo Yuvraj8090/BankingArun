@@ -39,7 +39,7 @@ export default function StatementsPage() {
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center">
-            <FileText className="w-5 h-5 text-white" />
+            <FileText className="w-5 h-5 text-slate-900" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Account Statements</h1>
@@ -85,7 +85,7 @@ export default function StatementsPage() {
           <div>
             <label className="block text-[11px] text-slate-600 mb-1">From date</label>
             <div className="flex items-center border border-slate-200 rounded-md px-3">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
               <input data-testid="stmt-from-date" type="date" value={start} onChange={e => setStart(e.target.value)}
                 className="flex-1 px-2 py-2 text-sm outline-none bg-transparent" />
             </div>
@@ -93,7 +93,7 @@ export default function StatementsPage() {
           <div>
             <label className="block text-[11px] text-slate-600 mb-1">To date</label>
             <div className="flex items-center border border-slate-200 rounded-md px-3">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
               <input data-testid="stmt-to-date" type="date" value={end} onChange={e => setEnd(e.target.value)}
                 className="flex-1 px-2 py-2 text-sm outline-none bg-transparent" />
             </div>

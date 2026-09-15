@@ -47,7 +47,7 @@ export default function SecurityCenterPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-md bg-slate-900 text-amber-400 flex items-center justify-center"><ShieldCheck className="w-5 h-5" /></div>
+          <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><ShieldCheck className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Security Centre</h1>
             <p className="text-xs text-slate-500">What this deployment actually looks like right now</p>
@@ -55,7 +55,7 @@ export default function SecurityCenterPage() {
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className={`text-3xl font-bold ${scoreColour}`}>{audit.score}<span className="text-base text-slate-400">/100</span></div>
+            <div className={`text-3xl font-bold ${scoreColour}`}>{audit.score}<span className="text-base text-slate-500">/100</span></div>
             <div className="text-[11px] font-semibold text-slate-600">{audit.verdict}</div>
           </div>
           <button onClick={load} className="px-3 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 flex items-center gap-1.5">

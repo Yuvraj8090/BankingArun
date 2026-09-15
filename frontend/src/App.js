@@ -233,34 +233,34 @@ function PublicFooter() {
   ];
 
   return (
-    <footer className="bg-slate-900 text-slate-300 mt-16">
+    <footer className="bg-white text-slate-600 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-xs">
         <div className="col-span-2 md:col-span-1 space-y-3">
           <Brand variant="full" height={40} onDark />
-          <p className="text-slate-400 leading-relaxed">
+          <p className="text-slate-500 leading-relaxed">
             Secure digital banking for personal and business customers, with video KYC, passkey sign-in and
             24×7 digital transfers.
           </p>
         </div>
         {columns.map((column) => (
           <div key={column.heading}>
-            <h4 className="text-white font-semibold mb-3">{column.heading}</h4>
-            <ul className="space-y-1.5 text-slate-400">
+            <h4 className="text-slate-900 font-semibold mb-3">{column.heading}</h4>
+            <ul className="space-y-1.5 text-slate-500">
               {column.links.map(([label, to]) => (
                 <li key={to}>
-                  <Link to={to} className="hover:text-white transition">{label}</Link>
+                  <Link to={to} className="hover:text-slate-900 transition">{label}</Link>
                 </li>
               ))}
             </ul>
           </div>
         ))}
       </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-slate-400">
-        <a href="tel:18001234567" className="hover:text-white">Toll-free 1800-123-4567</a>
-        <a href="mailto:support@ajspay.in" className="hover:text-white">support@ajspay.in</a>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-slate-500">
+        <a href="tel:18001234567" className="hover:text-slate-900">Toll-free 1800-123-4567</a>
+        <a href="mailto:support@ajspay.in" className="hover:text-slate-900">support@ajspay.in</a>
         <span>Cyber fraud helpline 1930</span>
       </div>
-      <div className="border-t border-slate-800 py-4 px-4 text-center text-[11px] text-slate-500 space-y-1">
+      <div className="border-t border-slate-200 py-4 px-4 text-center text-[11px] text-slate-500 space-y-1">
         <p>
           Aadhunik Jeewan Sanchay Nidhi Limited (CIN U65990UP2019PLN121746) is a Nidhi company incorporated under the
           Companies Act, 2013 and governed by the Nidhi Rules, 2014. It is not a bank, it is not licensed or regulated
