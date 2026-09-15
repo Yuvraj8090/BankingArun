@@ -36,6 +36,7 @@ import AdminConfigPage from './pages/AdminConfigPage';
 import SchemesPage from './pages/SchemesPage';
 import AgentsPage from './pages/AgentsPage';
 import FraudMonitorPage from './pages/FraudMonitorPage';
+import CrmPage from './pages/CrmPage';
 import SecurityCenterPage from './pages/SecurityCenterPage';
 import HostingerDeployPage from './pages/HostingerDeployPage';
 import AuthPage from './pages/AuthPage';
@@ -142,6 +143,7 @@ function AppShell() {
     schemes: <SchemesPage />,
     agents: <AgentsPage />,
     fraud: <FraudMonitorPage />,
+    crm: <CrmPage />,
     'security-center': <SecurityCenterPage />,
     hostinger: <HostingerDeployPage />
   };

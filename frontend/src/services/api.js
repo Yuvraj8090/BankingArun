@@ -166,5 +166,30 @@ export const api = {
   securityAudit: async () => (await axios.get(`${API}/security/audit`, getAuthHeaders())).data,
   securityEvents: async (severity) => (await axios.get(
     `${API}/security/events${severity ? `?severity=${severity}` : ''}`, getAuthHeaders())).data,
-  securitySeal: async () => (await axios.post(`${API}/security/seal`, {}, getAuthHeaders())).data
+  securitySeal: async () => (await axios.post(`${API}/security/seal`, {}, getAuthHeaders())).data,
+
+  // CRM — staff only
+  crmMembers: async (params = {}) =>
+    (await axios.get(`${API}/crm/members?${new URLSearchParams(params)}`, getAuthHeaders())).data,
+  crmMember: async (id) => (await axios.get(`${API}/crm/member/${encodeURIComponent(id)}`, getAuthHeaders())).data,
+  crmLogInteraction: async (payload) => (await axios.post(`${API}/crm/interaction`, payload, getAuthHeaders())).data,
+  crmLeads: async (params = {}) =>
+    (await axios.get(`${API}/crm/leads?${new URLSearchParams(params)}`, getAuthHeaders())).data,
+  crmLeadCreate: async (payload) => (await axios.post(`${API}/crm/leads`, payload, getAuthHeaders())).data,
+  crmLeadUpdate: async (id, payload) => (await axios.patch(`${API}/crm/leads/${id}`, payload, getAuthHeaders())).data,
+  crmTasks: async (params = {}) =>
+    (await axios.get(`${API}/crm/tasks?${new URLSearchParams(params)}`, getAuthHeaders())).data,
+  crmTaskCreate: async (payload) => (await axios.post(`${API}/crm/tasks`, payload, getAuthHeaders())).data,
+  crmTaskUpdate: async (id, payload) => (await axios.patch(`${API}/crm/tasks/${id}`, payload, getAuthHeaders())).data,
+
+  // Reporting
+  reportsList: async () => (await axios.get(`${API}/reports`, getAuthHeaders())).data,
+  reportRun: async (key, params = {}) =>
+    (await axios.get(`${API}/reports/${key}?${new URLSearchParams(params)}`, getAuthHeaders())).data,
+  reportExportUrl: (key, params = {}) => `${API}/reports/${key}/export?${new URLSearchParams(params)}`,
+  reportExport: async (key, params = {}) => {
+    const res = await axios.get(`${API}/reports/${key}/export?${new URLSearchParams(params)}`,
+      { ...getAuthHeaders(), responseType: 'blob' });
+    saveBlob(res.data, `${key}.${params.format === 'xlsx' ? 'xlsx' : 'csv'}`);
+  }
 };

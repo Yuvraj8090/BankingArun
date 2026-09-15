@@ -156,8 +156,14 @@ function public_user(array $user): array
 {
     $user['nominee'] = $user['nominee_name'] === null ? null
         : ['name' => $user['nominee_name'], 'relation' => $user['nominee_relation']];
+    // Everything secret about the account is removed here, so no handler can
+    // leak it by returning a user row. The TOTP secret is encrypted at rest and
+    // the recovery codes are bcrypt hashes, but neither belongs on the client.
     unset($user['password_hash'], $user['transaction_password_hash'], $user['session_version'],
-        $user['nominee_name'], $user['nominee_relation']);
+        $user['nominee_name'], $user['nominee_relation'],
+        $user['totp_secret'], $user['totp_backup_codes']);
+    // Whether 2FA is on is useful to the app; the material behind it is not.
+    $user['totp_enabled'] = (bool)($user['totp_enabled'] ?? false);
     return out($user);
 }
 
