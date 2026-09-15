@@ -11,7 +11,9 @@
 // because a report download is the easiest way to walk out with the member book.
 declare(strict_types=1);
 
-const REPORT_ROLES = ['staff', 'admin', 'branch_manager', 'bank_owner'];
+// Who may open the reports area at all. Each report then names its own roles,
+// so a loan officer reaching this list sees only the loan register.
+const REPORT_ROLES = ['staff', 'loan_officer', 'admin', 'branch_manager', 'bank_owner'];
 const REPORT_EXPORT_MAX = 20000;   // rows in a single download
 
 // Column formats: 'text', 'money', 'date', 'datetime', 'int'.

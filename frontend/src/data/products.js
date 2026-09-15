@@ -13,8 +13,8 @@ export const PRODUCTS = {
   'personal/savings-account': {
     title: 'Savings Account',
     tagline: 'Everyday banking with interest paid quarterly.',
-    summary: 'A zero-balance savings account with a debit card, UPI, NetBanking and free digital transfers. Open it online with PAN and Aadhaar, and finish verification by video KYC without visiting a branch.',
-    highlights: ['Interest credited every quarter', 'Debit card and UPI included', 'NEFT, RTGS, IMPS and UPI at no charge', 'Video KYC, no branch visit'],
+    summary: 'A zero-balance members\u2019 savings account with NetBanking, statements and transfers between member accounts. Open it online with PAN and Aadhaar, and finish verification by video KYC without visiting a branch.',
+    highlights: ['Interest credited every quarter', 'Transfers between member accounts at no charge', 'Statements as PDF or Excel, any date range', 'Video KYC, no branch visit'],
     facts: [['Interest rate', '4.00% p.a.'], ['Minimum balance', 'Nil'], ['Digital transfers', 'Free'], ['Statement', 'PDF or Excel, any date range']],
     documents: ['PAN card', 'Aadhaar or another officially valid document', 'Recent photograph']
   },
@@ -43,6 +43,7 @@ export const PRODUCTS = {
     documents: ['An active AJSPay account', 'Nominee details']
   },
   'personal/debit-cards': {
+    requires: 'debit_cards',
     title: 'Debit & Credit Cards',
     tagline: 'Freeze, set limits and control usage yourself.',
     summary: 'Every account comes with a virtual card immediately and a physical card on request. You control limits and switches from the app, and can freeze or permanently hotlist a card at once if it goes missing.',
@@ -53,6 +54,7 @@ export const PRODUCTS = {
 
   // ---------------- Corporate ----------------
   'corporate/current-account': {
+    requires: 'current_accounts',
     title: 'Current Account',
     tagline: 'For businesses that move money every day.',
     summary: 'A current account for companies and firms, with bulk payouts, per-batch references for reconciliation, and statements you can export as PDF or Excel for your accountant.',
@@ -61,6 +63,7 @@ export const PRODUCTS = {
     documents: ['Certificate of incorporation or registration', 'Company PAN', 'Board resolution and authorised signatory list', 'KYC of signatories']
   },
   'corporate/bulk-neft-rtgs': {
+    requires: 'payment_systems',
     title: 'Bulk NEFT / RTGS',
     tagline: 'Pay hundreds of beneficiaries in one authorised batch.',
     summary: 'Upload a payout batch, authorise it once with your transaction password, and every line gets its own reference number under a single batch reference. Any zero or negative line is rejected before the batch runs.',
@@ -137,6 +140,7 @@ export const PRODUCTS = {
 
   // ---------------- Investments ----------------
   'investments/mutual-funds': {
+    requires: 'mutual_funds',
     title: 'Mutual Funds',
     tagline: 'Start a SIP from ₹500 a month.',
     summary: 'Invest in the schemes listed in your account, as a monthly SIP or a lump sum. Each purchase debits your savings account and creates a folio you can follow under Deposits and Investments.',
@@ -146,6 +150,7 @@ export const PRODUCTS = {
     note: 'Mutual fund investments carry market risk. Past performance does not indicate future returns. Read the scheme documents before investing.'
   },
   'investments/sovereign-gold-bonds': {
+    requires: 'mutual_funds',
     title: 'Sovereign Gold Bonds',
     tagline: 'Gold holdings without storing metal.',
     summary: 'Sovereign Gold Bonds are issued by the Reserve Bank of India in tranches. When a tranche opens, you can place a subscription request from your account and the holding is recorded in your name.',
@@ -154,6 +159,7 @@ export const PRODUCTS = {
     documents: ['An active AJSPay account with completed KYC']
   },
   'investments/insurance': {
+    requires: 'insurance',
     title: 'Insurance',
     tagline: 'Term, health and motor cover.',
     summary: 'Compare the term, health and motor plans listed in your account and start an application. Cover is underwritten by our insurance partners, who assess and issue the policy.',

@@ -52,6 +52,8 @@ export default function ReportsPage() {
         setReports(data.reports);
         if (data.reports.length) setActive(data.reports[0]);
       } catch (e) {
+        // Show the reason rather than spinning forever on a failed load.
+        setReports([]);
         toast.error(e.response?.data?.detail || 'Could not load the report list');
       }
     })();
@@ -80,6 +82,11 @@ export default function ReportsPage() {
           <div className="px-4 py-3 border-b border-slate-100 text-sm font-semibold text-slate-900">
             Available to you ({reports.length})
           </div>
+          {!reports.length && (
+            <p className="p-6 text-center text-xs text-slate-500">
+              No reports are available to your role.
+            </p>
+          )}
           <div className="divide-y divide-slate-100">
             {reports.map((r) => (
               <button

@@ -1,12 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CheckCircle2, ChevronRight, FileText, Lock, UserPlus } from 'lucide-react';
+import { CheckCircle2, ChevronRight, FileText, Lock, UserPlus, Info } from 'lucide-react';
 import { GROUP_LABEL, productAt } from '../data/products';
+import { api } from '../services/api';
 
 // One public page per navbar/footer link, at its own URL (e.g. /loans/home-loan).
 export default function ProductPage() {
   const { group, slug } = useParams();
   const product = productAt(group, slug);
+  // A product that depends on an authorisation this institution does not hold
+  // must not be advertised as available. The public features list says which.
+  const [features, setFeatures] = useState(null);
+  useEffect(() => {
+    api.publicFeatures().then((d) => setFeatures(d.features)).catch(() => setFeatures([]));
+  }, []);
+  const unavailable = product?.requires && Array.isArray(features) && !features.includes(product.requires);
 
   if (!product) {
     return (
@@ -22,6 +30,18 @@ export default function ProductPage() {
 
   return (
     <div className="bg-slate-50">
+      {unavailable && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-start gap-2.5">
+            <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-900 leading-relaxed">
+              <strong>Not currently offered.</strong> This service needs an authorisation that Aadhunik Jeewan
+              Sanchay Nidhi Limited does not presently hold, so it is not available to members. The description
+              below is kept for reference only. Please speak to your branch about what is available today.
+            </p>
+          </div>
+        </div>
+      )}
       <section className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <nav className="flex items-center gap-1.5 text-[11px] text-slate-500" aria-label="Breadcrumb">

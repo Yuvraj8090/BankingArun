@@ -168,6 +168,9 @@ export const api = {
     `${API}/security/events${severity ? `?severity=${severity}` : ''}`, getAuthHeaders())).data,
   securitySeal: async () => (await axios.post(`${API}/security/seal`, {}, getAuthHeaders())).data,
 
+  // Public: which regulated services may be advertised (no session needed)
+  publicFeatures: async () => (await axios.get(`${API}/public/features`)).data,
+
   // First-run tour
   tutorialState: async () => (await axios.get(`${API}/tutorial/state`, getAuthHeaders())).data,
   tutorialProgress: async (step) => (await axios.post(`${API}/tutorial/progress`, { step }, getAuthHeaders())).data,

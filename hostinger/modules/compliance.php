@@ -180,6 +180,14 @@ function require_capability(string $key): void
         : 'The Nidhi Rules, 2014 do not permit this service.'));
 }
 
+// The public site needs to know what may be advertised. This returns only the
+// enabled keys — no authority names, no licence references — so it is safe to
+// serve without a session.
+function route_public_features(array $d): void
+{
+    respond(['features' => enabled_capabilities()]);
+}
+
 // --- Owner-facing register ---------------------------------------------------------------
 function route_capabilities(array $d): void
 {
