@@ -33,13 +33,19 @@ function effective_rate(array $scheme): ?float
         return 0.0;
     }
     $byInstalment = in_array($scheme['scheme_type'], ['daily', 'recurring'], true);
-    $contribution = $byInstalment ? $deposit / $months : 0.0;
-    $valueAt = function (float $rate) use ($byInstalment, $months, $deposit, $contribution): float {
+    // Some plans take instalments for only part of the term and then hold the
+    // fund. Spreading those contributions across the whole tenure would put the
+    // money in later than it really goes in, and overstate the rate needed to
+    // reach the maturity figure.
+    $payIn = (int)($scheme['contribution_months'] ?? 0) ?: $months;
+    $payIn = max(1, min($payIn, $months));
+    $contribution = $byInstalment ? $deposit / $payIn : 0.0;
+    $valueAt = function (float $rate) use ($byInstalment, $months, $payIn, $deposit, $contribution): float {
         if (!$byInstalment) {
             return $deposit * (1 + $rate) ** $months;
         }
         $total = 0.0;
-        for ($i = 1; $i <= $months; $i++) {
+        for ($i = 1; $i <= $payIn; $i++) {
             $total += $contribution * (1 + $rate) ** ($months - $i + 1);
         }
         return $total;
@@ -86,6 +92,8 @@ function scheme_payload(array $d, array $existing = []): array
         'name' => clip($get('name', ''), 120),
         'scheme_type' => $type,
         'tenure_months' => $months,
+        'contribution_months' => $get('contribution_months') === null || $get('contribution_months') === ''
+            ? null : max(1, min((int)$get('contribution_months'), $months)),
         'contribution_amount' => $get('contribution_amount') === null || $get('contribution_amount') === ''
             ? null : money($get('contribution_amount')),
         'principal_amount' => $get('principal_amount') === null || $get('principal_amount') === ''

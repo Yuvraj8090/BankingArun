@@ -318,6 +318,8 @@ CREATE TABLE IF NOT EXISTS data_requests (
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ALTER TABLE schemes ADD COLUMN IF NOT EXISTS contribution_months INT;
+
 -- --- PCI DSS: stop storing the card verification value ----------------------
 -- PCI DSS forbids retaining sensitive authentication data after authorisation,
 -- and the CVV is exactly that. It was kept so a virtual-card screen could show

@@ -769,6 +769,9 @@ CREATE TABLE IF NOT EXISTS schemes (
     name VARCHAR(120) NOT NULL,
     scheme_type VARCHAR(10) NOT NULL DEFAULT 'recurring',  -- daily | recurring | fixed | mis
     tenure_months INT NOT NULL,
+    -- Months during which instalments are actually paid. Shorter than the
+    -- tenure for a plan that is paid into for a few years and then held.
+    contribution_months INT,
     contribution_amount DECIMAL(15,2),                     -- per day or per month, for instalment plans
     principal_amount DECIMAL(15,2),                        -- lump sum, for FD / MIS
     total_deposit DECIMAL(15,2) NOT NULL,
