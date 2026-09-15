@@ -454,7 +454,7 @@ export default function CardsChequesPage() {
 
       {/* Set PIN modal */}
       {showPinModal && (
-        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-xl space-y-4 text-xs border border-slate-200">
             <h3 className="font-semibold text-slate-900 text-sm pb-2 border-b border-slate-100 flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-[#0b3b8c]" /> Green PIN Reset
@@ -486,7 +486,7 @@ export default function CardsChequesPage() {
 
       {/* QR modal */}
       {showQrModal && qrData && (
-        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl space-y-4 border border-slate-200">
             <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <QrCode className="w-4 h-4 text-[#0b3b8c]" /> UPI Payment QR

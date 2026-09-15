@@ -26,9 +26,15 @@ export default function TutorialOverlay({ state, onClose }) {
     if (!step?.anchor) { setRect(null); return; }
     const el = document.querySelector(`[data-testid="${step.anchor}"]`);
     if (!el) { setRect(null); return; }
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     const r = el.getBoundingClientRect();
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+  }, [step]);
+
+  useEffect(() => {
+    if (step?.anchor) {
+      document.querySelector(`[data-testid="${step.anchor}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }, [step]);
 
   useEffect(() => {
@@ -44,6 +50,7 @@ export default function TutorialOverlay({ state, onClose }) {
   // Escape asks to skip rather than silently abandoning the tour.
   useEffect(() => {
     const onKey = (e) => {
+      if (confirmSkip) { if (e.key === 'Escape') setConfirmSkip(false); return; }
       if (e.key === 'Escape') setConfirmSkip(true);
       if (e.key === 'ArrowRight' || e.key === 'Enter') next();
     };
@@ -85,14 +92,19 @@ export default function TutorialOverlay({ state, onClose }) {
   return (
     <div className="fixed inset-0 z-[70]" data-testid="tutorial-overlay" role="dialog" aria-modal="true"
       aria-label="Product tour">
-      {/* Dim everything, then punch a hole over the target with a ring. */}
-      <div className="absolute inset-0 bg-slate-50" onClick={() => setConfirmSkip(true)} />
+      {/* Dim everything, then punch a hole over the target with a ring. The
+          backdrop stays transparent while a target is spotlit — the ring's
+          box-shadow is what dims, and the hole has to show the live page. */}
+      <div className={`absolute inset-0 ${rect ? '' : 'bg-slate-900/60'}`}
+        onClick={() => setConfirmSkip(true)} />
       {rect && (
         <div
-          className="absolute rounded-lg ring-4 ring-amber-400 pointer-events-none transition-all duration-300"
+          className="absolute rounded-lg pointer-events-none transition-all duration-300"
           style={{
             top: rect.top - 4, left: rect.left - 4, width: rect.width + 8, height: rect.height + 8,
-            boxShadow: '0 0 0 9999px rgba(2, 6, 23, 0.6)'
+            // The ring and the dim are one property: a Tailwind `ring-*` class
+            // sets box-shadow too and would simply be overwritten by this style.
+            boxShadow: '0 0 0 3px #f59e0b, 0 0 0 9999px rgba(2, 6, 23, 0.55)'
           }}
         />
       )}
@@ -138,7 +150,7 @@ export default function TutorialOverlay({ state, onClose }) {
       </div>
 
       {confirmSkip && (
-        <div className="absolute inset-0 bg-slate-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl p-5 max-w-sm" data-testid="tutorial-skip-confirm">
             <h3 className="text-sm font-bold text-slate-900">Skip the tour?</h3>
             <p className="text-xs text-slate-600 mt-2">
