@@ -14,6 +14,8 @@ require __DIR__ . '/modules/master.php';
 require __DIR__ . '/modules/defence.php';
 require __DIR__ . '/modules/compliance.php';
 require __DIR__ . '/modules/mfa.php';
+require __DIR__ . '/modules/impersonation.php';
+require __DIR__ . '/modules/support.php';
 require __DIR__ . '/modules/ai.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
@@ -60,16 +62,25 @@ function session_cookie(string $value, int $expires): void
     ]);
 }
 
-function start_session(array $user): string
+// $impersonator is set only when a bank owner is viewing a member's account
+// through support impersonation. It travels inside the signed token, so it
+// cannot be added or removed by the client, and every request can see it.
+function start_session(array $user, ?array $impersonator = null, ?int $ttl = null): string
 {
     global $config;
-    $expires = time() + $config['token_ttl'];
-    $payload = b64url(json_encode([
+    $expires = time() + ($ttl ?? $config['token_ttl']);
+    $claims = [
         'sub' => $user['id'],
         'role' => $user['role'],
         'ver' => (int)$user['session_version'],
         'exp' => $expires,
-    ]));
+    ];
+    if ($impersonator !== null) {
+        $claims['imp'] = $impersonator['id'];
+        $claims['imp_email'] = $impersonator['email'];
+        $claims['imp_ver'] = (int)$impersonator['session_version'];
+    }
+    $payload = b64url(json_encode($claims));
     $token = $payload . '.' . sign($payload);
     session_cookie($token, $expires);
     return $token;
@@ -97,7 +108,46 @@ function current_user(): array
     if (!$user || (int)$user['session_version'] !== (int)($claims['ver'] ?? -1)) {
         fail(401, 'Invalid session token.');
     }
+    // An impersonated session stays valid only while the owner's own session
+    // does, so the owner logging out ends every impersonation they started.
+    global $IMPERSONATOR;
+    $IMPERSONATOR = null;
+    if (isset($claims['imp'])) {
+        $actor = row('SELECT * FROM users WHERE id = ?', [(string)$claims['imp']]);
+        if (!$actor || (int)$actor['session_version'] !== (int)($claims['imp_ver'] ?? -1)) {
+            fail(401, 'This support session has ended. Please sign in again.');
+        }
+        $IMPERSONATOR = $actor;
+    }
     return $user;
+}
+
+// The real person behind the session, when a bank owner is impersonating.
+function impersonator(): ?array
+{
+    global $IMPERSONATOR;
+    return $IMPERSONATOR ?? null;
+}
+
+// Reads the session token's claims without authenticating and without failing:
+// used by guards that run before routing, where a public route must still be
+// allowed through. Returns null when there is no token or the signature is bad.
+function peek_session_claims(): ?array
+{
+    $token = is_string($_COOKIE['access_token'] ?? null) ? $_COOKIE['access_token'] : '';
+    if ($token === '') {
+        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        $token = str_starts_with($header, 'Bearer ') ? substr($header, 7) : '';
+    }
+    if ($token === '') {
+        return null;
+    }
+    [$payload, $signature] = array_pad(explode('.', $token, 2), 2, '');
+    if (!hash_equals(sign($payload), $signature)) {
+        return null;  // a forged token is rejected properly by current_user()
+    }
+    $claims = json_decode(b64url_decode($payload), true);
+    return is_array($claims) ? $claims : null;
 }
 
 function public_user(array $user): array
@@ -320,7 +370,9 @@ function route_me(array $d): void
 {
     // `features` tells the app which regulated services it may show; see
     // modules/compliance.php.
-    respond(['user' => public_user(current_user()), 'features' => enabled_capabilities()]);
+    $user = current_user();
+    respond(['user' => public_user($user), 'features' => enabled_capabilities(),
+        'impersonation' => impersonation_state()]);
 }
 
 function route_logout(array $d): void
@@ -778,6 +830,13 @@ $routes = [
     // Regulated-capability register (modules/compliance.php)
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
+    // Support impersonation (modules/impersonation.php) — read only
+    // Support desk (modules/support.php)
+    'GET /support/queue' => 'route_support_queue',
+    'GET /support/notifications' => 'route_support_notifications',
+    'GET /impersonate/candidates' => 'route_impersonate_candidates',
+    'POST /impersonate/start' => 'route_impersonate_start',
+    'POST /impersonate/stop' => 'route_impersonate_stop',
 ];
 // Routes with an id in the path. Exact routes above are matched first.
 $paramRoutes = [
@@ -793,6 +852,10 @@ $paramRoutes = [
     ['PATCH', '#^/agents/([\w-]{1,64})$#', 'route_agent_update'],
     ['DELETE', '#^/agents/([\w-]{1,64})$#', 'route_agent_delete'],
     ['GET', '#^/agents/([\w-]{1,64})/collections$#', 'route_collections_list'],
+    ['GET', '#^/support/ticket/([\w-]{1,64})$#', 'route_ticket_detail'],
+    ['POST', '#^/support/ticket/([\w-]{1,64})/reply$#', 'route_ticket_reply'],
+    ['POST', '#^/support/ticket/([\w-]{1,64})/assign$#', 'route_ticket_assign'],
+    ['POST', '#^/support/ticket/([\w-]{1,64})/status$#', 'route_ticket_status'],
 ];
 
 // cron.php includes this file to reuse insert_txn(), audit() and the constants.
@@ -818,6 +881,10 @@ if ($handler === null) {
 // Rate limiting runs before the handler, and before an unknown path is rejected,
 // so probing for routes costs an attacker the same budget as using them.
 guard_request($method, $route);
+
+// A support session may read but never write. Checked here so no handler can
+// forget it, and before routing so a blocked write cannot have a side effect.
+guard_impersonation($method, $route);
 
 // Features that need an authorisation this entity does not hold are refused
 // here, before the handler runs, so the gate cannot be missed by a code path.

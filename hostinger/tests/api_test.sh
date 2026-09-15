@@ -133,10 +133,73 @@ done
 ck "repeated logins hit a 429" "1" "$(print -r -- "$codes" | grep -q 429 && echo 1 || echo 0)"
 Q "DELETE FROM login_attempts" >/dev/null
 
+print "\n-- support impersonation (read only) --"
+call POST /impersonate/start "$RETAIL" '{"user_id":"retail-001","reason":"attempting to escalate"}'
+ck "member cannot impersonate" 403 "$CODE"
+call POST /impersonate/start "$OWNER" '{"user_id":"retail-001","reason":"x"}'
+ck "a reason is required" 422 "$CODE"
+call POST /impersonate/start "$OWNER" '{"user_id":"admin-001","reason":"privilege escalation attempt"}'
+ck "an administrator cannot be impersonated" 403 "$CODE"
+call POST /impersonate/start "$OWNER" '{"user_id":"retail-001","reason":"ticket 4412 missing transfer"}'
+ck "owner can open a support session" 200 "$CODE"
+IMP=$(print -r -- "$BODY" | jq_ 'print(d["token"])')
+call GET /accounts "$IMP";              ck "support session can read" 200 "$CODE"
+call GET /auth/me "$IMP"
+ck "the session is flagged as impersonation" "True" "$(print -r -- "$BODY" | jq_ 'print(d["impersonation"]["active"])')"
+BEFORE_IMP=$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")
+call POST /accounts/transfer "$IMP" "{\"from_account_number\":\"$RETAIL_ACC\",\"to_account_number\":\"$CORP_ACC\",\"beneficiary_name\":\"T\",\"amount\":100,\"transfer_type\":\"IMPS\",\"transaction_password\":\"Txn@1234\"}"
+ck "support session cannot move money" 403 "$CODE"
+call POST /deposits/book "$IMP" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":1000,\"tenure_months\":12}"
+ck "support session cannot book a deposit" 403 "$CODE"
+call POST /totp/setup "$IMP" '{"password":"Banking@123"}'
+ck "support session cannot touch credentials" 403 "$CODE"
+ck "nothing moved while impersonating" "$BEFORE_IMP" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "blocked writes are logged" "1" "$([[ $(Q "SELECT COUNT(*) FROM security_events WHERE event_type='IMPERSONATION_WRITE_BLOCKED'") -ge 3 ]] && echo 1 || echo 0)"
+call POST /impersonate/stop "$IMP" '{}'
+ck "owner returns to their own identity" 200 "$CODE"
+ck "both sides are audited" "2" "$(Q "SELECT COUNT(*) FROM audit_logs WHERE action IN ('IMPERSONATION_STARTED','ACCOUNT_VIEWED_BY_SUPPORT')")"
+
+print "\n-- support desk --"
+Q "DELETE FROM ticket_messages; DELETE FROM support_tickets WHERE subject LIKE 'APITEST%';" >/dev/null
+call POST /support/complaint "$RETAIL" '{"category":"transfer","subject":"APITEST possible fraud on my account","description":"I did not make the transfer shown yesterday."}'
+ck "member can raise a ticket" 200 "$CODE"
+TID=$(print -r -- "$BODY" | jq_ 'print(d["ticket_id"])')
+ck "fraud wording raises the priority" "HIGH" "$(print -r -- "$BODY" | jq_ 'print(d["priority"])')"
+ck "an SLA deadline is set" "1" "$(Q "SELECT due_at IS NOT NULL FROM support_tickets WHERE ticket_id='$TID'")"
+ck "the member's words open the thread" "1" "$(Q "SELECT COUNT(*) FROM ticket_messages m JOIN support_tickets t ON t.id=m.ticket_id WHERE t.ticket_id='$TID'")"
+call GET /support/queue "$RETAIL"; ck "member cannot open the staff queue" 403 "$CODE"
+call GET /support/queue "$STAFF";  ck "staff can open the queue" 200 "$CODE"
+call POST "/support/ticket/$TID/assign" "$STAFF" '{}'; ck "staff claims the ticket" 200 "$CODE"
+ck "claiming moves it to IN_PROGRESS" "IN_PROGRESS" "$(Q "SELECT status FROM support_tickets WHERE ticket_id='$TID'")"
+call POST "/support/ticket/$TID/reply" "$STAFF" '{"body":"INTERNALSECRET ledger checked, genuine card test","internal":true}'
+ck "staff can add an internal note" 200 "$CODE"
+call POST "/support/ticket/$TID/reply" "$STAFF" '{"body":"Thanks for reporting. We are reviewing the transfer."}'
+ck "staff can reply to the member" 200 "$CODE"
+# Assert the unread flag BEFORE the member opens the thread, since reading clears it.
+ck "a staff reply marks it unread for the member" "1" "$(Q "SELECT unread_for_member>0 FROM support_tickets WHERE ticket_id='$TID'")"
+ck "first response time is recorded" "1" "$(Q "SELECT first_response_at IS NOT NULL FROM support_tickets WHERE ticket_id='$TID'")"
+call GET "/support/ticket/$TID" "$RETAIL"
+hasnt "the member never sees an internal note" "$BODY" "INTERNALSECRET"
+ck "reading the thread clears the member's unread flag" "0" "$(Q "SELECT unread_for_member FROM support_tickets WHERE ticket_id='$TID'")"
+call GET "/support/ticket/$TID" "$STAFF"
+has "staff do see the internal note" "$BODY" "INTERNALSECRET"
+call POST "/support/ticket/$TID/reply" "$RETAIL" '{"body":"Thank you, I will wait.","internal":true}'
+ck "a member cannot post an internal note" "0" "$(Q "SELECT COUNT(*) FROM ticket_messages WHERE author_role='member' AND internal=1")"
+ck "a member reply reopens the ticket" "IN_PROGRESS" "$(Q "SELECT status FROM support_tickets WHERE ticket_id='$TID'")"
+call POST "/support/ticket/$TID/status" "$STAFF" '{"status":"RESOLVED"}'
+ck "cannot resolve without recording how" 422 "$CODE"
+call POST "/support/ticket/$TID/status" "$STAFF" '{"status":"RESOLVED","resolution_note":"Confirmed as the members own card verification charge."}'
+ck "resolves with a note" 200 "$CODE"
+ck "resolution time recorded" "1" "$(Q "SELECT resolved_at IS NOT NULL FROM support_tickets WHERE ticket_id='$TID'")"
+Q "DELETE FROM ticket_messages; DELETE FROM support_tickets WHERE subject LIKE 'APITEST%';" >/dev/null
+
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
    DELETE FROM fraud_alerts; DELETE FROM security_events; DELETE FROM login_attempts;
-   DELETE FROM audit_logs WHERE action LIKE 'MFA%' OR action LIKE 'FRAUD%' OR action='FUND_TRANSFER';" >/dev/null
+   DELETE FROM ticket_messages; DELETE FROM support_tickets WHERE subject LIKE 'APITEST%';
+   DELETE FROM audit_logs WHERE action LIKE 'MFA%' OR action LIKE 'FRAUD%' OR action='FUND_TRANSFER'
+     OR action LIKE 'IMPERSONATION%' OR action='ACCOUNT_VIEWED_BY_SUPPORT' OR action LIKE 'TICKET%'
+     OR action='SUPPORT_TICKET';" >/dev/null
 reset_balances
 print "\n== $pass passed, $fail failed =="
 [[ $fail -eq 0 ]] || exit 1

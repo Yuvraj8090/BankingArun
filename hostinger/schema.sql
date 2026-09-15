@@ -297,10 +297,34 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
     priority VARCHAR(10) NOT NULL DEFAULT 'MEDIUM',
     assigned_to VARCHAR(100),
+    -- Support desk workflow (modules/support.php)
+    assigned_user_id VARCHAR(36),
+    due_at DATETIME,                       -- SLA deadline, set from priority
+    first_response_at DATETIME,
+    resolved_at DATETIME,
+    last_message_at DATETIME,
+    unread_for_member INT NOT NULL DEFAULT 0,
+    unread_for_staff INT NOT NULL DEFAULT 1,
+    resolution_note VARCHAR(500),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
     INDEX idx_status (status),
     FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One turn in a support conversation. `author_role` is 'member' or 'staff';
+-- an internal note is visible to staff only and never returned to the member.
+CREATE TABLE IF NOT EXISTS ticket_messages (
+    id VARCHAR(36) PRIMARY KEY,
+    ticket_id VARCHAR(36) NOT NULL,
+    author_user_id VARCHAR(36),
+    author_name VARCHAR(150),
+    author_role VARCHAR(10) NOT NULL,      -- member | staff
+    body TEXT NOT NULL,
+    internal TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ticket_time (ticket_id, created_at),
+    FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS referrals (

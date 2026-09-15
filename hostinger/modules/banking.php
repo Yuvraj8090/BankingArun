@@ -267,14 +267,23 @@ function route_complaint(array $d): void
     }
     $subject = clip($d['subject'], 200);
     $ticketId = 'TKT-SR-' . gmdate('Ymd') . '-' . random_int(1000, 9999);
+        $priority = str_contains(strtolower($subject), 'fraud') ? 'HIGH' : 'MEDIUM';
+    $ticketRow = uuid4();
     $pdo->prepare('INSERT INTO support_tickets (id, ticket_id, user_id, user_email, user_name, category, account_number,
-            subject, description, status, priority, assigned_to)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([uuid4(), $ticketId, $user['id'], $user['email'], $user['name'], clip($d['category'], 50),
-            $accountNumber, $subject, clip($d['description'], 2000), 'OPEN',
-            str_contains(strtolower($subject), 'fraud') ? 'HIGH' : 'MEDIUM', 'Grievance Redressal Desk']);
+            subject, description, status, priority, assigned_to, due_at, last_message_at, unread_for_staff)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)')
+        ->execute([$ticketRow, $ticketId, $user['id'], $user['email'], $user['name'], clip($d['category'], 50),
+            $accountNumber, $subject, clip($d['description'], 2000), 'OPEN', $priority,
+            'Grievance Redressal Desk', sla_deadline($priority), now_utc()]);
+    // The member's own words open the thread, so the conversation reads in order.
+    $pdo->prepare('INSERT INTO ticket_messages (id, ticket_id, author_user_id, author_name, author_role, body)
+        VALUES (?, ?, ?, ?, ?, ?)')
+        ->execute([uuid4(), $ticketRow, $user['id'], $user['name'], 'member', clip($d['description'], 2000)]);
     audit($user, 'SUPPORT_TICKET', $ticketId);
-    respond(['status' => 'SUCCESS', 'ticket_id' => $ticketId, 'message' => "Service request logged under Ticket #$ticketId."]);
+    respond(['status' => 'SUCCESS', 'ticket_id' => $ticketId, 'priority' => $priority,
+        'due_at' => iso(sla_deadline($priority)), 'grievance_officer' => grievance_officer(),
+        'message' => "Service request logged under Ticket #$ticketId. We aim to respond within "
+            . (TICKET_SLA_HOURS[$priority] ?? 72) . ' hours.']);
 }
 
 function route_my_tickets(array $d): void

@@ -113,6 +113,33 @@ ALTER TABLE users
     ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT,
     ADD COLUMN IF NOT EXISTS totp_enrolled_at DATETIME;
 
+-- --- Support desk workflow -------------------------------------------------
+ALTER TABLE support_tickets
+    ADD COLUMN IF NOT EXISTS assigned_user_id VARCHAR(36),
+    ADD COLUMN IF NOT EXISTS due_at DATETIME,
+    ADD COLUMN IF NOT EXISTS first_response_at DATETIME,
+    ADD COLUMN IF NOT EXISTS resolved_at DATETIME,
+    ADD COLUMN IF NOT EXISTS last_message_at DATETIME,
+    ADD COLUMN IF NOT EXISTS unread_for_member INT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS unread_for_staff INT NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS resolution_note VARCHAR(500),
+    ADD INDEX IF NOT EXISTS idx_due (status, due_at);
+
+-- One turn in a support conversation. `author_role` is 'member' or 'staff';
+-- an internal note is visible to staff only and never returned to the member.
+CREATE TABLE IF NOT EXISTS ticket_messages (
+    id VARCHAR(36) PRIMARY KEY,
+    ticket_id VARCHAR(36) NOT NULL,
+    author_user_id VARCHAR(36),
+    author_name VARCHAR(150),
+    author_role VARCHAR(10) NOT NULL,      -- member | staff
+    body TEXT NOT NULL,
+    internal TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ticket_time (ticket_id, created_at),
+    FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- --- Deposit interest and maturity (cron.php) ------------------------------
 ALTER TABLE deposits
     ADD COLUMN IF NOT EXISTS interest_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00,

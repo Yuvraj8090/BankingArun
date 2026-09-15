@@ -1,0 +1,264 @@
+<?php
+// AJSPay: the support desk. A member raises a query, it lands in a staff queue
+// with a deadline, and the two sides hold a threaded conversation until it is
+// resolved.
+//
+// Two rules shape the code. A member may only ever see their own tickets, and
+// may never see an internal note — staff notes are stripped before anything is
+// returned to a member, rather than merely hidden in the UI. And the clock is
+// the regulator's, not ours: the Consumer Protection Act expects a named
+// grievance officer and a stated turnaround, so every ticket carries a deadline
+// from the moment it is raised.
+declare(strict_types=1);
+
+const SUPPORT_STAFF_ROLES = ['staff', 'admin', 'branch_manager', 'bank_owner'];
+const TICKET_STATUSES = ['OPEN', 'IN_PROGRESS', 'WAITING_MEMBER', 'RESOLVED', 'CLOSED'];
+const TICKET_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+// Hours allowed before a ticket of each priority breaches its deadline.
+const TICKET_SLA_HOURS = ['URGENT' => 4, 'HIGH' => 24, 'MEDIUM' => 72, 'LOW' => 120];
+
+// Published so members can escalate. Set these from System Config; the defaults
+// make it obvious they have not been.
+function grievance_officer(): array
+{
+    $config = system_config();
+    return [
+        'name' => $config['grievance_officer_name'] ?? 'Not yet appointed',
+        'email' => $config['grievance_officer_email'] ?? null,
+        'phone' => $config['grievance_officer_phone'] ?? null,
+        'escalation' => 'If your complaint is not resolved within 30 days you may approach the Registrar of '
+            . 'Companies, or the consumer forum with jurisdiction. As a Nidhi company this institution is not '
+            . 'covered by the RBI Integrated Ombudsman Scheme.',
+        'configured' => isset($config['grievance_officer_name']),
+    ];
+}
+
+function sla_deadline(string $priority): string
+{
+    $hours = TICKET_SLA_HOURS[$priority] ?? 72;
+    return (new DateTimeImmutable('now'))->modify("+$hours hours")->format('Y-m-d H:i:s');
+}
+
+function ticket_public(array $ticket, bool $forStaff): array
+{
+    $ticket = out($ticket);
+    foreach (['due_at', 'first_response_at', 'resolved_at', 'last_message_at'] as $field) {
+        $ticket[$field] = empty($ticket[$field]) ? null : iso((string)$ticket[$field]);
+    }
+    $ticket['unread'] = (int)($forStaff ? $ticket['unread_for_staff'] : $ticket['unread_for_member']);
+    $ticket['overdue'] = $ticket['due_at'] !== null
+        && !in_array($ticket['status'], ['RESOLVED', 'CLOSED'], true)
+        && $ticket['due_at'] < iso(now_utc());
+    if (!$forStaff) {
+        // Internal routing details are none of the member's business.
+        unset($ticket['assigned_user_id'], $ticket['unread_for_staff'], $ticket['unread_for_member']);
+    }
+    return $ticket;
+}
+
+// Finds a ticket the caller is entitled to see, or fails. Staff see any ticket;
+// a member sees only their own, whichever id they guess.
+function ticket_for(array $user, string $id, bool &$isStaff): array
+{
+    $isStaff = in_array($user['role'], SUPPORT_STAFF_ROLES, true);
+    $ticket = row('SELECT * FROM support_tickets WHERE id = ? OR ticket_id = ?', [$id, $id]);
+    if (!$ticket || (!$isStaff && $ticket['user_id'] !== $user['id'])) {
+        fail(404, 'Ticket not found.');   // same answer either way: no probing
+    }
+    return $ticket;
+}
+
+// --- Member view -----------------------------------------------------------------------
+function route_ticket_detail(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = current_user();
+    $isStaff = false;
+    $ticket = ticket_for($user, $id, $isStaff);
+
+    $sql = 'SELECT * FROM ticket_messages WHERE ticket_id = ?';
+    $params = [$ticket['id']];
+    if (!$isStaff) {
+        $sql .= ' AND internal = 0';      // stripped server-side, not hidden in the UI
+    }
+    $messages = rows("$sql ORDER BY created_at", $params);
+
+    // Opening the thread clears the unread flag for whoever is reading it.
+    $column = $isStaff ? 'unread_for_staff' : 'unread_for_member';
+    $pdo->prepare("UPDATE support_tickets SET $column = 0 WHERE id = ?")->execute([$ticket['id']]);
+
+    respond([
+        'ticket' => ticket_public($ticket, $isStaff),
+        'messages' => array_map(fn($m) => ['id' => $m['id'], 'author_name' => $m['author_name'],
+            'author_role' => $m['author_role'], 'body' => $m['body'],
+            'internal' => (bool)$m['internal'], 'created_at' => iso($m['created_at'])], $messages),
+        'grievance_officer' => grievance_officer(),
+        'can_reply' => !in_array($ticket['status'], ['CLOSED'], true),
+    ]);
+}
+
+function route_ticket_reply(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = current_user();
+    $isStaff = false;
+    $ticket = ticket_for($user, $id, $isStaff);
+    need($d, 'body');
+    $body = clip($d['body'], 4000);
+    if (mb_strlen($body) < 2) {
+        fail(422, 'Write a message before sending.');
+    }
+    if ($ticket['status'] === 'CLOSED') {
+        fail(400, 'This ticket is closed. Please raise a new one.');
+    }
+    // Only staff can leave an internal note, and only staff ever read one.
+    $internal = $isStaff && !empty($d['internal']);
+
+    $pdo->beginTransaction();
+    $pdo->prepare('INSERT INTO ticket_messages (id, ticket_id, author_user_id, author_name, author_role, body, internal)
+        VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([uuid4(), $ticket['id'], $user['id'], $user['name'], $isStaff ? 'staff' : 'member',
+            $body, (int)$internal]);
+
+    $now = now_utc();
+    if ($internal) {
+        $pdo->prepare('UPDATE support_tickets SET last_message_at = ? WHERE id = ?')->execute([$now, $ticket['id']]);
+    } elseif ($isStaff) {
+        // First staff reply stops the response clock.
+        $pdo->prepare("UPDATE support_tickets SET last_message_at = ?, unread_for_member = unread_for_member + 1,
+                first_response_at = COALESCE(first_response_at, ?),
+                status = CASE WHEN status = 'OPEN' THEN 'WAITING_MEMBER' ELSE status END
+            WHERE id = ?")->execute([$now, $now, $ticket['id']]);
+    } else {
+        // A member replying to a resolved ticket reopens it.
+        $pdo->prepare("UPDATE support_tickets SET last_message_at = ?, unread_for_staff = unread_for_staff + 1,
+                status = CASE WHEN status IN ('RESOLVED', 'WAITING_MEMBER') THEN 'IN_PROGRESS' ELSE status END
+            WHERE id = ?")->execute([$now, $ticket['id']]);
+    }
+    audit($user, 'TICKET_REPLY', $ticket['ticket_id'] . ($internal ? ' (internal note)' : ''));
+    $pdo->commit();
+    respond(['status' => 'SUCCESS',
+        'message' => $internal ? 'Internal note added. The member cannot see it.' : 'Reply sent.']);
+}
+
+// --- Staff desk ------------------------------------------------------------------------
+function route_support_queue(array $d): void
+{
+    $staff = staff_user(SUPPORT_STAFF_ROLES);
+    $sql = 'SELECT * FROM support_tickets WHERE 1 = 1';
+    $params = [];
+    if (!empty($_GET['status']) && in_array($_GET['status'], TICKET_STATUSES, true)) {
+        $sql .= ' AND status = ?';
+        $params[] = $_GET['status'];
+    }
+    if (!empty($_GET['priority']) && in_array($_GET['priority'], TICKET_PRIORITIES, true)) {
+        $sql .= ' AND priority = ?';
+        $params[] = $_GET['priority'];
+    }
+    if (!empty($_GET['mine'])) {
+        $sql .= ' AND assigned_user_id = ?';
+        $params[] = $staff['id'];
+    }
+    if (!empty($_GET['q'])) {
+        $sql .= ' AND (ticket_id LIKE ? OR subject LIKE ? OR user_email LIKE ?)';
+        $like = '%' . clip($_GET['q'], 60) . '%';
+        array_push($params, $like, $like, $like);
+    }
+    // Overdue first, then by priority, then oldest.
+    $sql .= " ORDER BY CASE WHEN status IN ('RESOLVED','CLOSED') THEN 1 ELSE 0 END,
+        FIELD(priority, 'URGENT', 'HIGH', 'MEDIUM', 'LOW'), due_at";
+    [$tickets, $meta] = paginate($sql, $params, 25, 100);
+    respond([
+        'tickets' => array_map(fn($t) => ticket_public($t, true), $tickets),
+        'pagination' => $meta,
+        'counts' => [
+            'open' => (int)scalar("SELECT COUNT(*) FROM support_tickets WHERE status = 'OPEN'"),
+            'in_progress' => (int)scalar("SELECT COUNT(*) FROM support_tickets WHERE status = 'IN_PROGRESS'"),
+            'waiting_member' => (int)scalar("SELECT COUNT(*) FROM support_tickets WHERE status = 'WAITING_MEMBER'"),
+            'overdue' => (int)scalar("SELECT COUNT(*) FROM support_tickets
+                WHERE status NOT IN ('RESOLVED','CLOSED') AND due_at IS NOT NULL AND due_at < ?", [now_utc()]),
+            'unread' => (int)scalar('SELECT COUNT(*) FROM support_tickets WHERE unread_for_staff > 0'),
+            'mine' => (int)scalar('SELECT COUNT(*) FROM support_tickets WHERE assigned_user_id = ?', [$staff['id']]),
+        ],
+        'statuses' => TICKET_STATUSES,
+        'priorities' => TICKET_PRIORITIES,
+        'sla_hours' => TICKET_SLA_HOURS,
+    ]);
+}
+
+function route_ticket_assign(array $d, string $id = ''): void
+{
+    global $pdo;
+    $staff = staff_user(SUPPORT_STAFF_ROLES);
+    $ticket = row('SELECT * FROM support_tickets WHERE id = ? OR ticket_id = ?', [$id, $id]);
+    if (!$ticket) {
+        fail(404, 'Ticket not found.');
+    }
+    // Default to claiming it yourself; a manager may hand it to someone else.
+    $assignee = $staff;
+    if (!empty($d['assignee_id']) && $d['assignee_id'] !== $staff['id']) {
+        $assignee = row('SELECT * FROM users WHERE id = ?', [clip($d['assignee_id'], 36)]);
+        if (!$assignee || !in_array($assignee['role'], SUPPORT_STAFF_ROLES, true)) {
+            fail(422, 'Tickets can only be assigned to support staff.');
+        }
+    }
+    $pdo->prepare("UPDATE support_tickets SET assigned_user_id = ?, assigned_to = ?,
+            status = CASE WHEN status = 'OPEN' THEN 'IN_PROGRESS' ELSE status END WHERE id = ?")
+        ->execute([$assignee['id'], $assignee['name'], $ticket['id']]);
+    audit($staff, 'TICKET_ASSIGNED', "{$ticket['ticket_id']} to {$assignee['email']}");
+    respond(['status' => 'SUCCESS', 'message' => "{$ticket['ticket_id']} assigned to {$assignee['name']}."]);
+}
+
+function route_ticket_status(array $d, string $id = ''): void
+{
+    global $pdo;
+    $staff = staff_user(SUPPORT_STAFF_ROLES);
+    need($d, 'status');
+    $status = strtoupper(clip($d['status'], 20));
+    if (!in_array($status, TICKET_STATUSES, true)) {
+        fail(422, 'status must be one of: ' . implode(', ', TICKET_STATUSES));
+    }
+    $ticket = row('SELECT * FROM support_tickets WHERE id = ? OR ticket_id = ?', [$id, $id]);
+    if (!$ticket) {
+        fail(404, 'Ticket not found.');
+    }
+    $note = clip($d['resolution_note'] ?? '', 500);
+    if (in_array($status, ['RESOLVED', 'CLOSED'], true) && $note === '') {
+        fail(422, 'Record how this was resolved before closing it.');
+    }
+    $priority = strtoupper(clip($d['priority'] ?? '', 10));
+    $newDue = null;
+    if ($priority !== '' && in_array($priority, TICKET_PRIORITIES, true) && $priority !== $ticket['priority']) {
+        $newDue = sla_deadline($priority);   // re-prioritising resets the clock
+    }
+    $pdo->prepare('UPDATE support_tickets SET status = ?, priority = COALESCE(NULLIF(?, \'\'), priority),
+            due_at = COALESCE(?, due_at), resolution_note = COALESCE(NULLIF(?, \'\'), resolution_note),
+            resolved_at = CASE WHEN ? IN (\'RESOLVED\', \'CLOSED\') THEN COALESCE(resolved_at, ?) ELSE NULL END,
+            unread_for_member = unread_for_member + 1
+        WHERE id = ?')
+        ->execute([$status, $priority, $newDue, $note, $status, now_utc(), $ticket['id']]);
+    audit($staff, 'TICKET_STATUS', "{$ticket['ticket_id']} -> $status");
+    respond(['status' => 'SUCCESS', 'message' => "{$ticket['ticket_id']} is now $status."]);
+}
+
+// Drives the bell in the header for whichever side is asking.
+function route_support_notifications(array $d): void
+{
+    $user = current_user();
+    if (in_array($user['role'], SUPPORT_STAFF_ROLES, true)) {
+        respond([
+            'unread_tickets' => (int)scalar('SELECT COUNT(*) FROM support_tickets WHERE unread_for_staff > 0'),
+            'assigned_to_me' => (int)scalar("SELECT COUNT(*) FROM support_tickets
+                WHERE assigned_user_id = ? AND status NOT IN ('RESOLVED','CLOSED')", [$user['id']]),
+            'overdue' => (int)scalar("SELECT COUNT(*) FROM support_tickets
+                WHERE status NOT IN ('RESOLVED','CLOSED') AND due_at IS NOT NULL AND due_at < ?", [now_utc()]),
+        ]);
+    }
+    respond([
+        'unread_tickets' => (int)scalar('SELECT COUNT(*) FROM support_tickets
+            WHERE user_id = ? AND unread_for_member > 0', [$user['id']]),
+        'open_tickets' => (int)scalar("SELECT COUNT(*) FROM support_tickets
+            WHERE user_id = ? AND status NOT IN ('RESOLVED','CLOSED')", [$user['id']]),
+        'grievance_officer' => grievance_officer(),
+    ]);
+}
