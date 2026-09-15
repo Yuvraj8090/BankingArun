@@ -2,7 +2,7 @@ import {
   LayoutDashboard, ArrowRightLeft, CreditCard, PiggyBank, Banknote,
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
   GanttChartSquare, Building2, Video, ShieldCheck, FileText, Gift, Repeat, Settings2,
-  Layers, ClipboardList, Contact2
+  Layers, ClipboardList, Contact2, BarChart3
 } from 'lucide-react';
 
 // Role → sidebar menu. The same list is the access rule for /app/* URLs:
@@ -37,6 +37,7 @@ export const NAV_BY_ROLE = {
   admin: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
     { id: 'collection', label: 'Collections', icon: Wallet, testId: 'tab-collection' },
@@ -49,6 +50,7 @@ export const NAV_BY_ROLE = {
   branch_manager: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
     { id: 'collection', label: 'Collections', icon: Wallet, testId: 'tab-collection' },
@@ -61,6 +63,7 @@ export const NAV_BY_ROLE = {
     { id: 'owner', label: 'Executive Dashboard', icon: Crown, testId: 'tab-owner' },
     { id: 'security-center', label: 'Security Centre', icon: ShieldCheck, testId: 'tab-security-center', highlight: true },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'fraud', label: 'Fraud & AML Review', icon: ShieldAlert, testId: 'tab-fraud' },
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
@@ -75,6 +78,7 @@ export const NAV_BY_ROLE = {
   staff: [
     { id: 'staff', label: 'Customer Console', icon: Users, testId: 'tab-staff' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'kyc', label: 'KYC Verification', icon: FileBadge2, testId: 'tab-kyc' },
     { id: 'transfer', label: 'Process Transfer', icon: ArrowRightLeft, testId: 'tab-transfer' },
@@ -86,6 +90,7 @@ export const NAV_BY_ROLE = {
   ],
   loan_officer: [
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'loans', label: 'EMI Calculator', icon: Banknote, testId: 'tab-loans' },
     { id: 'kyc', label: 'Applicant KYC', icon: FileBadge2, testId: 'tab-kyc' }
   ]
