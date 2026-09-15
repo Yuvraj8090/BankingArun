@@ -122,7 +122,6 @@ const ROUTE_CAPABILITIES = [
     'GET /cards' => 'debit_cards',
     'POST /cards/manage' => 'debit_cards',
     'POST /cards/request-physical' => 'debit_cards',
-    'POST /cards/reveal-cvv' => 'debit_cards',
     'GET /upi/status' => 'upi',
     'POST /upi/link-card' => 'upi',
     'GET /upi/qr' => 'upi',

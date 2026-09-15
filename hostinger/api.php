@@ -17,6 +17,7 @@ require __DIR__ . '/modules/mfa.php';
 require __DIR__ . '/modules/impersonation.php';
 require __DIR__ . '/modules/support.php';
 require __DIR__ . '/modules/register.php';
+require __DIR__ . '/modules/privacy.php';
 require __DIR__ . '/modules/tutorial.php';
 require __DIR__ . '/modules/crm.php';
 require __DIR__ . '/modules/reports.php';
@@ -169,11 +170,11 @@ function public_user(array $user): array
     return out($user);
 }
 
-// The PIN is never stored in the clear, and the CVV is only released through
-// /cards/reveal-cvv after a transaction-password check.
+// The PIN is never stored in the clear. There is no CVV to hide: PCI DSS
+// forbids keeping it after authorisation, so it is never written down.
 function public_card(array $card): array
 {
-    unset($card['pin_hash'], $card['cvv']);
+    unset($card['pin_hash']);
     return out($card);
 }
 
@@ -237,12 +238,12 @@ function insert_card(string $userId, string $accountNumber, string $holder, arra
     global $pdo;
     $id = uuid4();
     $pdo->prepare('INSERT INTO cards (id, user_id, account_number, card_number, card_holder, card_type, network,
-            expiry_date, cvv, pin_hash, status, is_virtual, issued_by, online_limit, atm_limit, international_enabled)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            expiry_date, pin_hash, status, is_virtual, issued_by, online_limit, atm_limit, international_enabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([
             $id, $userId, $accountNumber, $spec['bin'] . ' ' . digits(4) . ' ' . digits(4) . ' ' . digits(4),
             mb_strtoupper($holder), $spec['type'], $spec['network'], gmdate('m/y', strtotime('+5 years')),
-            (string)random_int(100, 999), password_hash(digits(4), PASSWORD_BCRYPT), $spec['status'],
+            password_hash(digits(4), PASSWORD_BCRYPT), $spec['status'],
             (int)$spec['virtual'], 'AJSPay (Issuer Only)', $spec['online_limit'], $spec['atm_limit'],
             (int)$spec['international'],
         ]);
@@ -610,18 +611,9 @@ function route_cards(array $d): void
         rows('SELECT * FROM cards WHERE user_id = ? ORDER BY created_at, id', [$user['id']]))]);
 }
 
-function route_reveal_cvv(array $d): void
-{
-    $user = current_user();
-    need($d, 'card_id', 'transaction_password');
-    $card = row('SELECT id, cvv, card_number FROM cards WHERE id = ? AND user_id = ?', [clip($d['card_id'], 36), $user['id']]);
-    if (!$card) {
-        fail(404, 'Debit card not found.');
-    }
-    check_txn_password($user, $d['transaction_password'], 'Invalid Transaction Password.');
-    audit($user, 'CARD_CVV_REVEALED', 'Card ending ' . substr($card['card_number'], -4));
-    respond(['card_id' => $card['id'], 'cvv' => $card['cvv']]);
-}
+// route_reveal_cvv is deliberately gone. A CVV may not be stored after
+// authorisation (PCI DSS), so there is nothing to reveal; a real card programme
+// shows it once at issuance and never again.
 
 function route_manage_card(array $d): void
 {
@@ -772,7 +764,6 @@ $routes = [
     'GET /cards' => 'route_cards',
     'POST /cards/manage' => 'route_manage_card',
     'POST /cards/request-physical' => 'route_request_physical_card',
-    'POST /cards/reveal-cvv' => 'route_reveal_cvv',
     'GET /upi/status' => 'route_upi_status',
     'POST /upi/link-card' => 'route_upi_link_card',
     'GET /upi/qr' => 'route_upi_qr',
@@ -842,6 +833,15 @@ $routes = [
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only
+    // Data protection, DPDP Act 2023 (modules/privacy.php)
+    'GET /privacy/notice' => 'route_privacy_notice',
+    'GET /privacy/consent' => 'route_privacy_consent_get',
+    'POST /privacy/consent' => 'route_privacy_consent_set',
+    'GET /privacy/my-data' => 'route_privacy_my_data',
+    'POST /privacy/request' => 'route_privacy_request',
+    'GET /privacy/my-requests' => 'route_privacy_my_requests',
+    'GET /privacy/queue' => 'route_privacy_queue',
+    'POST /privacy/respond' => 'route_privacy_respond',
     // Member register and AML screening (modules/register.php)
     'GET /register/members' => 'route_register_list',
     'POST /register/admit' => 'route_register_admit',

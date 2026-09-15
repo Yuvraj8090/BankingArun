@@ -29,7 +29,6 @@ const RATE_ROUTES = [
     'POST /auth/verify-transaction-pin' => [25, 900],
     'POST /accounts/transfer' => [60, 300],
     'POST /accounts/bulk-transfer' => [10, 300],
-    'POST /cards/reveal-cvv' => [10, 900],
     'POST /passkey/login/complete' => [30, 900],
     'POST /support/chat' => [60, 300],
 ];

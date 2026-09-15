@@ -281,6 +281,50 @@ CREATE TABLE IF NOT EXISTS screening_hits (
     INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------------
+-- Digital Personal Data Protection Act, 2023
+-- ---------------------------------------------------------------------------
+-- Section 5 requires an itemised notice and consent for each purpose, and
+-- section 6(6) requires withdrawal to be as easy as giving it. One row per
+-- purpose per person, superseded rather than overwritten, so the history of
+-- what somebody agreed to and when is intact.
+CREATE TABLE IF NOT EXISTS consents (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    purpose VARCHAR(40) NOT NULL,
+    notice_version VARCHAR(10) NOT NULL,
+    granted TINYINT(1) NOT NULL,
+    ip VARCHAR(45),
+    recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_purpose (user_id, purpose, recorded_at),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sections 11-13: the rights to access, correct and erase, and to be told what
+-- happened to the request.
+CREATE TABLE IF NOT EXISTS data_requests (
+    id VARCHAR(36) PRIMARY KEY,
+    reference VARCHAR(20) NOT NULL UNIQUE,
+    user_id VARCHAR(36) NOT NULL,
+    kind VARCHAR(12) NOT NULL,                 -- access | correction | erasure
+    detail VARCHAR(1000),
+    status VARCHAR(12) NOT NULL DEFAULT 'open',  -- open | actioned | refused
+    response VARCHAR(1000),
+    due_by DATE NOT NULL,
+    handled_by VARCHAR(36),
+    handled_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status_due (status, due_by),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- PCI DSS: stop storing the card verification value ----------------------
+-- PCI DSS forbids retaining sensitive authentication data after authorisation,
+-- and the CVV is exactly that. It was kept so a virtual-card screen could show
+-- it; that feature is gone and so is the column. Dropping it destroys the
+-- stored values, which is the point.
+ALTER TABLE cards DROP COLUMN IF EXISTS cvv;
+
 -- --- Support desk workflow -------------------------------------------------
 ALTER TABLE support_tickets
     ADD COLUMN IF NOT EXISTS assigned_user_id VARCHAR(36),

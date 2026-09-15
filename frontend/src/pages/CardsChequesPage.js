@@ -44,9 +44,6 @@ const StatusPill = ({ status }) => {
 export default function CardsChequesPage() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [revealed, setRevealed] = useState({});      // card id -> CVV, fetched on demand
-  const [cvvPromptFor, setCvvPromptFor] = useState(null);
-  const [cvvPassword, setCvvPassword] = useState('');
   const [selected, setSelected] = useState(null);
   const [showPinModal, setShowPinModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -110,17 +107,6 @@ export default function CardsChequesPage() {
     } catch (e) { toast.error(e.response?.data?.detail || 'Link failed'); }
   };
 
-  // CVVs aren't sent with the card list: revealing one needs the transaction
-  // password, is recorded in the audit log, and hides itself again after 30s.
-  const revealCvv = async (cardId) => {
-    try {
-      const r = await api.revealCvv(cardId, cvvPassword);
-      setRevealed(prev => ({ ...prev, [cardId]: r.cvv }));
-      setCvvPromptFor(null);
-      setCvvPassword('');
-      setTimeout(() => setRevealed(prev => ({ ...prev, [cardId]: null })), 30000);
-    } catch (e) { toast.error(e.response?.data?.detail || 'Could not reveal CVV'); }
-  };
 
   if (loading) return (
     <div className="p-10 flex items-center justify-center min-h-[400px]">
@@ -188,7 +174,6 @@ export default function CardsChequesPage() {
               const isFrozen = card.status === 'frozen';
               const isHotlisted = card.status === 'hotlisted';
               const isQueued = card.status === 'dispatch_queued';
-              const showCvv = revealed[card.id];
               const gradient = card.network === 'Visa'
                 ? 'from-[#0b3b8c] via-[#1a4dae] to-[#2564cf]'
                 : card.network === 'RuPay'
@@ -238,48 +223,9 @@ export default function CardsChequesPage() {
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-900/70 uppercase">CVV</p>
-                      <div className="flex items-center gap-1 font-mono font-semibold">
-                        <span data-testid={`cvv-${card.id}`}>{showCvv || '•••'}</span>
-                        <button data-testid={`toggle-cvv-${card.id}`}
-                          onClick={() => showCvv
-                            ? setRevealed(p => ({ ...p, [card.id]: null }))
-                            : setCvvPromptFor(card.id)}
-                          className="text-slate-900/80 hover:text-slate-900">
-                          {showCvv ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        </button>
-                      </div>
-                      {cvvPromptFor === card.id && (
-                        <div className="absolute inset-x-4 bottom-4 z-10 bg-white text-slate-900 rounded-md p-3 shadow-xl">
-                          <p className="text-[10px] font-semibold">Enter your transaction password to reveal the CVV</p>
-                          <div className="flex gap-2 mt-2">
-                            <input
-                              type="password"
-                              autoFocus
-                              value={cvvPassword}
-                              onChange={(e) => setCvvPassword(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && revealCvv(card.id)}
-                              data-testid={`cvv-password-${card.id}`}
-                              placeholder="Transaction password"
-                              className="flex-1 border border-slate-300 rounded px-2 py-1 text-xs"
-                            />
-                            <button
-                              onClick={() => revealCvv(card.id)}
-                              data-testid={`cvv-confirm-${card.id}`}
-                              className="px-3 py-1 rounded bg-[#0b3b8c] text-white text-xs font-semibold"
-                            >
-                              Reveal
-                            </button>
-                            <button
-                              onClick={() => { setCvvPromptFor(null); setCvvPassword(''); }}
-                              className="px-2 py-1 rounded border border-slate-300 text-xs"
-                              aria-label="Cancel"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                          <p className="text-[9px] text-slate-500 mt-2">Hidden again after 30 seconds. Each reveal is logged.</p>
-                        </div>
-                      )}
+                      {/* Never stored, so never shown. PCI DSS forbids retaining the
+                          verification value after authorisation. */}
+                      <p className="font-mono font-semibold" title="Printed on your card; we do not keep it">•••</p>
                     </div>
                   </div>
 

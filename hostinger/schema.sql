@@ -91,7 +91,6 @@ CREATE TABLE IF NOT EXISTS cards (
     card_type VARCHAR(60) NOT NULL,
     network VARCHAR(20),
     expiry_date VARCHAR(5) NOT NULL,
-    cvv VARCHAR(4) NOT NULL,             -- released only via /cards/reveal-cvv (demo only; see INSTALL)
     pin_hash VARCHAR(255) NOT NULL,      -- bcrypt; the PIN itself is never stored or returned
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     is_virtual TINYINT(1) NOT NULL DEFAULT 1,
@@ -488,18 +487,13 @@ INSERT IGNORE INTO deposits (id, user_id, deposit_number, deposit_type, principa
 ('fd-retail-001', 'retail-001', 'FD88492019', 'fixed', 250000.00, 7.25, 24, 288625.00,
     DATE_ADD(UTC_DATE(), INTERVAL 730 DAY));
 
-INSERT IGNORE INTO cards (id, user_id, account_number, card_number, card_holder, card_type, network, expiry_date, cvv,
-    pin_hash, status, is_virtual, issued_by, online_limit, atm_limit, international_enabled, contactless_enabled,
-    ecom_enabled, upi_linked, created_at) VALUES
-('card-visa-001', 'retail-001', 'AJSP00984521098', '4532 9845 2109 8821', 'RAHUL SHARMA', 'Visa Platinum Debit', 'Visa',
-    '08/29', '418', '$2y$12$gzTa0eudv73cta0BIq4rpOGK2r2UVg7joErtmeBm28tyVXlHyw.eu', 'active', 1, 'AJSPay (Issuer Only)', 100000.00, 50000.00, 1, 1, 1, 0,
-    UTC_TIMESTAMP() - INTERVAL 30 DAY),
-('card-rupay-001', 'retail-001', 'AJSP00984521098', '5241 7373 2160 2721', 'RAHUL SHARMA',
-    'RuPay / Mastercard Global Debit', 'RuPay', '06/31', '902', '$2y$12$gzTa0eudv73cta0BIq4rpOGK2r2UVg7joErtmeBm28tyVXlHyw.eu', 'dispatch_queued', 0,
-    'AJSPay (Issuer Only)', 75000.00, 40000.00, 0, 1, 1, 0, UTC_TIMESTAMP() - INTERVAL 30 DAY + INTERVAL 1 SECOND),
-('card-rupay-002', 'retail-001', 'AJSP00984521098', '5241 9548 3082 4607', 'RAHUL SHARMA',
-    'RuPay / Mastercard Global Debit', 'Mastercard', '06/31', '561', '$2y$12$gzTa0eudv73cta0BIq4rpOGK2r2UVg7joErtmeBm28tyVXlHyw.eu', 'dispatch_queued', 0,
-    'AJSPay (Issuer Only)', 75000.00, 40000.00, 1, 1, 1, 0, UTC_TIMESTAMP() - INTERVAL 30 DAY + INTERVAL 2 SECOND);
+INSERT IGNORE INTO cards (id, user_id, account_number, card_number, card_holder, card_type, network, expiry_date, pin_hash, status, is_virtual, issued_by, online_limit, atm_limit, international_enabled, contactless_enabled, ecom_enabled, upi_linked, created_at) VALUES
+(Issuer Only),
+(),
+(Issuer Only),
+(),
+(Issuer Only),
+();
 
 INSERT IGNORE INTO transactions (id, user_id, account_number, type, mode, amount, balance_after, counterparty_name,
     counterparty_acc, ref_number, description, timestamp) VALUES
@@ -595,6 +589,43 @@ CREATE TABLE IF NOT EXISTS crm_tasks (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_assigned_due (assigned_to, status, due_on),
     INDEX idx_member (member_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Digital Personal Data Protection Act, 2023
+-- ---------------------------------------------------------------------------
+-- Section 5 requires an itemised notice and consent for each purpose, and
+-- section 6(6) requires withdrawal to be as easy as giving it. One row per
+-- purpose per person, superseded rather than overwritten, so the history of
+-- what somebody agreed to and when is intact.
+CREATE TABLE IF NOT EXISTS consents (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    purpose VARCHAR(40) NOT NULL,
+    notice_version VARCHAR(10) NOT NULL,
+    granted TINYINT(1) NOT NULL,
+    ip VARCHAR(45),
+    recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_purpose (user_id, purpose, recorded_at),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sections 11-13: the rights to access, correct and erase, and to be told what
+-- happened to the request.
+CREATE TABLE IF NOT EXISTS data_requests (
+    id VARCHAR(36) PRIMARY KEY,
+    reference VARCHAR(20) NOT NULL UNIQUE,
+    user_id VARCHAR(36) NOT NULL,
+    kind VARCHAR(12) NOT NULL,                 -- access | correction | erasure
+    detail VARCHAR(1000),
+    status VARCHAR(12) NOT NULL DEFAULT 'open',  -- open | actioned | refused
+    response VARCHAR(1000),
+    due_by DATE NOT NULL,
+    handled_by VARCHAR(36),
+    handled_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status_due (status, due_by),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
