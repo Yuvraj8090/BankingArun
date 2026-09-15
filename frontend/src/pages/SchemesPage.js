@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
 const BLANK = {
-  code: '', name: '', scheme_type: 'recurring', tenure_months: 12, contribution_amount: '',
+  code: '', name: '', scheme_type: 'recurring', tenure_months: 12, contribution_months: '',
+  contribution_amount: '',
   principal_amount: '', total_deposit: '', maturity_amount: '', payout_type: 'maturity',
   status: 'draft', notes: ''
 };
@@ -96,7 +97,11 @@ export default function SchemesPage() {
                 <td className="p-3 font-mono font-semibold text-slate-900">{s.code}</td>
                 <td className="p-3 text-slate-700">{s.name}</td>
                 <td className="p-3 text-slate-600">{TYPE_LABEL[s.scheme_type] || s.scheme_type}</td>
-                <td className="p-3 text-right text-slate-600">{s.tenure_months} mo</td>
+                <td className="p-3 text-right text-slate-600">
+                  {s.tenure_months} mo
+                  {s.contribution_months && s.contribution_months < s.tenure_months
+                    && <span className="block text-[9px] text-slate-400">pay in {s.contribution_months} mo</span>}
+                </td>
                 <td className="p-3 text-right text-slate-700">₹{Number(s.total_deposit).toLocaleString('en-IN')}</td>
                 <td className="p-3 text-right text-slate-700">₹{Number(s.maturity_amount).toLocaleString('en-IN')}</td>
                 <td className={`p-3 text-right font-semibold ${s.exceeds_cap ? 'text-[#c8102e]' : 'text-emerald-700'}`}>
@@ -139,6 +144,8 @@ export default function SchemesPage() {
             <Select label="Type" value={form.scheme_type} options={data.types.map(t => [t, TYPE_LABEL[t] || t])}
               onChange={v => setForm(f => ({ ...f, scheme_type: v }))} testId="scheme-type" />
             <Field label="Tenure (months)" type="number" value={form.tenure_months} onChange={v => setForm(f => ({ ...f, tenure_months: v }))} testId="scheme-tenure" />
+            <Field label="Pay-in months (blank = whole tenure)" type="number" value={form.contribution_months ?? ''}
+              onChange={v => setForm(f => ({ ...f, contribution_months: v }))} testId="scheme-payin" />
             <Field label="Per instalment (₹)" type="number" value={form.contribution_amount ?? ''} onChange={v => setForm(f => ({ ...f, contribution_amount: v }))} />
             <Field label="Lump sum principal (₹)" type="number" value={form.principal_amount ?? ''} onChange={v => setForm(f => ({ ...f, principal_amount: v }))} />
             <Field label="Total deposit (₹)" type="number" value={form.total_deposit} onChange={v => setForm(f => ({ ...f, total_deposit: v }))} testId="scheme-deposit" />
