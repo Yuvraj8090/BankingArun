@@ -108,25 +108,47 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
   };
 
   return (
-    <div className="min-h-[80vh] bg-slate-50 grid grid-cols-1 lg:grid-cols-5 gap-0">
-      {/* Left panel — brand + trust */}
-      <div className="lg:col-span-2 bg-[#0b3b8c] text-white p-8 lg:p-12 flex flex-col justify-between gap-10">
-        <Brand variant="stacked" height={80} onDark />
-        <div className="space-y-4">
-          <h2 className="text-2xl lg:text-3xl font-bold leading-tight">
-            Secure banking, <br/>reimagined for every Indian.
-          </h2>
-          <p className="text-sm text-slate-900/80">
-            Open a savings account in minutes, transfer via NEFT/RTGS/IMPS/UPI, manage cards, book FDs, apply for loans — all in one place.
-          </p>
-          <ul className="space-y-2 text-sm">
-            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-700" /> 256-bit SSL end-to-end</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-700" /> Passkey / biometric login</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-700" /> Video KYC — no branch visit</li>
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 grid grid-cols-1 lg:grid-cols-5">
+      {/* Left panel — brand and what this institution actually is. The content is
+          centred rather than stretched, so the panel does not open with a void. */}
+      <div className="lg:col-span-2 bg-[#0b3b8c] text-white px-8 py-10 lg:px-12 lg:py-14 flex flex-col justify-center">
+        <div className="max-w-sm mx-auto w-full space-y-8">
+          <Brand variant="stacked" height={68} onDark />
+
+          <div className="space-y-3">
+            <h2 className="text-2xl lg:text-[27px] font-bold leading-[1.2]">
+              Your savings, looked after properly.
+            </h2>
+            <p className="text-sm text-blue-100 leading-relaxed">
+              Become a member in minutes. Move money between member accounts, open fixed and
+              recurring deposits, and apply for a loan — all in one place.
+            </p>
+          </div>
+
+          <ul className="space-y-2.5 text-sm text-blue-50">
+            <li className="flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
+              <span>Encrypted end to end, with a 30&#8209;minute session timeout</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
+              <span>Passkey, biometric or authenticator sign&#8209;in</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
+              <span>Video KYC — no branch visit needed</span>
+            </li>
           </ul>
-        </div>
-        <div className="text-[11px] text-slate-900/60">
-          © {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited · Toll-free 1800-123-4567
+
+          <div className="pt-6 border-t border-white/15 space-y-1.5">
+            <p className="text-[11px] text-blue-100/90 leading-relaxed">
+              A Nidhi company under the Companies Act, 2013. Not a bank, not RBI&#8209;licensed,
+              and deposits are not insured by DICGC.
+            </p>
+            <p className="text-[11px] text-blue-100/70">
+              © {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited · 1800&#8209;123&#8209;4567
+            </p>
+          </div>
         </div>
       </div>
 
@@ -180,9 +202,6 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                 <Fingerprint className="w-4 h-4 text-[#0b3b8c]" /> Sign in with Passkey / Biometric
               </button>
 
-              <p className="text-[11px] text-slate-500 text-center pt-2">
-                Demo — Retail: <b>rahul.sharma@example.com</b> / <b>Banking@123</b>
-              </p>
             </form>
           ) : (
             <form onSubmit={doRegister} className="space-y-3">
