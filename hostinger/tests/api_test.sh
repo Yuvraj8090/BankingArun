@@ -272,6 +272,51 @@ call POST /tutorial/finish "$RETAIL" '{}'
 ck "finishing is recorded as completed" "completed" "$(Q "SELECT tutorial_status FROM users WHERE email='rahul.sharma@example.com'")"
 ck "skip and finish are audited distinctly" "2" "$(Q "SELECT COUNT(DISTINCT action) FROM audit_logs WHERE action IN ('TUTORIAL_SKIPPED','TUTORIAL_COMPLETED')")"
 
+print "\n-- member register (Nidhi Rules 11) --"
+Q "DELETE FROM screening_hits; DELETE FROM watchlist_entries; DELETE FROM share_allotments; DELETE FROM member_register;" >/dev/null
+call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
+ck "a non-member cannot deposit" 403 "$CODE"
+has "and is told why" "$BODY" "members only"
+call POST /register/admit "$RETAIL" '{"user_id":"retail-001","shares":10}'
+ck "a member cannot admit anyone" 403 "$CODE"
+call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":5}'
+ck "fewer than ten shares is refused" 422 "$CODE"
+call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":10,"occupation":"Salaried"}'
+ck "admitted with ten shares" 200 "$CODE"
+has "a folio number is issued" "$BODY" '"folio_no"'
+ck "the share ledger records it" "10" "$(Q "SELECT COALESCE(SUM(shares),0) FROM share_allotments WHERE kind='allotment'")"
+call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":10}'
+ck "the same person cannot be admitted twice" 400 "$CODE"
+call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
+ck "a member can deposit" 200 "$CODE"
+call POST /register/shares "$OWNER" '{"user_id":"retail-001","shares":5,"kind":"surrender"}'
+ck "cannot drop below ten while deposits are live" 400 "$CODE"
+call POST "/register/cease/retail-001" "$OWNER" '{"reason":"requested"}'
+ck "cannot cease while deposits are live" 400 "$CODE"
+call GET /register/members "$RETAIL"; ck "a member cannot read the register" 403 "$CODE"
+call GET /register/members "$OWNER";  ck "the owner can read the register" 200 "$CODE"
+
+print "\n-- sanctions and PEP screening --"
+call POST /screening/run "$OWNER" '{}'
+ck "screening refuses to run on an empty list" 400 "$CODE"
+call GET /screening/watchlist "$RETAIL"; ck "a member cannot see the watchlist" 403 "$CODE"
+call POST /screening/watchlist "$OWNER" '{"entries":[{"list_name":"UNSC","full_name":"Sharma Rahul","reference":"T1"},{"list_name":"PEP","full_name":"Someone Entirely Different","reference":"T2"}]}'
+ck "two names loaded" 200 "$CODE"
+call POST /screening/run "$OWNER" '{}'
+ck "screening ran" 200 "$CODE"
+ck "a reordered name is caught" "1" "$(Q "SELECT COUNT(*) FROM screening_hits WHERE status='open'")"
+ck "an unrelated name is not" "0" "$(Q "SELECT COUNT(*) FROM screening_hits WHERE matched_name LIKE 'Someone%'")"
+ck "an open match rates the member high" "high" "$(Q "SELECT risk_category FROM member_register WHERE user_id='retail-001'")"
+HIT=$(Q "SELECT id FROM screening_hits LIMIT 1")
+call POST /screening/action "$OWNER" "{\"hit_id\":\"$HIT\",\"action\":\"clear\",\"note\":\"ok\"}"
+ck "a review needs a real reason" 422 "$CODE"
+call POST /screening/action "$OWNER" "{\"hit_id\":\"$HIT\",\"action\":\"confirm\",\"note\":\"Passport and date of birth both match the listed individual.\"}"
+ck "a match can be confirmed" 200 "$CODE"
+call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":1000,\"tenure_months\":12}"
+ck "a confirmed match blocks transacting" 403 "$CODE"
+ck "and is logged as critical" "1" "$(Q "SELECT COUNT(*)>0 FROM security_events WHERE event_type='BLOCKED_SANCTIONED_MEMBER'")"
+Q "DELETE FROM screening_hits; DELETE FROM watchlist_entries; DELETE FROM share_allotments; DELETE FROM member_register;" >/dev/null
+
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
    DELETE FROM fraud_alerts; DELETE FROM security_events; DELETE FROM login_attempts;
@@ -281,7 +326,12 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
      OR action='SUPPORT_TICKET' OR action LIKE 'CRM%' OR action='REPORT_EXPORTED';
    DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;
    DELETE FROM audit_logs WHERE action LIKE 'TUTORIAL%';
-   UPDATE users SET tutorial_status='completed', tutorial_step=0;" >/dev/null
+   UPDATE users SET tutorial_status='completed', tutorial_step=0;
+   DELETE FROM deposits WHERE principal_amount IN (1000,5000);
+   DELETE FROM screening_hits; DELETE FROM watchlist_entries;
+   DELETE FROM share_allotments; DELETE FROM member_register;
+   DELETE FROM audit_logs WHERE action LIKE 'MEMBER_%' OR action LIKE 'SHARES_%'
+     OR action LIKE 'SCREENING_%' OR action LIKE 'WATCHLIST_%' OR action='DEPOSIT_BOOKED';" >/dev/null
 reset_balances
 print "\n== $pass passed, $fail failed =="
 [[ $fail -eq 0 ]] || exit 1

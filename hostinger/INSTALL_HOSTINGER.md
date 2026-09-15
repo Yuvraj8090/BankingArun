@@ -187,8 +187,11 @@ Sign in as the bank owner and open **System Config**. Enter your Twilio and Send
 
 - Standing instructions and scheduled transfers only run if you set up the cron job in step 7. Nothing recurring happens without it.
 - Cron pays interbank instructions by debiting the customer only. There is no real NEFT/RTGS connection, so an outgoing payment to another bank is recorded, not actually settled.
-- Deposits do not mature on their own: interest is shown from the booked rate, and nothing credits a deposit at the end of its term.
-- Card CVVs are stored so the virtual-card screen can show them. That's fine for a demo, but PCI DSS forbids storing CVVs in a real card system.
+- Deposit interest and maturity credits are implemented in `cron.php`. They require the cron job to run and a valid source account; monitor failures and reconcile the resulting ledger entries.
+- Card CVVs are still stored and can be revealed when the card capability is enabled. Do not use this implementation for real payment cards. PCI DSS prohibits merchants from storing CVVs after authorisation, even encrypted; issuer-specific exceptions do not establish this application's eligibility. See https://www.pcisecuritystandards.org/faqs/are-merchants-allowed-to-request-card-verification-codes-values-from-cardholders/.
+- The member-register report lists users, accounts and balances; it does not implement a share register or share-allotment records.
+- Sanctions/PEP screening and customer AML risk categorisation are not implemented. Loan risk scores are not a substitute.
+- Published demo credentials must be removed from a production deployment. The Security Centre checks six known demo login passwords; a passing result alone does not verify transaction passwords, other accounts or production readiness.
 - Video KYC face-match compares colour histograms. It is an image heuristic, not a biometric identity check, and should never be the only KYC control in production.
 - Bulk payouts only debit the corporate account, matching the original backend.
 - Logging out ends the session on every device.

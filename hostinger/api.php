@@ -16,6 +16,7 @@ require __DIR__ . '/modules/compliance.php';
 require __DIR__ . '/modules/mfa.php';
 require __DIR__ . '/modules/impersonation.php';
 require __DIR__ . '/modules/support.php';
+require __DIR__ . '/modules/register.php';
 require __DIR__ . '/modules/tutorial.php';
 require __DIR__ . '/modules/crm.php';
 require __DIR__ . '/modules/reports.php';
@@ -841,6 +842,16 @@ $routes = [
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only
+    // Member register and AML screening (modules/register.php)
+    'GET /register/members' => 'route_register_list',
+    'POST /register/admit' => 'route_register_admit',
+    'POST /register/shares' => 'route_register_shares',
+    'GET /screening/watchlist' => 'route_watchlist_list',
+    'POST /screening/watchlist' => 'route_watchlist_add',
+    'POST /screening/run' => 'route_screening_run',
+    'GET /screening/hits' => 'route_screening_hits',
+    'POST /screening/action' => 'route_screening_action',
+    'POST /screening/rerate' => 'route_risk_rerate',
     // First-run tour (modules/tutorial.php)
     'GET /tutorial/state' => 'route_tutorial_state',
     'POST /tutorial/progress' => 'route_tutorial_progress',
@@ -879,6 +890,8 @@ $paramRoutes = [
     ['POST', '#^/support/ticket/([\w-]{1,64})/reply$#', 'route_ticket_reply'],
     ['POST', '#^/support/ticket/([\w-]{1,64})/assign$#', 'route_ticket_assign'],
     ['POST', '#^/support/ticket/([\w-]{1,64})/status$#', 'route_ticket_status'],
+    ['GET', '#^/register/folio/([\w@.-]{1,80})$#', 'route_register_folio'],
+    ['POST', '#^/register/cease/([\w-]{1,64})$#', 'route_register_cease'],
     ['GET', '#^/crm/member/([\w@.-]{1,80})$#', 'route_crm_member'],
     ['PATCH', '#^/crm/leads/([\w-]{1,64})$#', 'route_crm_lead_update'],
     ['PATCH', '#^/crm/tasks/([\w-]{1,64})$#', 'route_crm_task_update'],

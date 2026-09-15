@@ -112,6 +112,33 @@ are deliberately not committed to the repository).
 - [ ] Excel export downloads and opens
 - [ ] Audit trail shows that export, naming who ran it and how many rows
 
+## 5b. Member register and screening (Branch manager / Director)
+
+The register is the reason a deposit can be refused. These checks prove it binds.
+
+- [ ] Member register lists both folios (AJS-000001, AJS-000002) with shares and paid-up value
+- [ ] The summary shows active members, total shares and paid-up capital
+- [ ] Admitting someone with **fewer than 10 shares is refused**, citing the Nidhi Rules
+- [ ] Admitting with 10 or more issues a folio number and a share certificate number
+- [ ] The same person cannot be admitted twice
+- [ ] A staff-level login **cannot** admit a member
+- [ ] A member **cannot** open the register at all
+- [ ] Allotting more shares updates the holding and appears in the share history
+- [ ] Surrendering shares below 10 is **refused** while that member holds active deposits
+- [ ] Ceasing a membership is **refused** while active deposits exist
+
+### Screening
+
+- [ ] Running screening with an empty watchlist is refused
+- [ ] Names can be loaded to the UNSC / MHA / PEP / INTERNAL lists
+- [ ] Add "Sharma Rahul" to UNSC and run screening — it **matches** Rahul Sharma (a reordered name)
+- [ ] An unrelated name does **not** match
+- [ ] An unresolved match rates that member **high** risk
+- [ ] Clearing or confirming a match without a real reason is refused
+- [ ] Confirming a match **blocks that member from depositing**
+- [ ] The block is recorded as a critical security event
+- [ ] A member cannot see the watchlist or the matches
+
 ### Support impersonation (Director only)
 
 - [ ] A member's account can be opened with a reason recorded
@@ -156,6 +183,9 @@ These are **not** bugs. A tester should not raise them:
   have not been entered.
 - Deposits show interest and maturity values; the nightly job credits them at 02:00 IST.
 - The database carries a small amount of seed data, so figures are illustrative.
+- Deposits now require membership. Both seeded account holders were admitted to the
+  register with 20 shares each, so they can deposit. A brand-new sign-up must be
+  admitted before it can place a deposit — that refusal is the rule working.
 
 ## How to report a problem
 

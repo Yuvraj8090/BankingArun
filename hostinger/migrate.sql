@@ -189,6 +189,98 @@ ALTER TABLE users
 UPDATE users SET tutorial_status = 'completed'
     WHERE tutorial_status = 'pending' AND created_at < UTC_TIMESTAMP();
 
+-- ---------------------------------------------------------------------------
+-- Statutory member register and AML screening
+-- ---------------------------------------------------------------------------
+-- Rule 11 of the Nidhi Rules, 2014: a Nidhi may only deal with its members, and
+-- every depositor must be allotted at least ten equity shares of ten rupees.
+-- This register is the evidence of that, and the reason deposits can be refused
+-- to a non-member.
+CREATE TABLE IF NOT EXISTS member_register (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL UNIQUE,
+    folio_no VARCHAR(20) NOT NULL UNIQUE,
+    admitted_on DATE NOT NULL,
+    shares_held INT NOT NULL DEFAULT 0,
+    share_face_value DECIMAL(10,2) NOT NULL DEFAULT 10.00,
+    certificate_no VARCHAR(30),
+    address VARCHAR(500),
+    occupation VARCHAR(100),
+    introduced_by VARCHAR(36),                 -- agent id, where there was one
+    status VARCHAR(12) NOT NULL DEFAULT 'active',   -- active | ceased
+    ceased_on DATE,
+    cessation_reason VARCHAR(255),
+    -- Customer due diligence, per the RBI Master Direction on KYC
+    risk_category VARCHAR(10) NOT NULL DEFAULT 'unrated',  -- low | medium | high | unrated
+    risk_reasons TEXT,
+    risk_reviewed_at DATETIME,
+    next_kyc_review DATE,
+    is_pep TINYINT(1) NOT NULL DEFAULT 0,
+    screening_status VARCHAR(20) NOT NULL DEFAULT 'not_screened',
+    screening_checked_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status (status),
+    INDEX idx_risk (risk_category),
+    INDEX idx_screening (screening_status),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Every movement of shares, so the holding in member_register can always be
+-- reconstructed from its history rather than trusted on its own.
+CREATE TABLE IF NOT EXISTS share_allotments (
+    id VARCHAR(36) PRIMARY KEY,
+    member_id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
+    kind VARCHAR(15) NOT NULL,                 -- allotment | transfer_in | transfer_out | surrender
+    shares INT NOT NULL,
+    face_value DECIMAL(10,2) NOT NULL DEFAULT 10.00,
+    amount DECIMAL(15,2) NOT NULL,
+    certificate_no VARCHAR(30),
+    allotted_on DATE NOT NULL,
+    reference VARCHAR(100),
+    recorded_by VARCHAR(36),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_member (member_id, allotted_on),
+    FOREIGN KEY (member_id) REFERENCES member_register(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Names to screen against. Held locally and loaded by the compliance officer,
+-- so no member name is ever sent to an outside service.
+CREATE TABLE IF NOT EXISTS watchlist_entries (
+    id VARCHAR(36) PRIMARY KEY,
+    list_name VARCHAR(20) NOT NULL,            -- UNSC | MHA | PEP | INTERNAL
+    full_name VARCHAR(200) NOT NULL,
+    normalised_name VARCHAR(200) NOT NULL,
+    aliases VARCHAR(500),
+    country VARCHAR(80),
+    category VARCHAR(80),
+    reference VARCHAR(100),
+    added_by VARCHAR(36),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_normalised (normalised_name),
+    INDEX idx_list (list_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- A possible match between somebody we deal with and a watchlist name. Always
+-- reviewed by a person: a name match is a reason to look, not a conclusion.
+CREATE TABLE IF NOT EXISTS screening_hits (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36),
+    lead_id VARCHAR(36),
+    screened_name VARCHAR(200) NOT NULL,
+    watchlist_id VARCHAR(36),
+    matched_name VARCHAR(200),
+    list_name VARCHAR(20),
+    score INT NOT NULL,
+    status VARCHAR(12) NOT NULL DEFAULT 'open',   -- open | cleared | confirmed
+    note VARCHAR(500),
+    reviewed_by VARCHAR(36),
+    reviewed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status_score (status, score),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- --- Support desk workflow -------------------------------------------------
 ALTER TABLE support_tickets
     ADD COLUMN IF NOT EXISTS assigned_user_id VARCHAR(36),

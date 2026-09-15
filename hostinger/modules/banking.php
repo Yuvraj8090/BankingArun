@@ -95,6 +95,10 @@ function route_book_deposit(array $d): void
     if ($amount <= 0) {
         fail(400, 'Deposit amount must be greater than ₹0.');
     }
+    // Nidhi Rules, 2014: deposits may be accepted from members only, and a
+    // member must hold at least ten equity shares. This is the check that makes
+    // the member register more than a list.
+    require_membership($user);
     $type = ($d['deposit_type'] ?? 'fixed') === 'recurring' ? 'recurring' : 'fixed';
     $tenure = (int)($d['tenure_months'] ?? 12);
     if ($tenure < 1 || $tenure > 120) {
