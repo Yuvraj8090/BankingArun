@@ -21,6 +21,13 @@ CREATE TABLE IF NOT EXISTS users (
     totp_enabled TINYINT(1) NOT NULL DEFAULT 0,
     totp_backup_codes TEXT,
     totp_enrolled_at DATETIME,
+    -- First-run tour (modules/tutorial.php). Progress lives on the server so a
+    -- member who gives up halfway resumes on their next device, not from the top.
+    tutorial_status VARCHAR(15) NOT NULL DEFAULT 'pending',  -- pending | in_progress | completed | skipped
+    tutorial_step INT NOT NULL DEFAULT 0,
+    tutorial_updated_at DATETIME,
+    first_login_at DATETIME,
+    last_security_review DATETIME,
     branch VARCHAR(100),
     pan_number VARCHAR(10),
     aadhaar_number VARCHAR(20),              -- masked (XXXX-XXXX-1234); the full number is never stored

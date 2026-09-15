@@ -16,6 +16,7 @@ require __DIR__ . '/modules/compliance.php';
 require __DIR__ . '/modules/mfa.php';
 require __DIR__ . '/modules/impersonation.php';
 require __DIR__ . '/modules/support.php';
+require __DIR__ . '/modules/tutorial.php';
 require __DIR__ . '/modules/crm.php';
 require __DIR__ . '/modules/reports.php';
 require __DIR__ . '/modules/ai.php';
@@ -839,6 +840,11 @@ $routes = [
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only
+    // First-run tour (modules/tutorial.php)
+    'GET /tutorial/state' => 'route_tutorial_state',
+    'POST /tutorial/progress' => 'route_tutorial_progress',
+    'POST /tutorial/finish' => 'route_tutorial_finish',
+    'POST /tutorial/restart' => 'route_tutorial_restart',
     // CRM (modules/crm.php) and reporting (modules/reports.php) — staff only
     'GET /crm/members' => 'route_crm_members',
     'POST /crm/interaction' => 'route_crm_log_interaction',

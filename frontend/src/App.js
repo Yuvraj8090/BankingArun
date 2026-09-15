@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   BrowserRouter, Routes, Route, Navigate, Outlet, Link,
   useLocation, useNavigate, useParams, useSearchParams
@@ -6,6 +6,7 @@ import {
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BankThemeProvider } from './context/BankThemeContext';
 import { canOpen, homeFor } from './navigation';
+import { api } from './services/api';
 import Brand from './components/Brand';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -38,6 +39,7 @@ import AgentsPage from './pages/AgentsPage';
 import FraudMonitorPage from './pages/FraudMonitorPage';
 import CrmPage from './pages/CrmPage';
 import ReportsPage from './pages/ReportsPage';
+import TutorialOverlay from './components/TutorialOverlay';
 import SecurityCenterPage from './pages/SecurityCenterPage';
 import HostingerDeployPage from './pages/HostingerDeployPage';
 import AuthPage from './pages/AuthPage';
@@ -114,6 +116,23 @@ function AppShell() {
   const { tab } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  // The first-run tour. Asked for once per session; the server decides whether
+  // this person has already been through it.
+  const [tour, setTour] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    api.tutorialState()
+      .then((state) => { if (!cancelled && state.should_show) setTour(state); })
+      .catch(() => {});  // the tour is never worth breaking the app over
+    const restart = async () => {
+      try { setTour(await api.tutorialRestart()); }
+      catch { /* ignore */ }
+    };
+    window.addEventListener('ajspay:restart-tour', restart);
+    return () => { cancelled = true; window.removeEventListener('ajspay:restart-tour', restart); };
+  }, [user]);
 
   if (loading) return <Loading />;
   // Remember the requested page in router state, never in the URL.
@@ -158,6 +177,7 @@ function AppShell() {
         <main className="flex-1 overflow-y-auto bg-slate-50">{pages[tab]}</main>
       </div>
       <ChatbotWidget />
+      {tour && <TutorialOverlay state={tour} onClose={() => setTour(null)} />}
       <Toaster position="top-right" richColors theme="light" />
     </div>
   );

@@ -168,6 +168,13 @@ export const api = {
     `${API}/security/events${severity ? `?severity=${severity}` : ''}`, getAuthHeaders())).data,
   securitySeal: async () => (await axios.post(`${API}/security/seal`, {}, getAuthHeaders())).data,
 
+  // First-run tour
+  tutorialState: async () => (await axios.get(`${API}/tutorial/state`, getAuthHeaders())).data,
+  tutorialProgress: async (step) => (await axios.post(`${API}/tutorial/progress`, { step }, getAuthHeaders())).data,
+  tutorialFinish: async (skipped, step) =>
+    (await axios.post(`${API}/tutorial/finish`, { skipped, step }, getAuthHeaders())).data,
+  tutorialRestart: async () => (await axios.post(`${API}/tutorial/restart`, {}, getAuthHeaders())).data,
+
   // CRM — staff only
   crmMembers: async (params = {}) =>
     (await axios.get(`${API}/crm/members?${new URLSearchParams(params)}`, getAuthHeaders())).data,

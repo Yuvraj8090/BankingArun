@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Search
-} from 'lucide-react';
+  Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Search, Compass} from 'lucide-react';
 import Brand from './Brand';
 import { ROLE_HOME } from '../navigation';
 
@@ -90,6 +89,17 @@ export default function Navbar({ onNavigate, activeTab }) {
                         className="w-full text-left px-3 py-2 rounded hover:bg-slate-50 text-slate-700 text-xs flex items-center gap-2"
                       >
                         <FileText className="w-3.5 h-3.5 text-[#0b3b8c]" /> Profile &amp; KYC
+                      </button>
+                      <button
+                        data-testid="profile-restart-tour-btn"
+                        onClick={() => {
+                          // AppShell owns the tour; tell it to start again.
+                          window.dispatchEvent(new CustomEvent('ajspay:restart-tour'));
+                          setShowMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded hover:bg-slate-50 text-slate-700 text-xs flex items-center gap-2"
+                      >
+                        <Compass className="w-3.5 h-3.5 text-[#0b3b8c]" /> Restart the tour
                       </button>
                     </div>
                     <div className="pt-1 border-t border-slate-100">

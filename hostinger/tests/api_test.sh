@@ -246,6 +246,32 @@ ck "XLSX export is a real workbook" "1" "$(file /tmp/ajspay_rep.xlsx | grep -qi 
 ck "every export is audited" "2" "$(( $(Q "SELECT COUNT(*) FROM audit_logs WHERE action='REPORT_EXPORTED'") - EXPORTS_BEFORE ))"
 rm -f /tmp/ajspay_rep.csv /tmp/ajspay_rep.xlsx
 
+print "\n-- first-run tour --"
+Q "UPDATE users SET tutorial_status='pending', tutorial_step=0 WHERE email='rahul.sharma@example.com'" >/dev/null
+call GET /tutorial/state ""; ck "anonymous cannot read tour state" 401 "$CODE"
+call GET /tutorial/state "$RETAIL"; ck "member gets a tour" 200 "$CODE"
+ck "it is offered on a first sign-in" "True" "$(print -r -- "$BODY" | jq_ 'print(d["should_show"])')"
+has "the welcome is worded for a member" "$BODY" "your member portal"
+hasnt "a gated feature is left out of the tour" "$BODY" "tab-cards"
+call GET /tutorial/state "$OWNER"
+has "the owner gets their own wording" "$BODY" "the management console"
+has "the owner tour covers the security centre" "$BODY" "tab-security-center"
+call POST /tutorial/progress "$RETAIL" '{"step":3}'
+ck "progress is saved" "in_progress|3" "$(Q "SELECT CONCAT_WS('|',tutorial_status,tutorial_step) FROM users WHERE email='rahul.sharma@example.com'")"
+call GET /tutorial/state "$RETAIL"
+ck "and resumed" "3" "$(print -r -- "$BODY" | jq_ 'print(d["step"])')"
+call POST /tutorial/progress "$RETAIL" '{"step":9999}'
+ck "an out-of-range step is clamped" "1" "$(Q "SELECT tutorial_step < 20 FROM users WHERE email='rahul.sharma@example.com'")"
+call POST /tutorial/finish "$RETAIL" '{"skipped":true,"step":2}'
+ck "skipping is recorded as skipped" "skipped" "$(Q "SELECT tutorial_status FROM users WHERE email='rahul.sharma@example.com'")"
+call GET /tutorial/state "$RETAIL"
+ck "a skipped tour is not shown again" "False" "$(print -r -- "$BODY" | jq_ 'print(d["should_show"])')"
+call POST /tutorial/restart "$RETAIL" '{}'
+ck "restart returns to the beginning" "in_progress|0" "$(Q "SELECT CONCAT_WS('|',tutorial_status,tutorial_step) FROM users WHERE email='rahul.sharma@example.com'")"
+call POST /tutorial/finish "$RETAIL" '{}'
+ck "finishing is recorded as completed" "completed" "$(Q "SELECT tutorial_status FROM users WHERE email='rahul.sharma@example.com'")"
+ck "skip and finish are audited distinctly" "2" "$(Q "SELECT COUNT(DISTINCT action) FROM audit_logs WHERE action IN ('TUTORIAL_SKIPPED','TUTORIAL_COMPLETED')")"
+
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
    DELETE FROM fraud_alerts; DELETE FROM security_events; DELETE FROM login_attempts;
@@ -253,7 +279,9 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
    DELETE FROM audit_logs WHERE action LIKE 'MFA%' OR action LIKE 'FRAUD%' OR action='FUND_TRANSFER'
      OR action LIKE 'IMPERSONATION%' OR action='ACCOUNT_VIEWED_BY_SUPPORT' OR action LIKE 'TICKET%'
      OR action='SUPPORT_TICKET' OR action LIKE 'CRM%' OR action='REPORT_EXPORTED';
-   DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;" >/dev/null
+   DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;
+   DELETE FROM audit_logs WHERE action LIKE 'TUTORIAL%';
+   UPDATE users SET tutorial_status='completed', tutorial_step=0;" >/dev/null
 reset_balances
 print "\n== $pass passed, $fail failed =="
 [[ $fail -eq 0 ]] || exit 1

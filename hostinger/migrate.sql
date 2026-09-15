@@ -176,6 +176,19 @@ CREATE TABLE IF NOT EXISTS crm_tasks (
     INDEX idx_member (member_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --- First-run tour ---------------------------------------------------------
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS tutorial_status VARCHAR(15) NOT NULL DEFAULT 'pending',
+    ADD COLUMN IF NOT EXISTS tutorial_step INT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS tutorial_updated_at DATETIME,
+    ADD COLUMN IF NOT EXISTS first_login_at DATETIME,
+    ADD COLUMN IF NOT EXISTS last_security_review DATETIME;
+
+-- Everyone who already has an account has found their way around, so do not
+-- ambush them with a first-run tour on their next sign-in.
+UPDATE users SET tutorial_status = 'completed'
+    WHERE tutorial_status = 'pending' AND created_at < UTC_TIMESTAMP();
+
 -- --- Support desk workflow -------------------------------------------------
 ALTER TABLE support_tickets
     ADD COLUMN IF NOT EXISTS assigned_user_id VARCHAR(36),
