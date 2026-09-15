@@ -193,13 +193,67 @@ ck "resolves with a note" 200 "$CODE"
 ck "resolution time recorded" "1" "$(Q "SELECT resolved_at IS NOT NULL FROM support_tickets WHERE ticket_id='$TID'")"
 Q "DELETE FROM ticket_messages; DELETE FROM support_tickets WHERE subject LIKE 'APITEST%';" >/dev/null
 
+print "\n-- CRM (staff only) --"
+Q "DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;" >/dev/null
+call GET /crm/members "$RETAIL";            ck "member blocked from the CRM" 403 "$CODE"
+call GET "/crm/member/retail-001" "$RETAIL"; ck "member blocked from member 360" 403 "$CODE"
+call GET "/crm/member/retail-001" "$STAFF";  ck "staff can open member 360" 200 "$CODE"
+hasnt "member 360 never exposes a password hash" "$BODY" "password_hash"
+call POST /crm/leads "$STAFF" '{"name":"APITEST Sunil Verma","phone":"+91 90111 22333","source":"walk_in"}'
+ck "lead created" 200 "$CODE"
+LID=$(print -r -- "$BODY" | jq_ 'print(d["id"])')
+call POST /crm/leads "$STAFF" '{"name":"APITEST Duplicate","phone":"+91 90111 22333"}'
+ck "duplicate lead phone refused" 400 "$CODE"
+call PATCH "/crm/leads/$LID" "$STAFF" '{"stage":"lost"}'
+ck "cannot mark a lead lost without a reason" 422 "$CODE"
+call PATCH "/crm/leads/$LID" "$STAFF" '{"stage":"enrolled"}'
+ck "cannot enrol without linking the member" 422 "$CODE"
+call PATCH "/crm/leads/$LID" "$STAFF" '{"stage":"enrolled","converted_user_id":"retail-001"}'
+ck "enrols when linked to a real member" 200 "$CODE"
+BEFORE_TASKS=$(Q "SELECT COUNT(*) FROM crm_tasks")
+call POST /crm/interaction "$STAFF" '{"member_user_id":"retail-001","channel":"call","subject":"APITEST FD renewal","outcome":"reached","follow_up_on":"2026-12-30"}'
+ck "interaction logged" 200 "$CODE"
+ck "a follow-up date creates a task" "1" "$(( $(Q "SELECT COUNT(*) FROM crm_tasks") - BEFORE_TASKS ))"
+call POST /crm/interaction "$STAFF" '{"channel":"call","subject":"orphan"}'
+ck "an interaction needs a member or a lead" 422 "$CODE"
+call GET /crm/tasks "$STAFF"
+TASKID=$(print -r -- "$BODY" | jq_ 'print(d["tasks"][0]["id"] if d["tasks"] else "")')
+call PATCH "/crm/tasks/$TASKID" "$STAFF" '{"status":"done"}'
+ck "cannot close a task silently" 422 "$CODE"
+call PATCH "/crm/tasks/$TASKID" "$STAFF" '{"status":"done","completion_note":"Member confirmed rollover"}'
+ck "task closes with a note" 200 "$CODE"
+Q "DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;" >/dev/null
+
+print "\n-- reporting --"
+call GET /reports "$RETAIL"; ck "member cannot list reports" 403 "$CODE"
+call GET /reports "$OWNER";  ck "owner can list reports" 200 "$CODE"
+call GET "/reports/member_register" "$STAFF"
+ck "the member register is restricted by role" 403 "$CODE"
+call GET "/reports/member_register" "$OWNER"
+ck "owner can run the member register" 200 "$CODE"
+has "totals cover the whole filtered set" "$BODY" '"totals"'
+call GET "/reports/nonsense" "$OWNER"; ck "unknown report 404" 404 "$CODE"
+call GET "/reports/audit_trail?sort=1;DROP%20TABLE%20users--" "$OWNER"
+ck "an injected sort falls back to the default" 200 "$CODE"
+ck "the users table survived" "1" "$(Q "SELECT COUNT(*)>0 FROM users")"
+call GET "/reports/member_register?q=%27%20OR%201%3D1--" "$OWNER"
+ck "an injected filter is bound, not interpolated" "0" "$(print -r -- "$BODY" | jq_ 'print(d["pagination"]["total"])')"
+EXPORTS_BEFORE=$(Q "SELECT COUNT(*) FROM audit_logs WHERE action='REPORT_EXPORTED'")
+curl -s -o /tmp/ajspay_rep.csv "$API/reports/member_register/export?format=csv" -H "Authorization: Bearer $OWNER"
+ck "CSV export is produced" "1" "$([[ -s /tmp/ajspay_rep.csv ]] && echo 1 || echo 0)"
+curl -s -o /tmp/ajspay_rep.xlsx "$API/reports/deposit_register/export?format=xlsx" -H "Authorization: Bearer $OWNER"
+ck "XLSX export is a real workbook" "1" "$(file /tmp/ajspay_rep.xlsx | grep -qi 'excel\|zip' && echo 1 || echo 0)"
+ck "every export is audited" "2" "$(( $(Q "SELECT COUNT(*) FROM audit_logs WHERE action='REPORT_EXPORTED'") - EXPORTS_BEFORE ))"
+rm -f /tmp/ajspay_rep.csv /tmp/ajspay_rep.xlsx
+
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
    DELETE FROM fraud_alerts; DELETE FROM security_events; DELETE FROM login_attempts;
    DELETE FROM ticket_messages; DELETE FROM support_tickets WHERE subject LIKE 'APITEST%';
    DELETE FROM audit_logs WHERE action LIKE 'MFA%' OR action LIKE 'FRAUD%' OR action='FUND_TRANSFER'
      OR action LIKE 'IMPERSONATION%' OR action='ACCOUNT_VIEWED_BY_SUPPORT' OR action LIKE 'TICKET%'
-     OR action='SUPPORT_TICKET';" >/dev/null
+     OR action='SUPPORT_TICKET' OR action LIKE 'CRM%' OR action='REPORT_EXPORTED';
+   DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;" >/dev/null
 reset_balances
 print "\n== $pass passed, $fail failed =="
 [[ $fail -eq 0 ]] || exit 1

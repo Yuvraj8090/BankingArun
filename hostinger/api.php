@@ -16,6 +16,8 @@ require __DIR__ . '/modules/compliance.php';
 require __DIR__ . '/modules/mfa.php';
 require __DIR__ . '/modules/impersonation.php';
 require __DIR__ . '/modules/support.php';
+require __DIR__ . '/modules/crm.php';
+require __DIR__ . '/modules/reports.php';
 require __DIR__ . '/modules/ai.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
@@ -831,6 +833,14 @@ $routes = [
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only
+    // CRM (modules/crm.php) and reporting (modules/reports.php) — staff only
+    'GET /crm/members' => 'route_crm_members',
+    'POST /crm/interaction' => 'route_crm_log_interaction',
+    'GET /crm/leads' => 'route_crm_leads',
+    'POST /crm/leads' => 'route_crm_lead_create',
+    'GET /crm/tasks' => 'route_crm_tasks',
+    'POST /crm/tasks' => 'route_crm_task_create',
+    'GET /reports' => 'route_reports_list',
     // Support desk (modules/support.php)
     'GET /support/queue' => 'route_support_queue',
     'GET /support/notifications' => 'route_support_notifications',
@@ -856,6 +866,11 @@ $paramRoutes = [
     ['POST', '#^/support/ticket/([\w-]{1,64})/reply$#', 'route_ticket_reply'],
     ['POST', '#^/support/ticket/([\w-]{1,64})/assign$#', 'route_ticket_assign'],
     ['POST', '#^/support/ticket/([\w-]{1,64})/status$#', 'route_ticket_status'],
+    ['GET', '#^/crm/member/([\w@.-]{1,80})$#', 'route_crm_member'],
+    ['PATCH', '#^/crm/leads/([\w-]{1,64})$#', 'route_crm_lead_update'],
+    ['PATCH', '#^/crm/tasks/([\w-]{1,64})$#', 'route_crm_task_update'],
+    ['GET', '#^/reports/([\w-]{1,40})/export$#', 'route_report_export'],
+    ['GET', '#^/reports/([\w-]{1,40})$#', 'route_report_run'],
 ];
 
 // cron.php includes this file to reuse insert_txn(), audit() and the constants.

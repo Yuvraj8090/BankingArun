@@ -113,6 +113,69 @@ ALTER TABLE users
     ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT,
     ADD COLUMN IF NOT EXISTS totp_enrolled_at DATETIME;
 
+-- ---------------------------------------------------------------------------
+-- CRM: what we know about a member beyond their balances
+-- ---------------------------------------------------------------------------
+-- Every call, visit or message logged against a member, so the next person to
+-- pick up the phone can see what was already said.
+CREATE TABLE IF NOT EXISTS crm_interactions (
+    id VARCHAR(36) PRIMARY KEY,
+    member_user_id VARCHAR(36),
+    lead_id VARCHAR(36),                    -- set instead when this is a prospect
+    channel VARCHAR(20) NOT NULL,           -- call | visit | email | sms | whatsapp | note
+    direction VARCHAR(10) NOT NULL DEFAULT 'outbound',
+    subject VARCHAR(200) NOT NULL,
+    notes TEXT,
+    outcome VARCHAR(30),                    -- reached | no_answer | callback | resolved | escalated
+    follow_up_on DATE,
+    recorded_by VARCHAR(36) NOT NULL,
+    recorded_by_name VARCHAR(150),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_member_time (member_user_id, created_at),
+    INDEX idx_lead_time (lead_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Someone who is not a member yet. A Nidhi may only deal with members, so this
+-- is the pipeline that ends at enrolment, not at a sale.
+CREATE TABLE IF NOT EXISTS crm_leads (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    email VARCHAR(150),
+    source VARCHAR(30),                     -- walk_in | referral | agent | campaign | phone
+    interest VARCHAR(30),                   -- savings | deposit | loan | other
+    stage VARCHAR(20) NOT NULL DEFAULT 'new',  -- new | contacted | documents | enrolled | lost
+    assigned_to VARCHAR(36),
+    agent_id VARCHAR(36),                   -- introducing agent, where there is one
+    converted_user_id VARCHAR(36),          -- set when they become a member
+    lost_reason VARCHAR(255),
+    notes VARCHAR(500),
+    created_by VARCHAR(36),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_stage (stage, created_at),
+    INDEX idx_assigned (assigned_to)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- A thing somebody has to do, about a member or a lead, by a date.
+CREATE TABLE IF NOT EXISTS crm_tasks (
+    id VARCHAR(36) PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    details VARCHAR(500),
+    member_user_id VARCHAR(36),
+    lead_id VARCHAR(36),
+    assigned_to VARCHAR(36) NOT NULL,
+    due_on DATE NOT NULL,
+    priority VARCHAR(10) NOT NULL DEFAULT 'MEDIUM',
+    status VARCHAR(15) NOT NULL DEFAULT 'open',   -- open | done | cancelled
+    completed_at DATETIME,
+    completion_note VARCHAR(500),
+    created_by VARCHAR(36),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_assigned_due (assigned_to, status, due_on),
+    INDEX idx_member (member_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- --- Support desk workflow -------------------------------------------------
 ALTER TABLE support_tickets
     ADD COLUMN IF NOT EXISTS assigned_user_id VARCHAR(36),
