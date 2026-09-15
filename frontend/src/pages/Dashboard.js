@@ -81,7 +81,7 @@ export default function Dashboard({ onNavigate }) {
       <div className="p-8 flex items-center justify-center min-h-[400px]">
         <div className="flex items-center gap-3 text-[#0b3b8c]">
           <RefreshCw className="w-6 h-6 animate-spin" />
-          <span>Loading secure NetBanking dashboard...</span>
+          <span>Loading your member portal…</span>
         </div>
       </div>
     );
@@ -97,11 +97,11 @@ export default function Dashboard({ onNavigate }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-2xl shadow-xl backdrop-blur-md">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            Welcome to NetBanking Overview
+            Your member portal
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Indian Core Banking Standard | Encrypted Multi-Tier Core Ledger
+            Member ledger · every entry double-recorded and auditable
           </p>
         </div>
 
@@ -306,7 +306,7 @@ export default function Dashboard({ onNavigate }) {
             </div>
           </div>}
 
-          {/* Core Banking Fast Actions */}
+          {/* Quick actions */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl space-y-2.5">
             <h3 className="font-bold text-slate-900 text-xs pb-2 border-b border-slate-200">Quick Indian Banking Services</h3>
             <button

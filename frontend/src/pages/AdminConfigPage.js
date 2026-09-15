@@ -11,7 +11,7 @@ export default function AdminConfigPage() {
 
   const load = async () => {
     try { const r = await api.adminConfigGet(); setCfg(r); setForm({ live_otp: r.live_otp, twilio_from_number: r.twilio_from_number, sendgrid_from_email: r.sendgrid_from_email, referral_reward_amount: r.referral_reward_amount, face_match_auto_threshold: r.face_match_auto_threshold }); }
-    catch { toast.error('Bank Owner access required'); }
+    catch { toast.error('Director access required'); }
   };
   useEffect(() => { load(); }, []);
 
@@ -39,7 +39,7 @@ export default function AdminConfigPage() {
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><Settings2 className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Super-Admin Runtime Config</h1>
-            <p className="text-xs text-slate-500">Bank Owner only — Twilio SMS, SendGrid Email, Referral rules, Face-match threshold</p>
+            <p className="text-xs text-slate-500">Director only — Twilio SMS, SendGrid Email, Referral rules, Face-match threshold</p>
           </div>
         </div>
         <span className="px-2.5 py-1 rounded bg-white text-amber-600 text-[10px] font-bold">BANK OWNER</span>

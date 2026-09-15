@@ -70,7 +70,7 @@ export default function ProductPage() {
               to="/login"
               className="px-5 py-2.5 rounded-md border border-slate-300 bg-white hover:border-[#0b3b8c] text-slate-800 text-xs font-semibold flex items-center gap-2"
             >
-              <Lock className="w-3.5 h-3.5" /> NetBanking login
+              <Lock className="w-3.5 h-3.5" /> member portal login
             </Link>
           </div>
         </div>

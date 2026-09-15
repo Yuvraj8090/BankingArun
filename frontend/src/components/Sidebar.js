@@ -44,7 +44,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
       {/* Support card */}
       <div className="mt-6 p-3 rounded-md bg-slate-50 border border-slate-200 text-slate-700 text-[11px] space-y-2">
         <div className="flex items-center gap-2 text-[#0b3b8c] font-semibold">
-          <HeadphonesIcon className="w-3.5 h-3.5" /> 24×7 Banking Help
+          <HeadphonesIcon className="w-3.5 h-3.5" /> 24×7 Member Help
         </div>
         <p className="text-slate-600">Toll-Free: <strong className="text-slate-900">1800 11 2211</strong></p>
         <p className="text-slate-600">Cyber Fraud: <strong className="text-[#c8102e]">1930</strong></p>

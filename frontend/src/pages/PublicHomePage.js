@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { api } from '../services/api';
 import {
   ShieldCheck, ArrowRight, Lock, UserPlus, Calculator, PiggyBank,
   Banknote, CreditCard, CheckCircle2, Fingerprint, HomeIcon,
@@ -8,6 +9,12 @@ import {
 } from 'lucide-react';
 
 export default function PublicHomePage() {
+  // Unauthenticated: the public features list needs no session.
+  const [features, setFeatures] = useState(null);
+  useEffect(() => {
+    api.publicFeatures().then((d) => setFeatures(d.features)).catch(() => setFeatures([]));
+  }, []);
+
   // Calculators
   const [calcType, setCalcType] = useState('emi');
   const [emiAmount, setEmiAmount] = useState(500000);
@@ -45,16 +52,21 @@ export default function PublicHomePage() {
     { icon: Umbrella, label: 'Insurance', desc: 'Term · Health · Motor', to: '/investments/insurance', color: 'text-[#c8102e]' }
   ];
 
-  const quickLinks = [
-    ['Open Savings Account', '/personal/savings-account'],
-    ['Apply for a Loan', '/loans/personal-loan'],
-    ['Book a Fixed Deposit', '/personal/fixed-deposits'],
-    ['Get a Debit Card', '/personal/debit-cards'],
-    ['Start a SIP', '/investments/mutual-funds'],
-    ['Bulk NEFT / RTGS', '/corporate/bulk-neft-rtgs'],
-    ['Branch & ATM Locator', '/branches'],
-    ['Rates & Charges', '/rates']
+  // Each shortcut names the capability it needs, so the panel never invites a
+  // visitor towards a service this institution is not authorised to offer.
+  const ALL_QUICK_LINKS = [
+    ['Open Savings Account', '/personal/savings-account', null],
+    ['Apply for a Loan', '/loans/personal-loan', 'loans'],
+    ['Book a Fixed Deposit', '/personal/fixed-deposits', 'deposits'],
+    ['Get a Debit Card', '/personal/debit-cards', 'debit_cards'],
+    ['Start a SIP', '/investments/mutual-funds', 'mutual_funds'],
+    ['Bulk NEFT / RTGS', '/corporate/bulk-neft-rtgs', 'payment_systems'],
+    ['Branch & ATM Locator', '/branches', null],
+    ['Rates & Charges', '/rates', null]
   ];
+  const quickLinks = ALL_QUICK_LINKS
+    .filter(([, , needs]) => !needs || !Array.isArray(features) || features.includes(needs))
+    .map(([label, to]) => [label, to]);
 
   return (
     <div className="bg-slate-50">
@@ -82,7 +94,7 @@ export default function PublicHomePage() {
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 leading-tight tracking-tight">
-              Banking made <span className="text-[#0b3b8c]">simple</span>,
+              Savings made <span className="text-[#0b3b8c]">simple</span>,
               <br className="hidden sm:inline" /> secure &amp; <span className="text-[#c8102e]">India-ready</span>.
             </h1>
 
@@ -104,7 +116,7 @@ export default function PublicHomePage() {
                 data-testid="hero-login-btn"
                 className="px-6 py-3 rounded-md border border-slate-300 bg-white hover:border-[#0b3b8c] hover:text-[#0b3b8c] text-slate-800 text-sm font-semibold flex items-center gap-2 transition"
               >
-                <Lock className="w-4 h-4" /> NetBanking Login
+                <Lock className="w-4 h-4" /> Member Login
               </Link>
             </div>
 
@@ -150,7 +162,7 @@ export default function PublicHomePage() {
       {/* Product Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Explore our banking products</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Explore what we offer members</h2>
           <p className="text-sm text-slate-600 mt-1">Everything you need for personal finance, retail operations and corporate treasury.</p>
         </div>
 

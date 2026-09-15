@@ -137,7 +137,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
           <div className="flex gap-2 p-1 bg-slate-100 rounded-md mb-6 text-xs">
             <Link to="/login" data-testid="auth-tab-login"
               className={`flex-1 py-2 rounded font-semibold transition text-center ${!isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
-              NetBanking Login
+              Member Login
             </Link>
             <Link to="/open-account" data-testid="auth-tab-register"
               className={`flex-1 py-2 rounded font-semibold transition text-center ${isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>

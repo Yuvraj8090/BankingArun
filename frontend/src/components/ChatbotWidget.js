@@ -43,7 +43,7 @@ export default function ChatbotWidget() {
           className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-[#0b3b8c] to-[#0e4aa8] hover:from-[#0a2f6f] hover:to-[#0b3b8c] text-white font-semibold text-xs shadow-lg shadow-[#0b3b8c]/25 transition transform hover:scale-105 active:scale-95"
         >
           <Bot className="w-5 h-5 text-white" />
-          <span>Ask Banking AI</span>
+          <span>Ask AJS Assistant</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         </button>
       )}

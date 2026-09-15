@@ -106,7 +106,7 @@ export const ROLE_HOME = {
 
 export const ROLE_LABEL = {
   retail: 'Customer', corporate: 'Corporate', admin: 'Branch Manager',
-  branch_manager: 'Branch Manager', bank_owner: 'Bank Owner',
+  branch_manager: 'Branch Manager', bank_owner: 'Director',
   staff: 'Staff / Teller', collection_agent: 'Collections', loan_officer: 'Loan Officer'
 };
 

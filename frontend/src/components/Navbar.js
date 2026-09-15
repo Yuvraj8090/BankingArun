@@ -10,7 +10,7 @@ const ROLE_BADGE = {
   corporate: { label: 'Corporate', color: 'bg-purple-50 text-purple-700 border-purple-200' },
   admin: { label: 'Branch Manager', color: 'bg-amber-50 text-amber-700 border-amber-200' },
   branch_manager: { label: 'Branch Manager', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  bank_owner: { label: 'Bank Owner', color: 'bg-[#0b3b8c] text-white border-[#0b3b8c]' },
+  bank_owner: { label: 'Director', color: 'bg-[#0b3b8c] text-white border-[#0b3b8c]' },
   staff: { label: 'Staff', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   collection_agent: { label: 'Collections', color: 'bg-rose-50 text-[#c8102e] border-rose-200' },
   loan_officer: { label: 'Loan Officer', color: 'bg-indigo-50 text-[#0b3b8c] border-indigo-200' }

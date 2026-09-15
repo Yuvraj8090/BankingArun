@@ -50,7 +50,7 @@ function Loading() {
     <div className="min-h-screen bg-white flex items-center justify-center text-slate-700 text-sm">
       <div className="flex items-center gap-3">
         <div className="w-5 h-5 border-2 border-blue-700 border-t-transparent rounded-full animate-spin" />
-        <span>Connecting to AJSPay Core Banking Ledger…</span>
+        <span>Connecting to the AJS member ledger…</span>
       </div>
     </div>
   );
@@ -60,7 +60,7 @@ function Loading() {
 function PublicLayout() {
   const { user, loading } = useAuth();
   if (loading) return <Loading />;
-  // Signed-in customers belong in NetBanking, not the marketing site.
+  // Signed-in members belong in the portal, not the marketing site.
   if (user) return <Navigate to={homeFor(user.role)} replace />;
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-100">
@@ -110,7 +110,7 @@ function AuthRoute({ isRegister }) {
   );
 }
 
-// ---------------- NetBanking ----------------
+// ---------------- Member portal ----------------
 function AppShell() {
   const { user, loading, features } = useAuth();
   const { tab } = useParams();

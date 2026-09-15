@@ -104,7 +104,7 @@ export default function HostingerDeployPage() {
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-4">
         <div className="flex justify-between items-center pb-2 border-b border-slate-200">
           <h2 className="font-bold text-slate-900 text-sm">
-            AJSPay Banking Capabilities
+            AJSPay Capabilities
           </h2>
           <span className="text-amber-600 text-xs font-mono">
             {portedCount} of {capabilityData.length} modules ported to PHP/MySQL
@@ -115,7 +115,7 @@ export default function HostingerDeployPage() {
           <table className="w-full text-left text-xs text-slate-600">
             <thead className="bg-white text-[11px] uppercase text-slate-500">
               <tr>
-                <th className="p-3">Core Banking Feature</th>
+                <th className="p-3">Feature</th>
                 <th className="p-3 text-right">AJSPay Status</th>
               </tr>
             </thead>

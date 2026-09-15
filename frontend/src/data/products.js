@@ -13,7 +13,7 @@ export const PRODUCTS = {
   'personal/savings-account': {
     title: 'Savings Account',
     tagline: 'Everyday banking with interest paid quarterly.',
-    summary: 'A zero-balance members\u2019 savings account with NetBanking, statements and transfers between member accounts. Open it online with PAN and Aadhaar, and finish verification by video KYC without visiting a branch.',
+    summary: 'A zero-balance members\u2019 savings account with the member portal, statements and transfers between member accounts. Open it online with PAN and Aadhaar, and finish verification by video KYC without visiting a branch.',
     highlights: ['Interest credited every quarter', 'Transfers between member accounts at no charge', 'Statements as PDF or Excel, any date range', 'Video KYC, no branch visit'],
     facts: [['Interest rate', '4.00% p.a.'], ['Minimum balance', 'Nil'], ['Digital transfers', 'Free'], ['Statement', 'PDF or Excel, any date range']],
     documents: ['PAN card', 'Aadhaar or another officially valid document', 'Recent photograph']
@@ -74,8 +74,8 @@ export const PRODUCTS = {
   'corporate/trade-finance': {
     title: 'Trade Finance',
     tagline: 'Support for import and export payments.',
-    summary: 'Trade facilities such as letters of credit and bank guarantees are arranged case by case with your relationship manager. Raise a request from your corporate NetBanking account and the team will respond with the documents needed.',
-    highlights: ['Letters of credit and bank guarantees', 'Import and export payment support', 'Handled by a relationship manager', 'Requests raised from NetBanking'],
+    summary: 'Trade facilities such as letters of credit and bank guarantees are arranged case by case with your relationship manager. Raise a request from your corporate member portal account and the team will respond with the documents needed.',
+    highlights: ['Letters of credit and guarantees', 'Import and export payment support', 'Handled by a relationship manager', 'Requests raised from NetBanking'],
     facts: [['Availability', 'On request, case by case'], ['Turnaround', 'Confirmed with your manager'], ['Charges', 'Quoted per facility']],
     documents: ['Corporate account and KYC on file', 'Trade documents for the specific transaction']
   },
@@ -173,9 +173,9 @@ export const PRODUCTS = {
   'support/grievance-redressal': {
     title: 'Grievance Redressal',
     tagline: 'How to raise a complaint and what happens next.',
-    summary: 'Raise a complaint from Support inside NetBanking and you get a ticket number immediately. Complaints mentioning fraud are marked high priority and routed to the grievance desk first.',
+    summary: 'Raise a complaint from Support inside the member portal and you get a ticket number immediately. Complaints mentioning fraud are marked high priority and routed to the grievance desk first.',
     highlights: ['Ticket number as soon as you file', 'Fraud reports prioritised', 'Track status in your account', 'Escalation if the first response does not resolve it'],
-    facts: [['Level 1', 'Grievance Redressal Desk, from NetBanking'], ['Level 2', 'Nodal officer at the head office'], ['Toll-free', '1800-123-4567, 24×7'], ['Cyber fraud helpline', '1930']],
+    facts: [['Level 1', 'Grievance Redressal Desk, from the member portal'], ['Level 2', 'Nodal officer at the head office'], ['Toll-free', '1800-123-4567, 24×7'], ['Cyber fraud helpline', '1930']],
     documents: ['Your account details', 'Transaction reference for the disputed entry']
   }
 };
