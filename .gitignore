@@ -1,2 +1,3 @@
 __pycache__/
 hostinger/config.local.php
+.deploy/
