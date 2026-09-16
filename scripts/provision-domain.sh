@@ -97,9 +97,20 @@ cat > /etc/apache2/sites-available/ajspay-ssl.conf <<EOF
 EOF
 apache2ctl configtest && systemctl reload apache2
 
+# The config the site is actually being served with wins. A hand-uploaded
+# document root carries its own config.local.php, whose credentials may have
+# moved on from the ones written when the box was first provisioned; adopting
+# the served copy is what keeps the database reachable after the swap.
+if [[ -f /var/www/ajspay/config.local.php ]]; then
+  cp -n /etc/ajspay/config.local.php /root/config.local.php.provisioned.bak || true
+  cp -f /var/www/ajspay/config.local.php /etc/ajspay/config.local.php
+  chown root:www-data /etc/ajspay/config.local.php
+  chmod 640 /etc/ajspay/config.local.php
+fi
+
 # Point the application at its own domain. Passkeys registered against the old
 # hostname stop working and must be re-enrolled; passwords are unaffected.
-cp -n /etc/ajspay/config.local.php /root/config.local.php.bak
+cp -n /etc/ajspay/config.local.php /root/config.local.php.bak || true
 sed -i "s/$legacy/$domain/g; s/89\.116\.134\.116/$domain/g" /etc/ajspay/config.local.php
 
 # A dump-only database user, so backups never need the application's password.
