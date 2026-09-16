@@ -270,9 +270,7 @@ function PublicFooter() {
       <div className="border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-[11px] text-slate-500 space-y-1">
         <p className="max-w-4xl mx-auto leading-relaxed">
-          Aadhunik Jeewan Sanchay Nidhi Limited (CIN U65990UP2019PLN121746) is a Nidhi company incorporated under the
-          Companies Act, 2013 and governed by the Nidhi Rules, 2014. It is not a bank, it is not licensed or regulated
-          by the Reserve Bank of India, deposits are not insured by DICGC, and it deals only with its members.
+          Aadhunik Jeewan Sanchay Nidhi Limited · CIN U65990UP2019PLN121746
         </p>
         <p>© {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited. All rights reserved.</p>
         </div>

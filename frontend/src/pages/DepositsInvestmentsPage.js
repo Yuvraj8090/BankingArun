@@ -169,7 +169,7 @@ export default function DepositsInvestmentsPage() {
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-4">
             <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex justify-between items-center">
               <span>Book Online Fixed / Recurring Deposit</span>
-              <span className="text-[#0b3b8c] text-xs font-mono">Member deposits · Not DICGC insured</span>
+              <span className="text-[#0b3b8c] text-xs font-mono">Member deposits</span>
             </h2>
 
             <form onSubmit={handleBookDeposit} className="space-y-4 text-xs">

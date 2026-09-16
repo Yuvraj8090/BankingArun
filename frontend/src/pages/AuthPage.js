@@ -141,10 +141,6 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
           </ul>
 
           <div className="pt-6 border-t border-white/15 space-y-1.5">
-            <p className="text-[11px] text-blue-100/90 leading-relaxed">
-              A Nidhi company under the Companies Act, 2013. Not a bank, not RBI&#8209;licensed,
-              and deposits are not insured by DICGC.
-            </p>
             <p className="text-[11px] text-blue-100/70">
               © {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited · 1800&#8209;123&#8209;4567
             </p>

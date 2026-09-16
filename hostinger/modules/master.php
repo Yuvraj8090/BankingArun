@@ -246,8 +246,7 @@ function route_public_schemes(array $d): void
         'company' => COMPANY_IDENTITY,
         'schemes' => $schemes,
         'max_rate_pa' => NIDHI_MAX_DEPOSIT_RATE,
-        'disclosure' => 'Returns are the amounts the scheme itself promises. Aadhunik Jeewan Sanchay '
-            . 'Nidhi Limited is a Nidhi company, not a bank, and deposits are not insured by the DICGC.',
+        'disclosure' => 'Returns are the amounts the scheme itself promises.',
     ]);
 }
 
