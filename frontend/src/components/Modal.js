@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 // Shared dialog for the create/edit forms. The scrim is translucent on purpose:
@@ -10,11 +11,23 @@ export default function Modal({ title, subtitle, onClose, children, footer, test
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
-    panel.current?.querySelector('input, textarea, select, button')?.focus();
-    return () => window.removeEventListener('keydown', onKey);
+    // preventScroll: focusing the first field otherwise scrolls the dialog's own
+    // scroll container, which drops the header out of view as it opens.
+    panel.current?.querySelector('input, textarea, select, button')?.focus({ preventScroll: true });
+    // Hold the page still underneath, so closing the dialog returns the reader
+    // to where they were rather than to wherever the page drifted.
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+    };
   }, [onClose]);
 
-  return (
+  // Rendered into <body>: an ancestor with a transform or a filter becomes the
+  // containing block for position:fixed, which pins the backdrop a few pixels
+  // down the page instead of over the whole viewport.
+  return createPortal((
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={panel} data-testid={testId} role="dialog" aria-modal="true" aria-label={title}
@@ -33,7 +46,7 @@ export default function Modal({ title, subtitle, onClose, children, footer, test
         {footer && <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-end gap-2">{footer}</div>}
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 export function Field({ label, hint, children }) {

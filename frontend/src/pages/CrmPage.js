@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Users, Search, RefreshCw, Phone, ArrowLeft, UserPlus, CheckCircle2,
-  AlertTriangle, CalendarClock, Plus, X, ShieldAlert
+  AlertTriangle, CalendarClock, Plus, ShieldAlert
 } from 'lucide-react';
 import { api } from '../services/api';
 import Pagination from '../components/Pagination';
+import Modal from '../components/Modal';
 import { toast } from 'sonner';
 
 const TABS = [['members', 'Members'], ['leads', 'Leads'], ['tasks', 'My Tasks']];
@@ -306,12 +307,22 @@ function LogInteraction({ memberId, onClose, onSaved }) {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
-      <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Log a contact</h2>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-700"><X className="w-4 h-4" /></button>
-      </div>
-      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+    <Modal
+      testId="crm-interaction-modal"
+      wide
+      title="Log a contact"
+      subtitle="A follow-up date creates a task for you automatically."
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose}
+          className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+        <button data-testid="crm-save-interaction" disabled={saving || !form.subject} onClick={save}
+          className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
+          Save
+        </button>
+      </>}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Select label="Channel" value={form.channel} onChange={(v) => setForm({ ...form, channel: v })}
           options={['call', 'visit', 'email', 'sms', 'whatsapp', 'note']} testId="crm-channel" />
         <Select label="Direction" value={form.direction} onChange={(v) => setForm({ ...form, direction: v })}
@@ -323,18 +334,11 @@ function LogInteraction({ memberId, onClose, onSaved }) {
         </div>
         <Field label="Follow up on (optional)" type="date" value={form.follow_up_on}
           onChange={(v) => setForm({ ...form, follow_up_on: v })} testId="crm-followup" />
-        <div className="md:col-span-3">
+        <div className="md:col-span-2">
           <Field label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
         </div>
       </div>
-      <div className="px-4 pb-4 flex items-center justify-between gap-3">
-        <p className="text-[11px] text-slate-500">A follow-up date creates a task for you automatically.</p>
-        <button data-testid="crm-save-interaction" disabled={saving || !form.subject} onClick={save}
-          className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
-          Save
-        </button>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -396,20 +400,28 @@ function LeadsTab() {
       </div>
 
       {adding && (
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} testId="crm-lead-name" />
-          <Field label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} testId="crm-lead-phone" />
-          <Field label="Email (optional)" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-          <Select label="Source" value={form.source} onChange={(v) => setForm({ ...form, source: v })}
-            options={['walk_in', 'referral', 'agent', 'campaign', 'phone']} />
-          <Select label="Interested in" value={form.interest} onChange={(v) => setForm({ ...form, interest: v })}
-            options={['savings', 'deposit', 'loan', 'other']} />
-          <div className="flex items-end gap-2">
+        <Modal
+          testId="crm-lead-modal"
+          title="New lead"
+          subtitle="Somebody who has enquired but is not yet on the member register."
+          onClose={() => setAdding(false)}
+          footer={<>
+            <button onClick={() => setAdding(false)}
+              className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
             <button data-testid="crm-save-lead" onClick={create} disabled={!form.name || !form.phone}
-              className="flex-1 px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">Add</button>
-            <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-md border border-slate-200 text-xs">Cancel</button>
+              className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">Add lead</button>
+          </>}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} testId="crm-lead-name" />
+            <Field label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} testId="crm-lead-phone" />
+            <Field label="Email (optional)" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
+            <Select label="Source" value={form.source} onChange={(v) => setForm({ ...form, source: v })}
+              options={['walk_in', 'referral', 'agent', 'campaign', 'phone']} />
+            <Select label="Interested in" value={form.interest} onChange={(v) => setForm({ ...form, interest: v })}
+              options={['savings', 'deposit', 'loan', 'other']} />
           </div>
-        </div>
+        </Modal>
       )}
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">

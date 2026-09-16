@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Users, RefreshCw, Plus, Save, Trash2, ReceiptText, X, Info } from 'lucide-react';
+import { Users, RefreshCw, Plus, Save, Trash2, ReceiptText, Info } from 'lucide-react';
 import { api } from '../services/api';
+import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
@@ -119,12 +120,21 @@ export default function AgentsPage() {
 
         <div className="lg:col-span-3 space-y-4">
           {form && (
-            <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-900">{form.id ? `Edit ${form.code}` : 'New agent'}</h2>
-                <button onClick={() => setForm(null)} className="text-slate-500 hover:text-slate-700"><X className="w-4 h-4" /></button>
-              </div>
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Modal
+              testId="agent-modal"
+              title={form.id ? `Edit ${form.code}` : 'New agent'}
+              subtitle="Collections are recorded against the agent. No commission is calculated — a Nidhi may not pay brokerage for bringing in deposits."
+              onClose={() => setForm(null)}
+              footer={<>
+                <button onClick={() => setForm(null)}
+                  className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+                <button data-testid="agent-save-btn" disabled={saving} onClick={saveAgent}
+                  className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50">
+                  {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save agent
+                </button>
+              </>}
+            >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label="Agent code" value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} testId="agent-code" />
                 <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} testId="agent-name" />
                 <Field label="Phone" value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} testId="agent-phone" />
@@ -138,13 +148,7 @@ export default function AgentsPage() {
                   </select>
                 </div>
               </div>
-              <div className="px-4 pb-4 flex justify-end">
-                <button data-testid="agent-save-btn" disabled={saving} onClick={saveAgent}
-                  className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50">
-                  {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save agent
-                </button>
-              </div>
-            </div>
+            </Modal>
           )}
 
           {selected && (
@@ -167,25 +171,37 @@ export default function AgentsPage() {
               </div>
 
               {entry && (
-                <div className="p-4 border-b border-slate-100 bg-slate-50 grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Field label="Member account number" value={entry.account_number} onChange={v => setEntry(e => ({ ...e, account_number: v }))} testId="collection-account" />
-                  <Field label="Amount (₹)" type="number" value={entry.amount} onChange={v => setEntry(e => ({ ...e, amount: v }))} testId="collection-amount" />
-                  <Field label="Collected on" type="date" value={entry.collected_on} onChange={v => setEntry(e => ({ ...e, collected_on: v }))} testId="collection-date" />
-                  <div>
-                    <label className="block text-[11px] text-slate-600 mb-1">Scheme (optional)</label>
-                    <select value={entry.scheme_id} onChange={e => setEntry(en => ({ ...en, scheme_id: e.target.value }))}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white">
-                      <option value="">—</option>
-                      {schemes.map(s => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}
-                    </select>
-                  </div>
-                  <Field label="Receipt no (optional)" value={entry.receipt_no} onChange={v => setEntry(e => ({ ...e, receipt_no: v }))} />
-                  <div className="flex items-end gap-2">
+                <Modal
+                  testId="collection-modal"
+                  title="Record a collection"
+                  subtitle={selected ? `${selected.name} · ${selected.code}` : ''}
+                  onClose={() => setEntry(null)}
+                  footer={<>
+                    <button onClick={() => setEntry(null)}
+                      className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
                     <button data-testid="collection-save-btn" disabled={saving} onClick={saveCollection}
-                      className="flex-1 px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">Save record</button>
-                    <button onClick={() => setEntry(null)} className="px-3 py-2 rounded-md border border-slate-200 text-xs">Cancel</button>
+                      className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
+                      Save record
+                    </button>
+                  </>}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Field label="Member account number" value={entry.account_number} onChange={v => setEntry(e => ({ ...e, account_number: v }))} testId="collection-account" />
+                    <Field label="Amount (₹)" type="number" value={entry.amount} onChange={v => setEntry(e => ({ ...e, amount: v }))} testId="collection-amount" />
+                    <Field label="Collected on" type="date" value={entry.collected_on} onChange={v => setEntry(e => ({ ...e, collected_on: v }))} testId="collection-date" />
+                    <div>
+                      <label className="block text-[11px] text-slate-600 mb-1">Scheme (optional)</label>
+                      <select value={entry.scheme_id} onChange={e => setEntry(en => ({ ...en, scheme_id: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white">
+                        <option value="">—</option>
+                        {schemes.map(s => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Field label="Receipt no (optional)" value={entry.receipt_no} onChange={v => setEntry(e => ({ ...e, receipt_no: v }))} />
+                    </div>
                   </div>
-                </div>
+                </Modal>
               )}
 
               <div className="overflow-x-auto">

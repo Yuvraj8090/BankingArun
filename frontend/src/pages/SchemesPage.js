@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Layers, RefreshCw, Plus, Save, Trash2, AlertTriangle, X } from 'lucide-react';
+import { Layers, RefreshCw, Plus, Save, Trash2, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import Modal from '../components/Modal';
 import { toast } from 'sonner';
 
 const BLANK = {
@@ -157,12 +158,22 @@ export default function SchemesPage() {
       </div>
 
       {form && (
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">{form.id ? `Edit ${form.code}` : 'New scheme'}</h2>
-            <button onClick={() => setForm(null)} className="text-slate-500 hover:text-slate-700"><X className="w-4 h-4" /></button>
-          </div>
-          <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Modal
+          testId="scheme-modal"
+          wide
+          title={form.id ? `Edit ${form.code}` : 'New scheme'}
+          subtitle={`The effective rate is worked out as you save; nothing above ${data.max_rate_pa}% a year can be made active.`}
+          onClose={() => setForm(null)}
+          footer={<>
+            <button onClick={() => setForm(null)}
+              className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+            <button data-testid="scheme-save-btn" disabled={saving} onClick={save}
+              className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50">
+              {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save scheme
+            </button>
+          </>}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Code" value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} testId="scheme-code" />
             <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} testId="scheme-name" />
             <Select label="Type" value={form.scheme_type} options={data.types.map(t => [t, TYPE_LABEL[t] || t])}
@@ -199,13 +210,7 @@ export default function SchemesPage() {
               <Field label="Notes" value={form.notes ?? ''} onChange={v => setForm(f => ({ ...f, notes: v }))} />
             </div>
           </div>
-          <div className="px-5 pb-5 flex justify-end">
-            <button data-testid="scheme-save-btn" disabled={saving} onClick={save}
-              className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50">
-              {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save scheme
-            </button>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
