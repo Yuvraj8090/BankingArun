@@ -124,6 +124,11 @@ if [[ ! -f /etc/ajspay/backup.cnf ]]; then
   chown root:ajspay-deploy /etc/ajspay/backup.cnf
   chmod 640 /etc/ajspay/backup.cnf
 fi
+# The directory is root:www-data 750, which the deploy account cannot traverse,
+# so backup.cnf stayed unreadable however its own mode was set. 751 lets it
+# through to the file it owns without making the directory listable, and
+# config.local.php stays 640 root:www-data and out of reach.
+chmod 751 /etc/ajspay
 install -d -m 700 -o ajspay-deploy -g ajspay-deploy /srv/ajspay/backups
 
 # A read-only login for querying production over an SSH tunnel. MariaDB stays
