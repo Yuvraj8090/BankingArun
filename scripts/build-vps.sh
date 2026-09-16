@@ -15,6 +15,9 @@ done < <(find hostinger -name '*.php' ! -name config.local.php -print0)
 mkdir -p .deploy
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
+# mktemp -d is 0700 and tar stamps the archived "." mode onto the release
+# directory on extraction, which would leave Apache unable to enter it.
+chmod 755 "$stage"
 cp -R frontend/build/. "$stage/"
 cp hostinger/api.php hostinger/db.php hostinger/cron.php hostinger/.htaccess "$stage/"
 cp -R hostinger/modules hostinger/assets "$stage/"

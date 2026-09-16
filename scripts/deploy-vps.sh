@@ -17,6 +17,9 @@ release="/srv/ajspay/releases/$revision"
 if [[ ! -d "$release" ]]; then
   mkdir "$release"
   tar -xzf "incoming/$revision.tar.gz" -C "$release" --no-same-owner
+  # Belt and braces against an archive built with a restrictive mode:
+  # directories must be traversable and files readable by Apache.
+  chmod -R a+rX "$release"
   ln -s /etc/ajspay/config.local.php "$release/config.local.php"
 fi
 test -f "$release/index.html"
