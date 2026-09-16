@@ -129,6 +129,14 @@ fi
 # through to the file it owns without making the directory listable, and
 # config.local.php stays 640 root:www-data and out of reach.
 chmod 751 /etc/ajspay
+
+# Apache passes SCRIPT_FILENAME as /srv/ajspay/current/..., a path that never
+# changes across a release swap, so OPcache keeps serving the previous
+# release's bytecode until the pool is reloaded. The deploy account is allowed
+# that one command and nothing else.
+printf 'ajspay-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl reload php8.5-fpm\n' > /etc/sudoers.d/ajspay-deploy
+chmod 440 /etc/sudoers.d/ajspay-deploy
+visudo -c -q -f /etc/sudoers.d/ajspay-deploy
 install -d -m 700 -o ajspay-deploy -g ajspay-deploy /srv/ajspay/backups
 
 # A read-only login for querying production over an SSH tunnel. MariaDB stays
