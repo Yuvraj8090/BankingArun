@@ -68,8 +68,10 @@ cat > /etc/apache2/sites-available/ajspay-ssl.conf <<EOF
     RewriteCond %{HTTP_HOST} !^${domain//./\\.}\$ [NC]
     RewriteRule ^ https://$domain%{REQUEST_URI} [R=301,L]
 
-    # Matches the resolved release path, not the symlink.
-    <Directory /srv/ajspay/releases>
+    # Covers both the 'current' symlink used as DocumentRoot and the real
+    # release path behind it; granting on only one of the two leaves Apache
+    # falling through to the global "Require all denied" and serving 403s.
+    <Directory /srv/ajspay>
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
@@ -81,7 +83,7 @@ cat > /etc/apache2/sites-available/ajspay-ssl.conf <<EOF
     <FilesMatch "\.(sql|md|log|env|ini|bak)\$">
         Require all denied
     </FilesMatch>
-    <DirectoryMatch "^/srv/ajspay/releases/[^/]+/(modules|assets)">
+    <DirectoryMatch "^/srv/ajspay/(current|releases/[^/]+)/(modules|assets)">
         Require all denied
     </DirectoryMatch>
 
