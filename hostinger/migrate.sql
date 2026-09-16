@@ -410,3 +410,15 @@ SET @c := (SELECT COUNT(*) FROM information_schema.columns
            WHERE table_schema = DATABASE() AND table_name = 'schemes' AND column_name = 'slabs');
 SET @q := IF(@c = 0, 'ALTER TABLE schemes ADD COLUMN slabs LONGTEXT AFTER payout_type', 'DO 0');
 PREPARE st FROM @q; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- Grievance escalation on support tickets.
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS grievance_status VARCHAR(10);
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS grievance_ground VARCHAR(20);
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS grievance_detail VARCHAR(1000);
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS escalated_by VARCHAR(36);
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS escalated_at DATETIME;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS grievance_due_by DATETIME;
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS grievance_outcome VARCHAR(1000);
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS grievance_handled_by VARCHAR(36);
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS grievance_handled_at DATETIME;
+ALTER TABLE support_tickets ADD INDEX IF NOT EXISTS idx_grievance (grievance_status, grievance_due_by);

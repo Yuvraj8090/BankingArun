@@ -851,6 +851,9 @@ $routes = [
     'GET /screening/hits' => 'route_screening_hits',
     'POST /screening/action' => 'route_screening_action',
     'POST /screening/rerate' => 'route_risk_rerate',
+    // Grievance escalation (modules/support.php); the two that carry a ticket
+    // reference are matched in $paramRoutes below.
+    'GET /grievance/queue' => 'route_grievance_queue',
     // First-run tour (modules/tutorial.php)
     'GET /tutorial/state' => 'route_tutorial_state',
     'POST /tutorial/progress' => 'route_tutorial_progress',
@@ -893,6 +896,8 @@ $paramRoutes = [
     ['POST', '#^/register/cease/([\w-]{1,64})$#', 'route_register_cease'],
     ['GET', '#^/crm/member/([\w@.-]{1,80})$#', 'route_crm_member'],
     ['PATCH', '#^/crm/leads/([\w-]{1,64})$#', 'route_crm_lead_update'],
+    ['POST', '#^/tickets/([\w-]{1,64})/escalate$#', 'route_grievance_escalate'],
+    ['POST', '#^/grievance/([\w-]{1,64})/resolve$#', 'route_grievance_resolve'],
     ['PATCH', '#^/crm/tasks/([\w-]{1,64})$#', 'route_crm_task_update'],
     ['GET', '#^/reports/([\w-]{1,40})/export$#', 'route_report_export'],
     ['GET', '#^/reports/([\w-]{1,40})$#', 'route_report_run'],

@@ -2,7 +2,7 @@ import {
   LayoutDashboard, ArrowRightLeft, CreditCard, PiggyBank, Banknote,
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
   GanttChartSquare, Building2, Video, ShieldCheck, FileText, Gift, Repeat, Settings2,
-  Layers, ClipboardList, Contact2, BarChart3
+  Layers, ClipboardList, Contact2, BarChart3, BookUser, FileLock2, Gavel
 } from 'lucide-react';
 
 // Role → sidebar menu. The same list is the access rule for /app/* URLs:
@@ -37,6 +37,10 @@ export const NAV_BY_ROLE = {
   admin: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
+    { id: 'screening', label: 'Sanctions Screening', icon: ShieldAlert, testId: 'tab-screening' },
+    { id: 'data-requests', label: 'Data Requests', icon: FileLock2, testId: 'tab-data-requests' },
+    { id: 'grievance', label: 'Grievance Queue', icon: Gavel, testId: 'tab-grievance' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
@@ -49,6 +53,10 @@ export const NAV_BY_ROLE = {
   branch_manager: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
+    { id: 'screening', label: 'Sanctions Screening', icon: ShieldAlert, testId: 'tab-screening' },
+    { id: 'data-requests', label: 'Data Requests', icon: FileLock2, testId: 'tab-data-requests' },
+    { id: 'grievance', label: 'Grievance Queue', icon: Gavel, testId: 'tab-grievance' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
@@ -64,6 +72,10 @@ export const NAV_BY_ROLE = {
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'fraud', label: 'Fraud & AML Review', icon: ShieldAlert, testId: 'tab-fraud' },
+    { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
+    { id: 'screening', label: 'Sanctions Screening', icon: ShieldAlert, testId: 'tab-screening' },
+    { id: 'data-requests', label: 'Data Requests', icon: FileLock2, testId: 'tab-data-requests' },
+    { id: 'grievance', label: 'Grievance Queue', icon: Gavel, testId: 'tab-grievance' },
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'admin-config', label: 'System Config (Twilio/SendGrid)', icon: Settings2, testId: 'tab-admin-config' },
@@ -76,6 +88,7 @@ export const NAV_BY_ROLE = {
   staff: [
     { id: 'staff', label: 'Customer Console', icon: Users, testId: 'tab-staff' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'kyc', label: 'KYC Verification', icon: FileBadge2, testId: 'tab-kyc' },

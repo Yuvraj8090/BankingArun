@@ -38,6 +38,10 @@ import SchemesPage from './pages/SchemesPage';
 import AgentsPage from './pages/AgentsPage';
 import FraudMonitorPage from './pages/FraudMonitorPage';
 import CrmPage from './pages/CrmPage';
+import MemberRegisterPage from './pages/MemberRegisterPage';
+import ScreeningPage from './pages/ScreeningPage';
+import DataRequestsPage from './pages/DataRequestsPage';
+import GrievancePage from './pages/GrievancePage';
 import ReportsPage from './pages/ReportsPage';
 import TutorialOverlay from './components/TutorialOverlay';
 import SecurityCenterPage from './pages/SecurityCenterPage';
@@ -163,6 +167,10 @@ function AppShell() {
     agents: <AgentsPage />,
     fraud: <FraudMonitorPage />,
     crm: <CrmPage />,
+    'member-register': <MemberRegisterPage />,
+    screening: <ScreeningPage />,
+    'data-requests': <DataRequestsPage />,
+    grievance: <GrievancePage />,
     reports: <ReportsPage />,
     'security-center': <SecurityCenterPage />
   };

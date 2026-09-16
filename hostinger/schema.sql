@@ -312,9 +312,21 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     unread_for_member INT NOT NULL DEFAULT 0,
     unread_for_staff INT NOT NULL DEFAULT 1,
     resolution_note VARCHAR(500),
+    -- Grievance escalation (modules/support.php). A ticket the member is not
+    -- satisfied with goes to the named officer with its own 30-day clock.
+    grievance_status VARCHAR(10),          -- open | resolved | rejected
+    grievance_ground VARCHAR(20),
+    grievance_detail VARCHAR(1000),
+    escalated_by VARCHAR(36),
+    escalated_at DATETIME,
+    grievance_due_by DATETIME,
+    grievance_outcome VARCHAR(1000),
+    grievance_handled_by VARCHAR(36),
+    grievance_handled_at DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
     INDEX idx_status (status),
+    INDEX idx_grievance (grievance_status, grievance_due_by),
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -45,6 +45,32 @@ call GET /security/audit "$OWNER";  ck "owner allowed the security audit" 200 "$
 call GET /schemes "$RETAIL"; ck "member refused the scheme master" 403 "$CODE"
 call GET /ai/fraud-queue "$RETAIL"; ck "member refused the fraud queue" 403 "$CODE"
 
+print "\n-- grievance escalation --"
+# A grievance is a support ticket the member is not satisfied with, handed to the
+# named officer with its own 30-day clock.
+Q "DELETE FROM ticket_messages; DELETE FROM support_tickets WHERE subject LIKE 'APITESTG%';" >/dev/null
+call POST /support/complaint "$RETAIL" '{"category":"deposit","subject":"APITESTG instalment not credited","description":"My March instalment is missing from the passbook."}'
+GRIEV=$(print -r -- "$BODY" | jq_ 'print(d["ticket_id"])')
+ck "member raised the ticket to escalate" 200 "$CODE"
+call GET /grievance/queue "$RETAIL"; ck "member cannot open the grievance queue" 403 "$CODE"
+call GET /grievance/queue "$STAFF";  ck "teller cannot open the grievance queue" 403 "$CODE"
+call GET /grievance/queue "$OWNER";  ck "the officer can open the queue" 200 "$CODE"
+call POST "/tickets/$GRIEV/escalate" "$RETAIL" '{"ground":"delay","detail":"No answer in three weeks."}'
+ck "member can escalate their own ticket" 200 "$CODE"
+ck "a 30-day grievance deadline is set" "1" "$(Q "SELECT grievance_due_by IS NOT NULL FROM support_tickets WHERE ticket_id='$GRIEV'")"
+call POST "/tickets/$GRIEV/escalate" "$RETAIL" '{"ground":"delay","detail":"Still nothing at all."}'
+ck "the same complaint cannot be escalated twice" 400 "$CODE"
+call POST "/grievance/$GRIEV/resolve" "$OWNER" '{"outcome":"rejected","decision":"short"}'
+ck "a decision without a reason is refused" 422 "$CODE"
+call POST "/grievance/$GRIEV/resolve" "$STAFF" '{"outcome":"resolved","decision":"Credited on 4 March, passbook attached."}'
+ck "a teller cannot decide a grievance" 403 "$CODE"
+call POST "/grievance/$GRIEV/resolve" "$OWNER" '{"outcome":"resolved","decision":"Credited on 4 March; the passbook entry has been reprinted."}'
+ck "the officer can decide it" 200 "$CODE"
+ck "the decision is recorded against the ticket" "resolved" "$(Q "SELECT grievance_status FROM support_tickets WHERE ticket_id='$GRIEV'")"
+call POST "/grievance/$GRIEV/resolve" "$OWNER" '{"outcome":"resolved","decision":"Trying to decide it a second time."}'
+ck "a decided complaint cannot be decided again" 400 "$CODE"
+Q "DELETE FROM ticket_messages; DELETE FROM support_tickets WHERE subject LIKE 'APITESTG%';" >/dev/null
+
 print "\n-- Nidhi deposit cap on schemes --"
 # A scheme that pays more than the Nidhi Rules allow may be drafted but never sold.
 call POST /schemes "$OWNER" '{"code":"ZZ-CAP-1","name":"Over cap","scheme_type":"recurring","tenure_months":12,"total_deposit":12000,"maturity_amount":16000,"status":"active"}'

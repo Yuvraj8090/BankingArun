@@ -29,6 +29,28 @@ export const api = {
   // Open to anyone: the plans actually on sale and the company's registration
   // particulars. No token — this is what the public site renders.
   publicSchemes: async () => (await axios.get(`${API}/public/schemes`)).data,
+  // Member register and share allotment (Nidhi Rules 11)
+  registerMembers: async (params) => (await axios.get(`${API}/register/members`, { ...getAuthHeaders(), params })).data,
+  registerAdmit: async (payload) => (await axios.post(`${API}/register/admit`, payload, getAuthHeaders())).data,
+  registerShares: async (payload) => (await axios.post(`${API}/register/shares`, payload, getAuthHeaders())).data,
+
+  // Sanctions / PEP screening
+  screeningHits: async (params) => (await axios.get(`${API}/screening/hits`, { ...getAuthHeaders(), params })).data,
+  screeningAction: async (payload) => (await axios.post(`${API}/screening/action`, payload, getAuthHeaders())).data,
+  screeningRun: async () => (await axios.post(`${API}/screening/run`, {}, getAuthHeaders())).data,
+  screeningRerate: async () => (await axios.post(`${API}/screening/rerate`, {}, getAuthHeaders())).data,
+  watchlist: async (params) => (await axios.get(`${API}/screening/watchlist`, { ...getAuthHeaders(), params })).data,
+  watchlistAdd: async (payload) => (await axios.post(`${API}/screening/watchlist`, payload, getAuthHeaders())).data,
+
+  // Data protection, DPDP Act 2023
+  privacyQueue: async (params) => (await axios.get(`${API}/privacy/queue`, { ...getAuthHeaders(), params })).data,
+  privacyRespond: async (payload) => (await axios.post(`${API}/privacy/respond`, payload, getAuthHeaders())).data,
+
+  // Grievance escalation
+  grievanceQueue: async (params) => (await axios.get(`${API}/grievance/queue`, { ...getAuthHeaders(), params })).data,
+  grievanceResolve: async (id, payload) => (await axios.post(`${API}/grievance/${id}/resolve`, payload, getAuthHeaders())).data,
+  ticketEscalate: async (id, payload) => (await axios.post(`${API}/tickets/${id}/escalate`, payload, getAuthHeaders())).data,
+
   getAccounts: async () => (await axios.get(`${API}/accounts`, getAuthHeaders())).data,
   getTransactions: async (accountNumber = '') => {
     const url = accountNumber ? `${API}/accounts/transactions?account_number=${accountNumber}` : `${API}/accounts/transactions`;

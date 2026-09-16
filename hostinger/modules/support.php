@@ -262,3 +262,120 @@ function route_support_notifications(array $d): void
         'grievance_officer' => grievance_officer(),
     ]);
 }
+
+// ---------------------------------------------------------------------------
+// Grievance escalation.
+//
+// A grievance is not a second kind of ticket: it is a ticket the member is not
+// satisfied with. Escalating hands it to the named grievance officer and starts
+// a fresh clock — thirty days, which is the turnaround published to members and
+// the one the Consumer Protection Act, 2019 expects a complaint to be answered
+// within. The support SLA keeps running underneath so neither deadline is lost.
+const GRIEVANCE_DAYS = 30;
+const GRIEVANCE_ROLES = ['admin', 'branch_manager', 'bank_owner'];
+const GRIEVANCE_GROUNDS = ['unresolved', 'delay', 'dissatisfied', 'staff_conduct', 'other'];
+
+function grievance_due(): string
+{
+    return (new DateTimeImmutable('now'))->modify('+' . GRIEVANCE_DAYS . ' days')->format('Y-m-d H:i:s');
+}
+
+// A member escalates their own ticket; staff may escalate on their behalf, which
+// is what happens when somebody complains at the counter.
+function route_grievance_escalate(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = current_user();
+    need($d, 'ground', 'detail');
+    $ground = clip($d['ground'], 20);
+    if (!in_array($ground, GRIEVANCE_GROUNDS, true)) {
+        fail(422, 'ground must be one of: ' . implode(', ', GRIEVANCE_GROUNDS));
+    }
+    $detail = clip($d['detail'], 1000);
+    if (mb_strlen($detail) < 10) {
+        fail(422, 'Say what went wrong, in a sentence. The officer needs something to act on.');
+    }
+    $ticket = row('SELECT * FROM support_tickets WHERE id = ? OR ticket_id = ?', [$id, $id]);
+    if (!$ticket) {
+        fail(404, 'Ticket not found.');
+    }
+    $isStaff = in_array($user['role'], SUPPORT_STAFF_ROLES, true);
+    if (!$isStaff && $ticket['user_id'] !== $user['id']) {
+        fail(404, 'Ticket not found.');   // never confirm another member's ticket exists
+    }
+    if ($ticket['grievance_status'] === 'open') {
+        fail(400, 'This complaint is already with the grievance officer.');
+    }
+    $pdo->prepare('UPDATE support_tickets SET grievance_status = ?, grievance_ground = ?,
+            grievance_detail = ?, escalated_by = ?, escalated_at = ?, grievance_due_by = ?,
+            unread_for_staff = unread_for_staff + 1
+        WHERE id = ?')
+        ->execute(['open', $ground, $detail, $user['id'], now_utc(), grievance_due(), $ticket['id']]);
+    audit($user, 'GRIEVANCE_RAISED', $ticket['ticket_id']);
+    security_event('GRIEVANCE_RAISED', 'warning', "{$ticket['ticket_id']} escalated to the grievance officer");
+    respond(['status' => 'SUCCESS', 'grievance_officer' => grievance_officer(),
+        'due_by' => iso(grievance_due()),
+        'message' => "{$ticket['ticket_id']} is with the grievance officer. You will have an answer within "
+            . GRIEVANCE_DAYS . ' days.']);
+}
+
+function route_grievance_queue(array $d): void
+{
+    staff_user(GRIEVANCE_ROLES);
+    $status = in_array($_GET['status'] ?? '', ['open', 'resolved', 'rejected'], true)
+        ? $_GET['status'] : 'open';
+    $sql = 'SELECT t.id, t.ticket_id, t.user_name, t.user_email, t.subject, t.category, t.priority,
+                   t.status, t.created_at, t.grievance_status, t.grievance_ground, t.grievance_detail,
+                   t.escalated_at, t.grievance_due_by, t.grievance_outcome, t.resolution_note
+        FROM support_tickets t WHERE t.grievance_status = ?';
+    $params = [$status];
+    if (!empty($_GET['q'])) {
+        $sql .= ' AND (t.ticket_id LIKE ? OR t.user_name LIKE ? OR t.subject LIKE ?)';
+        $like = '%' . clip($_GET['q'], 60) . '%';
+        array_push($params, $like, $like, $like);
+    }
+    [$items, $meta] = paginate($sql . ' ORDER BY t.grievance_due_by', $params, 25, 100);
+    respond([
+        'grievances' => out_all($items),
+        'pagination' => $meta,
+        'counts' => [
+            'open' => (int)scalar("SELECT COUNT(*) FROM support_tickets WHERE grievance_status = 'open'"),
+            'overdue' => (int)scalar("SELECT COUNT(*) FROM support_tickets
+                WHERE grievance_status = 'open' AND grievance_due_by < NOW()"),
+            'resolved' => (int)scalar("SELECT COUNT(*) FROM support_tickets WHERE grievance_status = 'resolved'"),
+        ],
+        'grounds' => GRIEVANCE_GROUNDS,
+        'response_window_days' => GRIEVANCE_DAYS,
+        'grievance_officer' => grievance_officer(),
+    ]);
+}
+
+function route_grievance_resolve(array $d, string $id = ''): void
+{
+    global $pdo;
+    $staff = staff_user(GRIEVANCE_ROLES);
+    need($d, 'outcome', 'decision');
+    $outcome = clip($d['outcome'], 12);
+    if (!in_array($outcome, ['resolved', 'rejected'], true)) {
+        fail(422, 'outcome must be resolved or rejected.');
+    }
+    // Rejecting a complaint without telling the member why is the failure the
+    // Act is written against, so the reason is required for both outcomes.
+    $decision = clip($d['decision'], 1000);
+    if (mb_strlen($decision) < 10) {
+        fail(422, 'Write the decision and the reason for it. The member is entitled to be told.');
+    }
+    $ticket = row('SELECT * FROM support_tickets WHERE id = ? OR ticket_id = ?', [$id, $id]);
+    if (!$ticket) {
+        fail(404, 'No such complaint.');
+    }
+    if ($ticket['grievance_status'] !== 'open') {
+        fail(400, 'This complaint is not open with the grievance officer.');
+    }
+    $pdo->prepare('UPDATE support_tickets SET grievance_status = ?, grievance_outcome = ?,
+            grievance_handled_by = ?, grievance_handled_at = ?, unread_for_member = unread_for_member + 1
+        WHERE id = ?')
+        ->execute([$outcome, $decision, $staff['id'], now_utc(), $ticket['id']]);
+    audit($staff, 'GRIEVANCE_' . strtoupper($outcome), $ticket['ticket_id']);
+    respond(['status' => 'SUCCESS', 'message' => "{$ticket['ticket_id']} marked $outcome."]);
+}
