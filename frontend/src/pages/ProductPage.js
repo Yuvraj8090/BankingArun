@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CheckCircle2, ChevronRight, FileText, Lock, UserPlus, Info } from 'lucide-react';
-import { GROUP_LABEL, productAt } from '../data/products';
+import { GROUP_LABEL } from '../data/products';
+import { useCatalog } from '../data/catalog';
 import { api } from '../services/api';
 
 // One public page per navbar/footer link, at its own URL (e.g. /loans/home-loan).
 export default function ProductPage() {
   const { group, slug } = useParams();
-  const product = productAt(group, slug);
+  const catalog = useCatalog();
+  const product = catalog[`${group}/${slug}`];
   // A product that depends on an authorisation this institution does not hold
   // must not be advertised as available. The public features list says which.
   const [features, setFeatures] = useState(null);

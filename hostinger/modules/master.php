@@ -560,3 +560,161 @@ function route_branch_delete(array $d, string $id = ''): void
     audit($user, 'BRANCH_DELETED', "{$branch['code']} {$branch['name']}");
     respond(['status' => 'SUCCESS', 'message' => "Branch {$branch['code']} removed."]);
 }
+
+// --- Public product pages -------------------------------------------------------------
+// The content behind /personal/savings-account and its siblings. The public reader is
+// unauthenticated; only the director may change what visitors are told.
+const PRODUCT_WRITE_ROLES = ['bank_owner'];
+const PRODUCT_READ_ROLES = ['bank_owner', 'admin', 'branch_manager'];
+const PRODUCT_GROUPS = ['personal', 'corporate', 'loans', 'investments', 'support'];
+
+function product_public(array $row): array
+{
+    // A malformed list must not take the public page down with it, so anything
+    // that does not decode to a list is served as an empty one.
+    $list = function (?string $raw): array {
+        $value = json_decode((string)$raw, true);
+        return is_array($value) ? $value : [];
+    };
+    return [
+        'id' => $row['id'],
+        'path' => "{$row['group_key']}/{$row['slug']}",
+        'group' => $row['group_key'],
+        'slug' => $row['slug'],
+        'title' => $row['title'],
+        'tagline' => $row['tagline'],
+        'summary' => $row['summary'],
+        'highlights' => $list($row['highlights']),
+        'facts' => $list($row['facts']),
+        'documents' => $list($row['documents']),
+        'note' => $row['note'],
+        'requires' => $row['requires'],
+        'sort_order' => (int)$row['sort_order'],
+        'status' => $row['status'],
+    ];
+}
+
+function route_public_products(array $d): void
+{
+    $rows = rows("SELECT * FROM site_products WHERE status = 'active' ORDER BY sort_order, title");
+    respond(['products' => array_map('product_public', $rows)]);
+}
+
+function route_products_list(array $d): void
+{
+    staff_user(PRODUCT_READ_ROLES);
+    respond([
+        'products' => array_map('product_public', rows('SELECT * FROM site_products ORDER BY sort_order, title')),
+        'groups' => PRODUCT_GROUPS,
+    ]);
+}
+
+function product_payload(array $d, array $existing = []): array
+{
+    $get = fn(string $key, $fallback = null) => $d[$key] ?? ($existing[$key] ?? $fallback);
+    $group = clip($get('group', $get('group_key', '')), 30);
+    if (!in_array($group, PRODUCT_GROUPS, true)) {
+        fail(422, 'group must be one of: ' . implode(', ', PRODUCT_GROUPS));
+    }
+    $slug = strtolower(clip($get('slug', ''), 80));
+    if (!preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $slug)) {
+        fail(422, 'slug must be lowercase words joined by hyphens, e.g. savings-account.');
+    }
+    $title = clip($get('title', ''), 150);
+    if ($title === '') {
+        fail(422, 'Title is required.');
+    }
+    // Lists arrive as arrays from the editor. Strings are dropped rather than
+    // stored, so a malformed payload cannot corrupt a live public page.
+    $strings = function ($value): string {
+        $items = [];
+        foreach (is_array($value) ? $value : [] as $item) {
+            $text = clip($item, 300);
+            if ($text !== '') {
+                $items[] = $text;
+            }
+        }
+        return json_encode(array_values($items), JSON_UNESCAPED_UNICODE);
+    };
+    $pairs = function ($value): string {
+        $items = [];
+        foreach (is_array($value) ? $value : [] as $pair) {
+            if (!is_array($pair) || count($pair) < 2) {
+                continue;
+            }
+            $label = clip($pair[0], 120);
+            if ($label !== '') {
+                $items[] = [$label, clip($pair[1], 300)];
+            }
+        }
+        return json_encode(array_values($items), JSON_UNESCAPED_UNICODE);
+    };
+    $status = $get('status', 'active');
+    if (!in_array($status, ['active', 'draft'], true)) {
+        fail(422, 'status must be active or draft.');
+    }
+    return [
+        'group_key' => $group,
+        'slug' => $slug,
+        'title' => $title,
+        'tagline' => clip($get('tagline', ''), 255),
+        'summary' => clip($get('summary', ''), 4000),
+        'highlights' => $strings($get('highlights', [])),
+        'facts' => $pairs($get('facts', [])),
+        'documents' => $strings($get('documents', [])),
+        'note' => clip($get('note', ''), 2000) ?: null,
+        'requires' => clip($get('requires', ''), 50) ?: null,
+        'sort_order' => (int)$get('sort_order', 0),
+        'status' => $status,
+    ];
+}
+
+function route_product_create(array $d): void
+{
+    global $pdo;
+    $user = staff_user(PRODUCT_WRITE_ROLES);
+    $product = product_payload($d);
+    if (row('SELECT id FROM site_products WHERE group_key = ? AND slug = ?', [$product['group_key'], $product['slug']])) {
+        fail(400, "A page already exists at /{$product['group_key']}/{$product['slug']}.");
+    }
+    $product = ['id' => uuid4()] + $product;
+    $columns = implode(', ', array_keys($product));
+    $holders = rtrim(str_repeat('?, ', count($product)), ', ');
+    $pdo->prepare("INSERT INTO site_products ($columns) VALUES ($holders)")->execute(array_values($product));
+    audit($user, 'PRODUCT_CREATED', "{$product['group_key']}/{$product['slug']}");
+    respond(['status' => 'SUCCESS', 'message' => "Page /{$product['group_key']}/{$product['slug']} created.",
+        'product' => product_public(row('SELECT * FROM site_products WHERE id = ?', [$product['id']]))]);
+}
+
+function route_product_update(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = staff_user(PRODUCT_WRITE_ROLES);
+    $existing = row('SELECT * FROM site_products WHERE id = ?', [$id]);
+    if (!$existing) {
+        fail(404, 'Page not found.');
+    }
+    $product = product_payload($d, $existing);
+    $moved = $product['group_key'] !== $existing['group_key'] || $product['slug'] !== $existing['slug'];
+    if ($moved && row('SELECT id FROM site_products WHERE group_key = ? AND slug = ?', [$product['group_key'], $product['slug']])) {
+        fail(400, "A page already exists at /{$product['group_key']}/{$product['slug']}.");
+    }
+    $set = implode(', ', array_map(fn($column) => "$column = ?", array_keys($product)));
+    $pdo->prepare("UPDATE site_products SET $set WHERE id = ?")->execute([...array_values($product), $id]);
+    audit($user, 'PRODUCT_UPDATED', "{$product['group_key']}/{$product['slug']}");
+    respond(['status' => 'SUCCESS', 'message' => "Page /{$product['group_key']}/{$product['slug']} updated.",
+        'product' => product_public(row('SELECT * FROM site_products WHERE id = ?', [$id]))]);
+}
+
+function route_product_delete(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = staff_user(PRODUCT_WRITE_ROLES);
+    $product = row('SELECT * FROM site_products WHERE id = ?', [$id]);
+    if (!$product) {
+        fail(404, 'Page not found.');
+    }
+    $pdo->prepare('DELETE FROM site_products WHERE id = ?')->execute([$id]);
+    audit($user, 'PRODUCT_DELETED', "{$product['group_key']}/{$product['slug']}");
+    respond(['status' => 'SUCCESS', 'message' => "Page /{$product['group_key']}/{$product['slug']} removed."]);
+}

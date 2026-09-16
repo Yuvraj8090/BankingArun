@@ -30,7 +30,8 @@ const KEYWORDS = {
   'data-requests': ['dpdp', 'data request', 'erasure', 'consent', 'privacy request'],
   screening: ['aml', 'sanctions', 'pep', 'watchlist', 'screening'],
   'fraud-monitor': ['fraud', 'suspicious', 'alert', 'risk'],
-  'branch-admin': ['branch', 'atm', 'network', 'locator', 'location', 'add branch', 'edit branch']
+  'branch-admin': ['branch', 'atm', 'network', 'locator', 'location', 'add branch', 'edit branch'],
+  'public-pages': ['public page', 'product page', 'website', 'content', 'edit page', 'brochure']
 };
 
 // Every id the app knows about, so pages reachable from the profile menu

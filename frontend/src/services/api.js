@@ -180,6 +180,13 @@ export const api = {
   branchCreate: async (payload) => (await axios.post(`${API}/branches`, payload, getAuthHeaders())).data,
   branchUpdate: async (id, payload) => (await axios.patch(`${API}/branches/${id}`, payload, getAuthHeaders())).data,
   branchDelete: async (id) => (await axios.delete(`${API}/branches/${id}`, getAuthHeaders())).data,
+
+  // Content behind the public product pages.
+  publicProducts: async () => (await axios.get(`${API}/public/products`)).data,
+  productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
+  productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,
+  productUpdate: async (id, payload) => (await axios.patch(`${API}/products/${id}`, payload, getAuthHeaders())).data,
+  productDelete: async (id) => (await axios.delete(`${API}/products/${id}`, getAuthHeaders())).data,
   collectionCreate: async (payload) => (await axios.post(`${API}/collections`, payload, getAuthHeaders())).data,
 
   // AI module: fraud/AML, loan grading, collection anomalies

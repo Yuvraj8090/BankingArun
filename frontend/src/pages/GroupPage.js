@@ -1,16 +1,18 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronRight, ArrowRight } from 'lucide-react';
-import { GROUP_LABEL, PRODUCTS } from '../data/products';
+import { GROUP_LABEL } from '../data/products';
+import { useCatalog } from '../data/catalog';
 
 // The landing page for a product group, at /loans, /personal and so on. It gives
 // the middle breadcrumb on every product page somewhere real to point.
 export default function GroupPage() {
   const { group } = useParams();
+  const catalog = useCatalog();
   const label = GROUP_LABEL[group];
-  const products = Object.entries(PRODUCTS)
+  const products = Object.entries(catalog)
     .filter(([path]) => path.startsWith(`${group}/`))
-    .map(([path, product]) => ({ path, ...product }));
+    .map(([path, product]) => ({ ...product, path }));
 
   if (!label || products.length === 0) {
     return (

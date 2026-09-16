@@ -38,6 +38,7 @@ import AdminConfigPage from './pages/AdminConfigPage';
 import SchemesPage from './pages/SchemesPage';
 import AgentsPage from './pages/AgentsPage';
 import BranchAdminPage from './pages/BranchAdminPage';
+import ProductAdminPage from './pages/ProductAdminPage';
 import FraudMonitorPage from './pages/FraudMonitorPage';
 import CrmPage from './pages/CrmPage';
 import MemberRegisterPage from './pages/MemberRegisterPage';
@@ -168,6 +169,7 @@ function AppShell() {
     schemes: <SchemesPage />,
     agents: <AgentsPage />,
     'branch-admin': <BranchAdminPage />,
+    'public-pages': <ProductAdminPage />,
     fraud: <FraudMonitorPage />,
     crm: <CrmPage />,
     'member-register': <MemberRegisterPage />,

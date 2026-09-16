@@ -818,6 +818,8 @@ $routes = [
     'POST /agents' => 'route_agent_create',
     'GET /branches' => 'route_branches_list',
     'POST /branches' => 'route_branch_create',
+    'GET /products' => 'route_products_list',
+    'POST /products' => 'route_product_create',
     'POST /collections' => 'route_collection_create',
     // AI module (modules/ai.php)
     'GET /ai/fraud-queue' => 'route_fraud_queue',
@@ -831,6 +833,7 @@ $routes = [
     // Regulated-capability register (modules/compliance.php)
     'GET /public/features' => 'route_public_features',
     'GET /public/schemes' => 'route_public_schemes',
+    'GET /public/products' => 'route_public_products',
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only
@@ -891,6 +894,8 @@ $paramRoutes = [
     ['DELETE', '#^/agents/([\w-]{1,64})$#', 'route_agent_delete'],
     ['PATCH', '#^/branches/([\w-]{1,64})$#', 'route_branch_update'],
     ['DELETE', '#^/branches/([\w-]{1,64})$#', 'route_branch_delete'],
+    ['PATCH', '#^/products/([\w-]{1,64})$#', 'route_product_update'],
+    ['DELETE', '#^/products/([\w-]{1,64})$#', 'route_product_delete'],
     ['GET', '#^/agents/([\w-]{1,64})/collections$#', 'route_collections_list'],
     ['GET', '#^/support/ticket/([\w-]{1,64})$#', 'route_ticket_detail'],
     ['POST', '#^/support/ticket/([\w-]{1,64})/reply$#', 'route_ticket_reply'],

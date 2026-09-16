@@ -79,6 +79,7 @@ export const NAV_BY_ROLE = {
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'branch-admin', label: 'Branch & ATM Network', icon: MapPin, testId: 'tab-branch-admin' },
+    { id: 'public-pages', label: 'Public Pages', icon: FileText, testId: 'tab-public-pages' },
     { id: 'admin-config', label: 'System Config (Twilio/SendGrid)', icon: Settings2, testId: 'tab-admin-config' },
     { id: 'admin', label: 'All Branches', icon: Building2, testId: 'tab-admin' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
