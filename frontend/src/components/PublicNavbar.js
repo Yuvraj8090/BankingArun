@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Lock, UserPlus, Phone, MapPin, ChevronDown, Menu, X, Search } from 'lucide-react';
+import { Lock, UserPlus, Phone, MapPin, ChevronDown, Menu, X } from 'lucide-react';
 import Brand from './Brand';
+import PublicSearch from './PublicSearch';
 
 // Every entry here is a real route, so each product has its own shareable URL.
 const NAV_GROUPS = [
@@ -94,15 +95,7 @@ export default function PublicNavbar() {
           </Link>
 
           <div className="hidden lg:flex flex-1 max-w-md">
-            <div className="w-full flex items-center border border-slate-300 rounded-md px-3 h-9 focus-within:border-blue-800">
-              <Search className="w-4 h-4 text-slate-500" />
-              <input
-                data-testid="public-search-input"
-                type="text"
-                placeholder="Search products, services, FAQs…"
-                className="flex-1 bg-transparent text-xs px-2 outline-none placeholder:text-slate-500"
-              />
-            </div>
+            <PublicSearch />
           </div>
 
           <div className="flex items-center gap-2">

@@ -15,6 +15,7 @@ import PublicNavbar from './components/PublicNavbar';
 import PublicHomePage from './pages/PublicHomePage';
 import PublicRatesPage from './pages/PublicRatesPage';
 import ProductPage from './pages/ProductPage';
+import GroupPage from './pages/GroupPage';
 import Dashboard from './pages/Dashboard';
 import TransferPage from './pages/TransferPage';
 import CardsChequesPage from './pages/CardsChequesPage';
@@ -266,13 +267,15 @@ function PublicFooter() {
         <a href="mailto:support@ajspay.in" className="hover:text-slate-900">support@ajspay.in</a>
         <span>Cyber fraud helpline 1930</span>
       </div>
-      <div className="border-t border-slate-200 py-4 px-4 text-center text-[11px] text-slate-500 space-y-1">
-        <p>
+      <div className="border-t border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-[11px] text-slate-500 space-y-1">
+        <p className="max-w-4xl mx-auto leading-relaxed">
           Aadhunik Jeewan Sanchay Nidhi Limited (CIN U65990UP2019PLN121746) is a Nidhi company incorporated under the
           Companies Act, 2013 and governed by the Nidhi Rules, 2014. It is not a bank, it is not licensed or regulated
           by the Reserve Bank of India, deposits are not insured by DICGC, and it deals only with its members.
         </p>
         <p>© {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited. All rights reserved.</p>
+        </div>
       </div>
     </footer>
   );
@@ -292,6 +295,7 @@ export default function App() {
               <Route path="/" element={<HomeRoute />} />
               <Route path="/rates" element={<PublicRatesPage />} />
               <Route path="/branches" element={<div className="pt-6 bg-slate-50"><BranchLocatorPage /></div>} />
+              <Route path="/:group" element={<GroupPage />} />
               <Route path="/:group/:slug" element={<ProductPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />

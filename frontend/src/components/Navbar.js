@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Search, Compass} from 'lucide-react';
+  Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Compass} from 'lucide-react';
 import Brand from './Brand';
+import GlobalSearch from './GlobalSearch';
 import { ROLE_HOME } from '../navigation';
 
 const ROLE_BADGE = {
@@ -17,7 +18,7 @@ const ROLE_BADGE = {
 };
 
 export default function Navbar({ onNavigate, activeTab }) {
-  const { user, logout } = useAuth();
+  const { user, logout, features } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const badge = ROLE_BADGE[user?.role] || ROLE_BADGE.retail;
 
@@ -37,14 +38,7 @@ export default function Navbar({ onNavigate, activeTab }) {
 
           {/* Search */}
           <div className="flex-1 max-w-md hidden md:flex">
-            <div className="w-full flex items-center border border-slate-200 rounded-md px-3 h-9 focus-within:border-[#0b3b8c] bg-slate-50">
-              <Search className="w-4 h-4 text-slate-500" />
-              <input
-                data-testid="global-search"
-                placeholder="Search payees, transactions, services…"
-                className="flex-1 bg-transparent text-xs px-2 outline-none placeholder:text-slate-500"
-              />
-            </div>
+            <GlobalSearch role={user?.role} features={features} onNavigate={onNavigate} />
           </div>
 
           {/* Right */}

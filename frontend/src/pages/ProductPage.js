@@ -44,11 +44,13 @@ export default function ProductPage() {
       )}
       <section className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <nav className="flex items-center gap-1.5 text-[11px] text-slate-500" aria-label="Breadcrumb">
+          <nav className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-slate-500" aria-label="Breadcrumb">
             <Link to="/" className="hover:text-[#0b3b8c]">Home</Link>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-slate-700">{GROUP_LABEL[group] || 'Products'}</span>
-            <ChevronRight className="w-3 h-3" />
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            <Link to={`/${group}`} className="hover:text-[#0b3b8c] truncate">
+              {GROUP_LABEL[group] || 'Products'}
+            </Link>
+            <ChevronRight className="w-3 h-3 shrink-0" />
             <span className="text-slate-900 font-semibold">{product.title}</span>
           </nav>
 
