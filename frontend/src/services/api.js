@@ -26,6 +26,9 @@ const saveBlob = (data, filename, type) => {
 
 export const api = {
   // Accounts
+  // Open to anyone: the plans actually on sale and the company's registration
+  // particulars. No token — this is what the public site renders.
+  publicSchemes: async () => (await axios.get(`${API}/public/schemes`)).data,
   getAccounts: async () => (await axios.get(`${API}/accounts`, getAuthHeaders())).data,
   getTransactions: async (accountNumber = '') => {
     const url = accountNumber ? `${API}/accounts/transactions?account_number=${accountNumber}` : `${API}/accounts/transactions`;

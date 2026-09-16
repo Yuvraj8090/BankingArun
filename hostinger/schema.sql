@@ -777,6 +777,10 @@ CREATE TABLE IF NOT EXISTS schemes (
     total_deposit DECIMAL(15,2) NOT NULL,
     maturity_amount DECIMAL(15,2) NOT NULL,
     payout_type VARCHAR(10) NOT NULL DEFAULT 'maturity',   -- maturity | monthly
+    -- Every denomination the plan is sold in, as published in the brochure:
+    -- [{"unit":100,"deposit":108000,"maturity":125900}, ...]. The columns above
+    -- hold the representative slab the effective rate is worked out from.
+    slabs LONGTEXT,
     status VARCHAR(10) NOT NULL DEFAULT 'draft',           -- active | draft | inactive
     notes VARCHAR(255),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

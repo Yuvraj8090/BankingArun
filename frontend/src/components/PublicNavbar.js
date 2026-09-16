@@ -76,8 +76,8 @@ export default function PublicNavbar() {
             <span className="hidden md:inline">Video KYC · Passkey sign-in · 24×7 transfers</span>
           </div>
           <div className="flex items-center gap-4">
-            <a href="tel:18001234567" className="hidden sm:flex items-center gap-1 hover:text-slate-900">
-              <Phone className="w-3 h-3" /> 1800-123-4567
+            <a href="tel:9105015464" className="hidden sm:flex items-center gap-1 hover:text-slate-900">
+              <Phone className="w-3 h-3" /> 9105015464
             </a>
             <Link to="/branches" data-testid="public-nav-locator" className="flex items-center gap-1 hover:text-slate-900">
               <MapPin className="w-3 h-3" /> Locate Us

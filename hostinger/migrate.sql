@@ -404,3 +404,9 @@ INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribu
 ('sch-dd-5y', 'AJS-DD-5Y', 'Daily Yojana 5 Year', 'daily', 60, 50.00, NULL, 90000.00, 117900.00, 'maturity', 'draft', 'Plan book: daily ₹50 for 5 years'),
 ('sch-fd-8y', 'AJS-FD-8Y', 'Savadhi Yojana (3x in 8 years)', 'fixed', 96, NULL, 2500.00, 2500.00, 7500.00, 'maturity', 'draft', 'Plan book: 3x in 8 years — well above the Nidhi cap'),
 ('sch-mis-5y', 'AJS-MIS-5Y', 'Niyamit Aay 60 Month MIS', 'mis', 60, NULL, 10000.00, 10000.00, 15000.00, 'monthly', 'draft', 'Plan book: ₹10,000 unit, ₹250 monthly payout');
+
+-- Brochure slab tables: every denomination a plan is sold in.
+SET @c := (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema = DATABASE() AND table_name = 'schemes' AND column_name = 'slabs');
+SET @q := IF(@c = 0, 'ALTER TABLE schemes ADD COLUMN slabs LONGTEXT AFTER payout_type', 'DO 0');
+PREPARE st FROM @q; EXECUTE st; DEALLOCATE PREPARE st;

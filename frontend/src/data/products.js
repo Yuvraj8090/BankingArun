@@ -175,7 +175,7 @@ export const PRODUCTS = {
     tagline: 'How to raise a complaint and what happens next.',
     summary: 'Raise a complaint from Support inside the member portal and you get a ticket number immediately. Complaints mentioning fraud are marked high priority and routed to the grievance desk first.',
     highlights: ['Ticket number as soon as you file', 'Fraud reports prioritised', 'Track status in your account', 'Escalation if the first response does not resolve it'],
-    facts: [['Level 1', 'Grievance Redressal Desk, from the member portal'], ['Level 2', 'Nodal officer at the head office'], ['Toll-free', '1800-123-4567, 24×7'], ['Cyber fraud helpline', '1930']],
+    facts: [['Level 1', 'Grievance Redressal Desk, from the member portal'], ['Level 2', 'Nodal officer at the head office'], ['Toll-free', '9105015464, 24×7'], ['Cyber fraud helpline', '1930']],
     documents: ['Your account details', 'Transaction reference for the disputed entry']
   }
 };

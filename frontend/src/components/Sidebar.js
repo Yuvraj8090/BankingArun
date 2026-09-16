@@ -46,7 +46,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
         <div className="flex items-center gap-2 text-[#0b3b8c] font-semibold">
           <HeadphonesIcon className="w-3.5 h-3.5" /> 24×7 Member Help
         </div>
-        <p className="text-slate-600">Toll-Free: <strong className="text-slate-900">1800 11 2211</strong></p>
+        <p className="text-slate-600">Helpline: <strong className="text-slate-900">9105015464</strong></p>
         <p className="text-slate-600">Cyber Fraud: <strong className="text-[#c8102e]">1930</strong></p>
         <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
           <span>Session Active</span>

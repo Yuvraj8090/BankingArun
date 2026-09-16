@@ -45,6 +45,37 @@ call GET /security/audit "$OWNER";  ck "owner allowed the security audit" 200 "$
 call GET /schemes "$RETAIL"; ck "member refused the scheme master" 403 "$CODE"
 call GET /ai/fraud-queue "$RETAIL"; ck "member refused the fraud queue" 403 "$CODE"
 
+print "\n-- Nidhi deposit cap on schemes --"
+# A scheme that pays more than the Nidhi Rules allow may be drafted but never sold.
+call POST /schemes "$OWNER" '{"code":"ZZ-CAP-1","name":"Over cap","scheme_type":"recurring","tenure_months":12,"total_deposit":12000,"maturity_amount":16000,"status":"active"}'
+ck "over-cap scheme refused activation" 422 "$CODE"
+has "refusal names the rate" "$BODY" "above the 12.5% cap"
+call POST /schemes "$OWNER" '{"code":"ZZ-CAP-1","name":"Over cap","scheme_type":"recurring","tenure_months":12,"total_deposit":12000,"maturity_amount":16000,"status":"draft"}'
+ck "same scheme saved as a draft" 200 "$CODE"
+
+# The cap applies to every published denomination, not just the headline one: a
+# member buys a slab, so a compliant headline must not smuggle an over-cap row in.
+call POST /schemes "$OWNER" '{"code":"ZZ-CAP-2","name":"Bad slab","scheme_type":"recurring","tenure_months":36,"total_deposit":108000,"maturity_amount":124650,"status":"active","slabs":[{"unit":3000,"deposit":108000,"maturity":124650},{"unit":500,"deposit":18000,"maturity":21975}]}'
+ck "over-cap denomination refused" 422 "$CODE"
+has "refusal names the denomination" "$BODY" "denomination"
+call POST /schemes "$OWNER" '{"code":"ZZ-CAP-2","name":"Good slabs","scheme_type":"recurring","tenure_months":36,"total_deposit":108000,"maturity_amount":124650,"status":"active","slabs":[{"unit":3000,"deposit":108000,"maturity":124650},{"unit":6000,"deposit":216000,"maturity":249300}]}'
+ck "compliant denominations accepted" 200 "$CODE"
+
+# A scheme paying out monthly returns the money years earlier than one paying on
+# maturity, so the same two totals imply a much higher rate.
+call POST /schemes "$OWNER" '{"code":"ZZ-MIS-1","name":"Monthly payout","scheme_type":"mis","tenure_months":60,"principal_amount":10000,"total_deposit":10000,"maturity_amount":15000,"payout_type":"monthly","status":"active"}'
+ck "monthly-payout scheme rated on its true return" 422 "$CODE"
+has "monthly payout rate is far above the maturity reading" "$BODY" "18.71%"
+call POST /schemes "$OWNER" '{"code":"ZZ-MIS-2","name":"Maturity payout","scheme_type":"mis","tenure_months":60,"principal_amount":10000,"total_deposit":10000,"maturity_amount":15000,"payout_type":"maturity","status":"active"}'
+ck "same totals paid on maturity stay within the cap" 200 "$CODE"
+
+# The public rate card is open to anyone and must never advertise a draft.
+call GET /public/schemes ""
+ck "public rate card needs no login" 200 "$CODE"
+has "public card carries the CIN" "$BODY" "U65990UP2019PLN121746"
+hasnt "public card hides the drafted over-cap scheme" "$BODY" "ZZ-CAP-1"
+Q "DELETE FROM schemes WHERE code LIKE 'ZZ-%';" >/dev/null
+
 print "\n-- regulated capability gating --"
 call GET /cards "$RETAIL";               ck "debit cards gated" 403 "$CODE"
 call GET /upi/status "$RETAIL";          ck "UPI gated" 403 "$CODE"

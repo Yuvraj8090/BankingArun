@@ -254,7 +254,7 @@ function PublicFooter() {
         ))}
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-slate-500">
-        <a href="tel:18001234567" className="hover:text-slate-900">Toll-free 1800-123-4567</a>
+        <a href="tel:9105015464" className="hover:text-slate-900">Helpline 9105015464</a>
         <a href="mailto:support@ajspay.in" className="hover:text-slate-900">support@ajspay.in</a>
         <span>Cyber fraud helpline 1930</span>
       </div>

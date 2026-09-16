@@ -101,7 +101,7 @@ export default function KycAccountPage() {
                 <input
                   type="text"
                   readOnly
-                  value="Electricity Bill - Nariman Point Apt #402"
+                  value="Electricity Bill - Arya Nagar, Chhutmalpur"
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-600"
                 />
                 <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] cursor-pointer border border-slate-200">

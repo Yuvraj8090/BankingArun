@@ -152,7 +152,7 @@ export default function PublicHomePage() {
                 <div className="flex items-center gap-2 text-slate-600">
                   <Phone className="w-3.5 h-3.5" /> 24×7 Toll-Free
                 </div>
-                <a href="tel:18001234567" className="font-semibold text-[#0b3b8c]">1800-123-4567</a>
+                <a href="tel:18001234567" className="font-semibold text-[#0b3b8c]">9105015464</a>
               </div>
             </div>
           </div>
@@ -343,7 +343,7 @@ export default function PublicHomePage() {
             </div>
             <div>
               <div className="font-semibold text-slate-900 group-hover:text-[#0b3b8c]">Talk to us</div>
-              <div className="text-xs text-slate-600">Toll-free 1800-123-4567 · 24×7</div>
+              <div className="text-xs text-slate-600">Toll-free 9105015464 · 24×7</div>
             </div>
           </a>
           <Link to="/branches" className="flex items-start gap-3 group">

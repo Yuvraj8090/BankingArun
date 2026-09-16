@@ -10,7 +10,7 @@ export default function ChatbotWidget() {
 
   const quickPrompts = [
     "What are current FD interest rates?",
-    "What is the AJSPay Nariman Point IFSC?",
+    "Where is the Chhutmalpur branch?",
     "What are the IMPS & UPI transfer limits?",
     "How to hotlist or block my debit card?"
   ];

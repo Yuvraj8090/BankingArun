@@ -1,154 +1,201 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Percent, FileText, Info, ChevronRight } from 'lucide-react';
+import { Percent, Info, ChevronRight, RefreshCw, ShieldCheck, Building2 } from 'lucide-react';
+import { api } from '../services/api';
 
+const TYPE_LABEL = {
+  daily: 'Daily deposit',
+  recurring: 'Monthly deposit',
+  fixed: 'Fixed deposit',
+  mis: 'Monthly income'
+};
+
+// Per-day for a daily plan, per-month for a recurring one, one payment for the rest.
+const UNIT_LABEL = { daily: 'Per day', recurring: 'Per month', fixed: 'Amount', mis: 'Amount' };
+
+const inr = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+const years = (months) => (months % 12 === 0 ? `${months / 12} year` : `${months} month`);
+
+// The public rate card. Every figure comes from the scheme master, so what is
+// advertised here is exactly what the back office has approved — a plan held in
+// draft because it breaches the deposit cap never reaches this page.
 export default function PublicRatesPage() {
-  const depositRates = [
-    { tenure: "7 days to 45 days", general: "3.50%", senior: "4.00%" },
-    { tenure: "46 days to 179 days", general: "5.25%", senior: "5.75%" },
-    { tenure: "180 days to 364 days", general: "6.50%", senior: "7.00%" },
-    { tenure: "1 year to 2 years", general: "7.25%", senior: "7.75%" },
-    { tenure: "2 years to 3 years (Special)", general: "7.50%", senior: "8.00%" },
-    { tenure: "3 years to 5 years", general: "7.00%", senior: "7.50%" },
-    { tenure: "5 years to 10 years (Tax Saver)", general: "7.10%", senior: "7.60%" }
-  ];
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [openCode, setOpenCode] = useState(null);
 
-  const loanRates = [
-    { product: "Home Loan (Floating)", roi: "8.40% – 9.15% p.a.", procFee: "0.25% (max ₹10,000)" },
-    { product: "Personal Loan", roi: "10.50% – 13.50% p.a.", procFee: "1.00% of loan amount" },
-    { product: "Vehicle Loan (4-wheeler)", roi: "8.75% – 9.50% p.a.", procFee: "₹1,500 flat" },
-    { product: "Gold Loan (Instant Payout)", roi: "7.90% – 8.50% p.a.", procFee: "Nil" },
-    { product: "Education Loan (India)", roi: "9.15% – 10.25% p.a.", procFee: "0.50% of loan amount" }
-  ];
+  useEffect(() => {
+    api.publicSchemes()
+      .then((d) => { setData(d); setOpenCode(d.schemes?.[0]?.code ?? null); })
+      .catch(() => setError('The rate card could not be loaded. Please try again shortly.'));
+  }, []);
 
-  const serviceCharges = [
-    { s: "NEFT / RTGS (online)", c: "Nil" },
-    { s: "IMPS transfer (up to ₹1 lakh)", c: "₹2.50 + GST" },
-    { s: "IMPS transfer (₹1 lakh to ₹5 lakh)", c: "₹15 + GST" },
-    { s: "ATM cash withdrawal (own bank)", c: "Free (unlimited)" },
-    { s: "ATM cash withdrawal (other bank)", c: "₹21 + GST beyond 5 free/month" },
-    { s: "Cheque book (25 leaves)", c: "₹75 + GST" },
-    { s: "Duplicate passbook / statement", c: "₹100 + GST" }
-  ];
+  if (error) {
+    return <div className="max-w-3xl mx-auto px-4 py-16 text-sm text-slate-700">{error}</div>;
+  }
+  if (!data) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16 flex items-center gap-2 text-sm text-slate-600">
+        <RefreshCw className="w-4 h-4 animate-spin" /> Loading the rate card…
+      </div>
+    );
+  }
+
+  const { company, schemes, max_rate_pa: cap, disclosure } = data;
+  const byType = schemes.reduce((acc, s) => ({ ...acc, [s.scheme_type]: [...(acc[s.scheme_type] || []), s] }), {});
 
   return (
     <div className="bg-slate-50">
 
-      {/* Breadcrumb / header */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mb-2">
-            <span>Home</span> <ChevronRight className="w-3 h-3" /> <span className="text-slate-800">Rates &amp; Charges</span>
+            <span>Home</span> <ChevronRight className="w-3 h-3" /> <span className="text-slate-800">Savings Plans</span>
           </div>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
-                Interest Rates &amp; Service Charges
+                Savings Plans &amp; Returns
               </h1>
-              <p className="text-xs text-slate-600 mt-1">
-                Effective from June 2026 · Set by the board under the Nidhi Rules, 2014. Indicative and subject to change.
+              <p className="text-xs text-slate-600 mt-1 max-w-2xl">
+                Every plan we accept deposits into, with the exact amount payable and the amount
+                returned. Interest is shown as the effective rate a year, which is what the plan&apos;s
+                own figures work out to.
               </p>
             </div>
             <Link
-              data-testid="rates-book-fd-btn"
-              to="/personal/fixed-deposits"
-              className="px-5 py-2.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold shadow-sm"
+              data-testid="rates-open-account-btn"
+              to="/open-account"
+              className="px-5 py-2.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold shadow-sm whitespace-nowrap"
             >
-              Book High-Yield FD Now
+              Become a member
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        {/* Fixed Deposit table */}
+        <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-[#0b3b8c] shrink-0 mt-0.5" />
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            {disclosure} The Nidhi Rules, 2014 cap what we may pay on a deposit at <strong>{cap}% a year</strong>,
+            and no plan on this page pays more than that.
+          </p>
+        </div>
+
+        {Object.entries(byType).map(([type, list]) => (
+          <div key={type} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+              <Percent className="w-4 h-4 text-[#0b3b8c]" />
+              <h2 className="font-semibold text-slate-900 text-sm">{TYPE_LABEL[type] || type} plans</h2>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {list.map((s) => {
+                const open = openCode === s.code;
+                const payIn = s.contribution_months && s.contribution_months < s.tenure_months
+                  ? s.contribution_months : null;
+                return (
+                  <div key={s.code} data-testid={`public-scheme-${s.code}`}>
+                    <button
+                      onClick={() => setOpenCode(open ? null : s.code)}
+                      aria-expanded={open}
+                      className="w-full text-left px-6 py-4 hover:bg-slate-50 flex items-center justify-between gap-4"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900">{s.name}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {years(s.tenure_months)} term
+                          {payIn && <> · paid in for {payIn} months, then held</>}
+                          {s.payout_type === 'monthly' && <> · paid out every month</>}
+                          {' · '}{s.slabs.length} amount{s.slabs.length === 1 ? '' : 's'} to choose from
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-lg font-bold text-[#0b3b8c] leading-none">
+                          {s.effective_rate_pa === null ? '—' : `${s.effective_rate_pa}%`}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1">a year</div>
+                      </div>
+                    </button>
+
+                    {open && (
+                      <div className="px-6 pb-5 -mt-1">
+                        <div className="overflow-x-auto border border-slate-200 rounded-md">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
+                              <tr>
+                                <th className="p-2.5 font-semibold">{UNIT_LABEL[s.scheme_type]}</th>
+                                <th className="p-2.5 font-semibold text-right">You pay in total</th>
+                                <th className="p-2.5 font-semibold text-right">
+                                  {s.payout_type === 'monthly' ? 'You receive in total' : 'You receive on maturity'}
+                                </th>
+                                <th className="p-2.5 font-semibold text-right">Effective a year</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {s.slabs.map((slab, i) => (
+                                <tr key={i} className="hover:bg-slate-50">
+                                  <td className="p-2.5 font-semibold text-slate-900 tabular-nums">₹{inr(slab.unit)}</td>
+                                  <td className="p-2.5 text-right text-slate-700 tabular-nums">₹{inr(slab.deposit)}</td>
+                                  <td className="p-2.5 text-right font-semibold text-slate-900 tabular-nums">₹{inr(slab.maturity)}</td>
+                                  <td className="p-2.5 text-right text-slate-600 tabular-nums">
+                                    {slab.effective_rate_pa === null ? '—' : `${slab.effective_rate_pa}%`}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {s.notes && <p className="text-[11px] text-slate-500 mt-2">{s.notes}</p>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
-            <Percent className="w-4 h-4 text-[#0b3b8c]" />
-            <h2 className="font-semibold text-slate-900 text-sm">Domestic Term Deposit Rates (below ₹2 Crore)</h2>
+            <Building2 className="w-4 h-4 text-[#0b3b8c]" />
+            <h2 className="font-semibold text-slate-900 text-sm">Who you are dealing with</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-[11px] uppercase text-slate-600">
-                <tr>
-                  <th className="p-3 font-semibold">Tenure bucket</th>
-                  <th className="p-3 font-semibold">General public</th>
-                  <th className="p-3 font-semibold text-right">Senior citizens (60+)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {depositRates.map((d, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50" data-testid={`fd-rate-row-${idx}`}>
-                    <td className="p-3 text-slate-800 text-xs">{d.tenure}</td>
-                    <td className="p-3 font-semibold text-[#0b3b8c] text-xs">{d.general}</td>
-                    <td className="p-3 text-right font-semibold text-emerald-700 text-xs">{d.senior}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 px-6 py-5 text-xs">
+            <Row label="Registered name" value={company.legal_name} />
+            <Row label="Corporate Identity Number" value={company.cin} mono />
+            <Row label="PAN" value={company.pan} mono />
+            <Row label="TAN" value={company.tan} mono />
+            <Row label="Incorporated on"
+              value={new Date(company.incorporated_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} />
+            <Row label="Constitution" value={company.company_type} />
+            <Row label="Registered office" value={company.registered_office} />
+            <Row label="Corporate office" value={company.corporate_office} />
+            <Row label="Telephone" value={company.phone} mono />
+            <Row label="Verify us"
+              value={<a className="text-[#0b3b8c] font-semibold hover:underline" href={company.verify_at}
+                rel="noreferrer noopener" target="_blank">MCA register (mca.gov.in)</a>} />
+          </dl>
           <div className="px-6 py-3 border-t border-slate-100 text-[11px] text-slate-500 bg-slate-50 flex items-start gap-2">
             <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            Rates are indicative and may change without prior notice. TDS is deducted as per Income Tax Act 1961 on interest exceeding ₹40,000 (₹50,000 for seniors) per year.
-          </div>
-        </div>
-
-        {/* Loans table */}
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#c8102e]" />
-            <h2 className="font-semibold text-slate-900 text-sm">Retail Lending Rates (Repo-linked EBLR)</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-[11px] uppercase text-slate-600">
-                <tr>
-                  <th className="p-3 font-semibold">Loan category</th>
-                  <th className="p-3 font-semibold">Interest rate range</th>
-                  <th className="p-3 font-semibold text-right">Processing fee</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loanRates.map((l, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50" data-testid={`loan-rate-row-${idx}`}>
-                    <td className="p-3 text-slate-800 text-xs">{l.product}</td>
-                    <td className="p-3 font-semibold text-slate-900 text-xs">{l.roi}</td>
-                    <td className="p-3 text-right text-slate-600 text-xs">{l.procFee}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Service charges */}
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200">
-            <h2 className="font-semibold text-slate-900 text-sm">Common Service Charges</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">A quick reference to help you plan your everyday banking.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 text-xs">
-            <div className="divide-y divide-slate-100">
-              {serviceCharges.slice(0, Math.ceil(serviceCharges.length/2)).map((s, idx) => (
-                <div key={idx} className="px-6 py-3 flex items-center justify-between">
-                  <span className="text-slate-800">{s.s}</span>
-                  <span className="font-semibold text-slate-900">{s.c}</span>
-                </div>
-              ))}
-            </div>
-            <div className="divide-y divide-slate-100">
-              {serviceCharges.slice(Math.ceil(serviceCharges.length/2)).map((s, idx) => (
-                <div key={idx} className="px-6 py-3 flex items-center justify-between">
-                  <span className="text-slate-800">{s.s}</span>
-                  <span className="font-semibold text-slate-900">{s.c}</span>
-                </div>
-              ))}
-            </div>
+            Check the Corporate Identity Number above on the MCA register before you deposit money with
+            anyone, including us.
           </div>
         </div>
 
       </div>
+    </div>
+  );
+}
+
+function Row({ label, value, mono }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className={`text-slate-900 mt-0.5 ${mono ? 'font-mono' : ''}`}>{value}</dd>
     </div>
   );
 }

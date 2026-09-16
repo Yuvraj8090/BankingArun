@@ -828,6 +828,7 @@ $routes = [
     'POST /security/seal' => 'route_integrity_seal',
     // Regulated-capability register (modules/compliance.php)
     'GET /public/features' => 'route_public_features',
+    'GET /public/schemes' => 'route_public_schemes',
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only

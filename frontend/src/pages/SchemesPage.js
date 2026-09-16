@@ -8,10 +8,20 @@ const BLANK = {
   code: '', name: '', scheme_type: 'recurring', tenure_months: 12, contribution_months: '',
   contribution_amount: '',
   principal_amount: '', total_deposit: '', maturity_amount: '', payout_type: 'maturity',
-  status: 'draft', notes: ''
+  status: 'draft', notes: '', slabs: []
 };
 
 const TYPE_LABEL = { daily: 'Daily', recurring: 'Recurring', fixed: 'Fixed deposit', mis: 'Monthly income' };
+
+// Slabs are edited as plain lines rather than JSON so a manager can paste a
+// column straight out of the brochure.
+const slabText = (slabs) =>
+  (slabs || []).map(s => `${s.unit}, ${s.deposit}, ${s.maturity}`).join('\n');
+
+const parseSlabs = (text) => text.split('\n')
+  .map(line => line.split(',').map(n => Number(n.trim())))
+  .filter(p => p.length === 3 && p.every(n => Number.isFinite(n) && n > 0))
+  .map(([unit, deposit, maturity]) => ({ unit, deposit, maturity }));
 
 // Back-office scheme master. Nothing here is shown on the public site.
 export default function SchemesPage() {
@@ -86,6 +96,7 @@ export default function SchemesPage() {
               <th className="p-3 font-semibold text-right">Tenure</th>
               <th className="p-3 font-semibold text-right">Deposit</th>
               <th className="p-3 font-semibold text-right">Maturity</th>
+              <th className="p-3 font-semibold text-right">Denominations</th>
               <th className="p-3 font-semibold text-right">Effective p.a.</th>
               <th className="p-3 font-semibold">Status</th>
               {canEdit && <th className="p-3 font-semibold text-right">Actions</th>}
@@ -104,6 +115,19 @@ export default function SchemesPage() {
                 </td>
                 <td className="p-3 text-right text-slate-700">₹{Number(s.total_deposit).toLocaleString('en-IN')}</td>
                 <td className="p-3 text-right text-slate-700">₹{Number(s.maturity_amount).toLocaleString('en-IN')}</td>
+                <td className="p-3 text-right text-slate-600">
+                  {s.slabs?.length || 0}
+                  {s.slabs?.some(x => x.exceeds_cap) && (
+                    <span className="block text-[9px] text-[#c8102e] font-semibold">
+                      {s.slabs.filter(x => x.exceeds_cap).length} over cap
+                    </span>
+                  )}
+                  {!s.slabs?.some(x => x.exceeds_cap) && s.slabs?.some(x => x.off_headline) && (
+                    <span className="block text-[9px] text-amber-700">
+                      {s.slabs.filter(x => x.off_headline).length} priced differently
+                    </span>
+                  )}
+                </td>
                 <td className={`p-3 text-right font-semibold ${s.exceeds_cap ? 'text-[#c8102e]' : 'text-emerald-700'}`}>
                   {s.effective_rate_pa === null ? '—' : `${s.effective_rate_pa}%`}
                   {s.exceeds_cap && <span className="block text-[9px] font-normal">above cap</span>}
@@ -154,6 +178,23 @@ export default function SchemesPage() {
               onChange={v => setForm(f => ({ ...f, payout_type: v }))} />
             <Select label="Status" value={form.status} options={data.statuses.map(s => [s, s])}
               onChange={v => setForm(f => ({ ...f, status: v }))} testId="scheme-status" />
+            <div className="md:col-span-2">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Denominations this plan is sold in
+              </label>
+              <p className="text-[11px] text-slate-500 mb-1.5">
+                One line per amount: <span className="font-mono">unit, total deposit, maturity</span>.
+                Every line has to stay within the {data.max_rate_pa}% cap before the plan can go active.
+              </p>
+              <textarea
+                data-testid="scheme-slabs"
+                rows={6}
+                value={slabText(form.slabs)}
+                onChange={e => setForm(f => ({ ...f, slabs: parseSlabs(e.target.value) }))}
+                className="w-full px-3 py-2 rounded-md border border-slate-200 text-xs font-mono text-slate-900 bg-white"
+                placeholder={'500, 36000, 52500\n1000, 72000, 105000'}
+              />
+            </div>
             <div className="md:col-span-2">
               <Field label="Notes" value={form.notes ?? ''} onChange={v => setForm(f => ({ ...f, notes: v }))} />
             </div>

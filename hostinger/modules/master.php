@@ -32,6 +32,9 @@ function effective_rate(array $scheme): ?float
     if ($maturity <= $deposit) {
         return 0.0;
     }
+    if (($scheme['payout_type'] ?? 'maturity') === 'monthly' && $months < 2) {
+        return null;
+    }
     $byInstalment = in_array($scheme['scheme_type'], ['daily', 'recurring'], true);
     // Some plans take instalments for only part of the term and then hold the
     // fund. Spreading those contributions across the whole tenure would put the
@@ -40,20 +43,38 @@ function effective_rate(array $scheme): ?float
     $payIn = (int)($scheme['contribution_months'] ?? 0) ?: $months;
     $payIn = max(1, min($payIn, $months));
     $contribution = $byInstalment ? $deposit / $payIn : 0.0;
-    $valueAt = function (float $rate) use ($byInstalment, $months, $payIn, $deposit, $contribution): float {
+    // What the member pays in, discounted to the day they join. Instalments are
+    // paid at the start of each month, so the first one is not discounted.
+    $paidIn = function (float $rate) use ($byInstalment, $payIn, $deposit, $contribution): float {
         if (!$byInstalment) {
-            return $deposit * (1 + $rate) ** $months;
+            return $deposit;
         }
         $total = 0.0;
         for ($i = 1; $i <= $payIn; $i++) {
-            $total += $contribution * (1 + $rate) ** ($months - $i + 1);
+            $total += $contribution / (1 + $rate) ** ($i - 1);
+        }
+        return $total;
+    };
+    // What they get back, discounted the same way. A monthly-payout scheme hands
+    // the money over in equal instalments across the term rather than in one sum
+    // at the end, so the member has it years earlier and the scheme is paying a
+    // far higher rate than the same two totals would imply on maturity.
+    $monthlyPayout = ($scheme['payout_type'] ?? 'maturity') === 'monthly';
+    $paidOut = function (float $rate) use ($monthlyPayout, $months, $maturity): float {
+        if (!$monthlyPayout) {
+            return $maturity / (1 + $rate) ** $months;
+        }
+        $each = $maturity / $months;
+        $total = 0.0;
+        for ($i = 1; $i <= $months; $i++) {
+            $total += $each / (1 + $rate) ** $i;
         }
         return $total;
     };
     [$low, $high] = [0.0, 0.05];  // up to 5% per month
     for ($i = 0; $i < 80; $i++) {
         $mid = ($low + $high) / 2;
-        if ($valueAt($mid) < $maturity) {
+        if ($paidOut($mid) > $paidIn($mid)) {
             $low = $mid;
         } else {
             $high = $mid;
@@ -68,6 +89,30 @@ function scheme_public(array $scheme): array
     $rate = effective_rate($scheme);
     $scheme['effective_rate_pa'] = $rate;
     $scheme['exceeds_cap'] = $rate !== null && $rate > NIDHI_MAX_DEPOSIT_RATE;
+    // Rate every denomination, not just the representative one. A slab whose own
+    // figures imply a different return is either priced differently on purpose or
+    // is a misprint, and either way somebody should be able to see it.
+    $slabs = json_decode((string)($scheme['slabs'] ?? ''), true);
+    $scheme['slabs'] = [];
+    if (is_array($slabs)) {
+        foreach ($slabs as $slab) {
+            $slabRate = effective_rate([
+                'tenure_months' => $scheme['tenure_months'],
+                'contribution_months' => $scheme['contribution_months'] ?? null,
+                'total_deposit' => $slab['deposit'],
+                'maturity_amount' => $slab['maturity'],
+                'scheme_type' => $scheme['scheme_type'],
+                'payout_type' => $scheme['payout_type'],
+            ]);
+            $slab['effective_rate_pa'] = $slabRate;
+            $slab['exceeds_cap'] = $slabRate !== null && $slabRate > NIDHI_MAX_DEPOSIT_RATE;
+            // Flag a slab that is more than half a point away from the plan's own
+            // headline rate, which is how a mistyped figure shows up.
+            $slab['off_headline'] = $rate !== null && $slabRate !== null
+                && abs($slabRate - $rate) > 0.5;
+            $scheme['slabs'][] = $slab;
+        }
+    }
     return $scheme;
 }
 
@@ -101,6 +146,7 @@ function scheme_payload(array $d, array $existing = []): array
         'total_deposit' => money($get('total_deposit', 0)),
         'maturity_amount' => money($get('maturity_amount', 0)),
         'payout_type' => in_array($payout, ['maturity', 'monthly'], true) ? $payout : 'maturity',
+        'slabs' => scheme_slabs($get('slabs')),
         'status' => $status,
         'notes' => clip($get('notes', ''), 255) ?: null,
     ];
@@ -116,7 +162,93 @@ function scheme_payload(array $d, array $existing = []): array
             'This scheme returns about %.2f%% a year, above the %.1f%% cap in the Nidhi Rules, 2014. '
             . 'Save it as a draft or reduce the maturity amount.', $rate, NIDHI_MAX_DEPOSIT_RATE));
     }
+    // A member buys one denomination, not the headline. A published slab table
+    // can pay a different rate row by row, so every row has to clear the cap
+    // before any of them may be sold.
+    if ($status === 'active' && $scheme['slabs'] !== null) {
+        foreach (json_decode($scheme['slabs'], true) as $slab) {
+            $slabRate = effective_rate([
+                'tenure_months' => $scheme['tenure_months'],
+                'contribution_months' => $scheme['contribution_months'],
+                'total_deposit' => $slab['deposit'],
+                'maturity_amount' => $slab['maturity'],
+                'scheme_type' => $scheme['scheme_type'],
+                'payout_type' => $scheme['payout_type'],
+            ]);
+            if ($slabRate !== null && $slabRate > NIDHI_MAX_DEPOSIT_RATE) {
+                fail(422, sprintf(
+                    'The %s denomination of this scheme returns about %.2f%% a year, above the %.1f%% '
+                    . 'cap in the Nidhi Rules, 2014, even though the headline slab is within it. '
+                    . 'Correct that row or save the scheme as a draft.',
+                    number_format((float)$slab['unit'], 0), $slabRate, NIDHI_MAX_DEPOSIT_RATE));
+            }
+        }
+    }
     return $scheme;
+}
+
+// The brochure sells each plan in fixed denominations. They are stored as JSON
+// rather than rows of their own because they are a published price list, not
+// something the ledger ever joins against.
+function scheme_slabs($raw): ?string
+{
+    if ($raw === null || $raw === '' || $raw === []) {
+        return null;
+    }
+    $list = is_string($raw) ? json_decode($raw, true) : $raw;
+    if (!is_array($list)) {
+        fail(422, 'slabs must be a list of {unit, deposit, maturity} entries.');
+    }
+    if (count($list) > 60) {
+        fail(422, 'A scheme may publish at most 60 denominations.');
+    }
+    $clean = [];
+    foreach ($list as $row) {
+        if (!is_array($row)) {
+            fail(422, 'Each slab must be an object with unit, deposit and maturity.');
+        }
+        $unit = money($row['unit'] ?? 0);
+        $dep = money($row['deposit'] ?? 0);
+        $mat = money($row['maturity'] ?? 0);
+        if ($unit <= 0 || $dep <= 0 || $mat <= 0) {
+            fail(422, 'Every slab needs a unit, a deposit and a maturity above zero.');
+        }
+        $clean[] = ['unit' => $unit, 'deposit' => $dep, 'maturity' => $mat];
+    }
+    usort($clean, fn($a, $b) => $a['unit'] <=> $b['unit']);
+    return json_encode($clean);
+}
+
+// The company's own registration particulars, as they appear on the certificate
+// of incorporation and the PAN/TAN allotment letters. Published so that a member
+// can check the company on the MCA register before they part with any money.
+const COMPANY_IDENTITY = [
+    'legal_name' => 'Aadhunik Jeewan Sanchay Nidhi Limited',
+    'cin' => 'U65990UP2019PLN121746',
+    'pan' => 'AASCA7672B',
+    'tan' => 'MRTA12278A',
+    'incorporated_on' => '2019-09-27',
+    'company_type' => 'Public company limited by shares, Nidhi under the Companies Act, 2013',
+    'registered_office' => 'V Fatehpur Bhado, PO Chutmalpur, Saharanpur, Uttar Pradesh 247662',
+    'corporate_office' => 'Arya Nagar, Kamalpur Road, Chhutmalpur, Saharanpur, Uttar Pradesh 247662',
+    'phone' => '9105015464',
+    'verify_at' => 'https://www.mca.gov.in',
+];
+
+// Open to anyone, no login: the plans on sale and the terms attached to them.
+// Draft plans are never listed, so a scheme over the deposit cap cannot be
+// advertised even by accident.
+function route_public_schemes(array $d): void
+{
+    $schemes = array_map('scheme_public', rows(
+        'SELECT * FROM schemes WHERE status = ? ORDER BY scheme_type, tenure_months, code', ['active']));
+    respond([
+        'company' => COMPANY_IDENTITY,
+        'schemes' => $schemes,
+        'max_rate_pa' => NIDHI_MAX_DEPOSIT_RATE,
+        'disclosure' => 'Returns are the amounts the scheme itself promises. Aadhunik Jeewan Sanchay '
+            . 'Nidhi Limited is a Nidhi company, not a bank, and deposits are not insured by the DICGC.',
+    ]);
 }
 
 function route_schemes_list(array $d): void
