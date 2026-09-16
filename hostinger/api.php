@@ -816,6 +816,8 @@ $routes = [
     'POST /schemes' => 'route_scheme_create',
     'GET /agents' => 'route_agents_list',
     'POST /agents' => 'route_agent_create',
+    'GET /branches' => 'route_branches_list',
+    'POST /branches' => 'route_branch_create',
     'POST /collections' => 'route_collection_create',
     // AI module (modules/ai.php)
     'GET /ai/fraud-queue' => 'route_fraud_queue',
@@ -887,6 +889,8 @@ $paramRoutes = [
     ['DELETE', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_delete'],
     ['PATCH', '#^/agents/([\w-]{1,64})$#', 'route_agent_update'],
     ['DELETE', '#^/agents/([\w-]{1,64})$#', 'route_agent_delete'],
+    ['PATCH', '#^/branches/([\w-]{1,64})$#', 'route_branch_update'],
+    ['DELETE', '#^/branches/([\w-]{1,64})$#', 'route_branch_delete'],
     ['GET', '#^/agents/([\w-]{1,64})/collections$#', 'route_collections_list'],
     ['GET', '#^/support/ticket/([\w-]{1,64})$#', 'route_ticket_detail'],
     ['POST', '#^/support/ticket/([\w-]{1,64})/reply$#', 'route_ticket_reply'],

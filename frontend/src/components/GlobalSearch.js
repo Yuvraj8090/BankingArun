@@ -29,7 +29,8 @@ const KEYWORDS = {
   grievance: ['complaint', 'grievance', 'dispute', 'escalation', 'ombudsman'],
   'data-requests': ['dpdp', 'data request', 'erasure', 'consent', 'privacy request'],
   screening: ['aml', 'sanctions', 'pep', 'watchlist', 'screening'],
-  'fraud-monitor': ['fraud', 'suspicious', 'alert', 'risk']
+  'fraud-monitor': ['fraud', 'suspicious', 'alert', 'risk'],
+  'branch-admin': ['branch', 'atm', 'network', 'locator', 'location', 'add branch', 'edit branch']
 };
 
 // Every id the app knows about, so pages reachable from the profile menu

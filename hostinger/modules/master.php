@@ -455,3 +455,108 @@ function route_collection_create(array $d): void
         'message' => 'Collection of ' . rupees($amount) . " recorded for {$agent['name']}. Receipt {$collection['receipt_no']}.",
         'collection' => out($collection)]);
 }
+
+// --- Branch and ATM network -----------------------------------------------------------
+// The public locator reads this table, so a branch added here appears on the public site
+// immediately. Only the director may change it.
+const BRANCH_WRITE_ROLES = ['bank_owner'];
+const BRANCH_READ_ROLES = ['bank_owner', 'admin', 'branch_manager', 'staff'];
+
+function branch_payload(array $d, array $existing = []): array
+{
+    $get = fn(string $key, $fallback = null) => $d[$key] ?? ($existing[$key] ?? $fallback);
+    $name = clip($get('name', ''), 150);
+    $code = strtoupper(clip($get('code', ''), 11));
+    if ($name === '') {
+        fail(422, 'Branch name is required.');
+    }
+    if (!preg_match('/^[A-Z0-9]{4,11}$/', $code)) {
+        fail(422, 'Branch code must be 4 to 11 letters or digits.');
+    }
+    // A blank coordinate is legitimate — a branch with no pin simply is not mapped —
+    // but a value that is present must be a real point on the globe.
+    $point = function (string $key, float $limit) use ($get) {
+        $value = $get($key);
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_numeric($value) || abs((float)$value) > $limit) {
+            fail(422, "$key must be a number between -$limit and $limit.");
+        }
+        return round((float)$value, 6);
+    };
+    return [
+        'name' => $name,
+        'bank' => clip($get('bank', 'AJSPay'), 50) ?: 'AJSPay',
+        'code' => $code,
+        'address' => clip($get('address', ''), 255),
+        'lat' => $point('lat', 90.0),
+        'lng' => $point('lng', 180.0),
+        'phone' => clip($get('phone', ''), 30),
+        'has_atm' => empty($get('has_atm')) ? 0 : 1,
+        'has_cdm' => empty($get('has_cdm')) ? 0 : 1,
+        'has_locker' => empty($get('has_locker')) ? 0 : 1,
+        'timing' => clip($get('timing', ''), 50),
+    ];
+}
+
+function route_branches_list(array $d): void
+{
+    staff_user(BRANCH_READ_ROLES);
+    respond(['branches' => out_all(rows('SELECT * FROM branches ORDER BY name'))]);
+}
+
+function route_branch_create(array $d): void
+{
+    global $pdo;
+    $user = staff_user(BRANCH_WRITE_ROLES);
+    $branch = branch_payload($d);
+    if (row('SELECT id FROM branches WHERE code = ?', [$branch['code']])) {
+        fail(400, 'A branch with this code already exists.');
+    }
+    $branch = ['id' => uuid4()] + $branch;
+    $columns = implode(', ', array_keys($branch));
+    $holders = rtrim(str_repeat('?, ', count($branch)), ', ');
+    $pdo->prepare("INSERT INTO branches ($columns) VALUES ($holders)")->execute(array_values($branch));
+    audit($user, 'BRANCH_CREATED', "{$branch['code']} {$branch['name']}");
+    respond(['status' => 'SUCCESS', 'message' => "Branch {$branch['code']} created.",
+        'branch' => out(row('SELECT * FROM branches WHERE id = ?', [$branch['id']]))]);
+}
+
+function route_branch_update(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = staff_user(BRANCH_WRITE_ROLES);
+    $existing = row('SELECT * FROM branches WHERE id = ?', [$id]);
+    if (!$existing) {
+        fail(404, 'Branch not found.');
+    }
+    $branch = branch_payload($d, $existing);
+    if ($branch['code'] !== $existing['code'] && row('SELECT id FROM branches WHERE code = ?', [$branch['code']])) {
+        fail(400, 'A branch with this code already exists.');
+    }
+    $set = implode(', ', array_map(fn($column) => "$column = ?", array_keys($branch)));
+    $pdo->prepare("UPDATE branches SET $set WHERE id = ?")->execute([...array_values($branch), $id]);
+    audit($user, 'BRANCH_UPDATED', "{$branch['code']} {$branch['name']}");
+    respond(['status' => 'SUCCESS', 'message' => "Branch {$branch['code']} updated.",
+        'branch' => out(row('SELECT * FROM branches WHERE id = ?', [$id]))]);
+}
+
+function route_branch_delete(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = staff_user(BRANCH_WRITE_ROLES);
+    $branch = row('SELECT * FROM branches WHERE id = ?', [$id]);
+    if (!$branch) {
+        fail(404, 'Branch not found.');
+    }
+    // Members and staff are attached to a branch by name; removing it from under
+    // them would leave their records pointing at a branch that no longer exists.
+    $attached = row('SELECT COUNT(*) AS n FROM users WHERE branch = ?', [$branch['name']]);
+    if ($attached && (int)$attached['n'] > 0) {
+        fail(400, "{$branch['name']} still has {$attached['n']} member(s) or staff attached to it. Move them first.");
+    }
+    $pdo->prepare('DELETE FROM branches WHERE id = ?')->execute([$id]);
+    audit($user, 'BRANCH_DELETED', "{$branch['code']} {$branch['name']}");
+    respond(['status' => 'SUCCESS', 'message' => "Branch {$branch['code']} removed."]);
+}

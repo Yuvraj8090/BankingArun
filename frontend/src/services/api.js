@@ -173,6 +173,13 @@ export const api = {
   agentUpdate: async (id, payload) => (await axios.patch(`${API}/agents/${id}`, payload, getAuthHeaders())).data,
   agentDelete: async (id) => (await axios.delete(`${API}/agents/${id}`, getAuthHeaders())).data,
   agentCollections: async (id) => (await axios.get(`${API}/agents/${id}/collections`, getAuthHeaders())).data,
+
+  // Branch and ATM network. The public locator reads the same table, so a change
+  // here is visible on the public site straight away.
+  branchesList: async () => (await axios.get(`${API}/branches`, getAuthHeaders())).data,
+  branchCreate: async (payload) => (await axios.post(`${API}/branches`, payload, getAuthHeaders())).data,
+  branchUpdate: async (id, payload) => (await axios.patch(`${API}/branches/${id}`, payload, getAuthHeaders())).data,
+  branchDelete: async (id) => (await axios.delete(`${API}/branches/${id}`, getAuthHeaders())).data,
   collectionCreate: async (payload) => (await axios.post(`${API}/collections`, payload, getAuthHeaders())).data,
 
   // AI module: fraud/AML, loan grading, collection anomalies

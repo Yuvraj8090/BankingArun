@@ -78,6 +78,7 @@ export const NAV_BY_ROLE = {
     { id: 'grievance', label: 'Grievance Queue', icon: Gavel, testId: 'tab-grievance' },
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
+    { id: 'branch-admin', label: 'Branch & ATM Network', icon: MapPin, testId: 'tab-branch-admin' },
     { id: 'admin-config', label: 'System Config (Twilio/SendGrid)', icon: Settings2, testId: 'tab-admin-config' },
     { id: 'admin', label: 'All Branches', icon: Building2, testId: 'tab-admin' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },
