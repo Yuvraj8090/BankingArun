@@ -6,6 +6,11 @@ revision=$(git rev-parse HEAD)
 [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
 scp .deploy/release.tar.gz "$VPS_USER@$VPS_HOST:/srv/ajspay/incoming/$revision.tar.gz"
 scp scripts/backup-db.sh "$VPS_USER@$VPS_HOST:/srv/ajspay/backup-db.sh"
+# The release package deliberately carries no .sql files — they have no business
+# inside a web root — so the migration is delivered beside it instead, ready to
+# run by hand. Applying it is never automatic: a schema change lands when
+# someone decides it should, not as a side effect of shipping a frontend.
+scp hostinger/migrate.sql "$VPS_USER@$VPS_HOST:/srv/ajspay/migrate.sql"
 ssh "$VPS_USER@$VPS_HOST" bash -s -- "$revision" <<'REMOTE'
 set -euo pipefail
 revision=$1
