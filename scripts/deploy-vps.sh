@@ -35,15 +35,18 @@ previous=$(readlink current || true)
 ln -s "$release" current.next
 mv -Tf current.next current
 # The swapped-in PHP is only actually running once OPcache lets go of the
-# previous release's bytecode, so this must happen before the smoke check.
-sudo -n /usr/bin/systemctl reload php8.5-fpm
+# previous release's bytecode, so this must happen before the smoke check. A
+# reload that is not permitted is worth shouting about, but aborting here would
+# strand the deploy between the swap and its own rollback, so it only warns.
+sudo -n /usr/bin/systemctl reload php8.5-fpm ||
+  echo 'WARNING: could not reload php-fpm; PHP changes in this release are not live yet' >&2
 # A failed smoke check restores the prior release without touching the database.
 if ! curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt | grep -qx "$revision" ||
    [[ "$(curl -sS -o /dev/null -w '%{http_code}' https://ajspay.co.in/api/auth/me)" != 401 ]]; then
   if [[ -n "$previous" ]]; then
     ln -s "$previous" current.rollback
     mv -Tf current.rollback current
-    sudo -n /usr/bin/systemctl reload php8.5-fpm
+    sudo -n /usr/bin/systemctl reload php8.5-fpm || true
   fi
   echo 'Deployment smoke check failed' >&2
   exit 1
