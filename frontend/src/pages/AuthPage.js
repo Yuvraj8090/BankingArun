@@ -328,7 +328,10 @@ function Field({ icon: Icon, label, children }) {
     <div>
       <label className="block text-[11px] text-slate-600 mb-1 font-medium">{label}</label>
       <div className="relative">
-        <Icon className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+        {/* z-10 keeps the icon above the field. A password field brings its own
+            relative wrapper for the reveal button, and being positioned and later
+            in the DOM it would otherwise paint its white background over this. */}
+        <Icon className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
         {children}
       </div>
     </div>
