@@ -244,7 +244,7 @@ function PublicFooter() {
   ];
 
   return (
-    <footer className="bg-white text-slate-600 mt-16">
+    <footer className="bg-white text-slate-600 border-t border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-xs">
         <div className="col-span-2 md:col-span-1 space-y-3">
           <Brand variant="full" height={40} onDark />
