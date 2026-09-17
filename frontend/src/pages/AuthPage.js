@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Building2, ShieldCheck, Lock, User, Mail, Phone, CreditCard,
@@ -24,10 +24,13 @@ const bufToB64u = (buf) => {
 
 export default function AuthPage({ onSuccess, defaultIsRegister }) {
   const { login, register } = useAuth();
-  const [isRegister, setIsRegister] = useState(!!defaultIsRegister);
+  const navigate = useNavigate();
+  // The two tabs are real URLs, so the route decides which form shows. Holding
+  // this in state meant switching tabs changed the address bar while the form
+  // stayed put, and only a reload — which remounts — appeared to fix it.
+  const isRegister = !!defaultIsRegister;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // register fields
@@ -43,9 +46,14 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
     try {
       const u = new URL(window.location.href);
       const r = u.searchParams.get('ref');
-      if (r) { setReferralCode(r.toUpperCase()); setIsRegister(true); }
+      if (!r) return;
+      setReferralCode(r.toUpperCase());
+      // A referral link opens the registration form by going there, rather than
+      // by overriding the form on /login and leaving the URL disagreeing with
+      // what is on screen.
+      if (!defaultIsRegister) navigate(`/open-account${u.search}`, { replace: true });
     } catch {}
-  }, []);
+  }, [defaultIsRegister, navigate]);
 
   const doLogin = async (e) => {
     e?.preventDefault();
@@ -172,21 +180,8 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                   className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
               </Field>
               <Field icon={Lock} label="Password">
-                <div className="relative">
-                  <input data-testid="login-password-input" type={showPwd ? 'text' : 'password'} required
-                    value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-11 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
-                  {/* The padding is the point: the icon is 16px, which is far below
-                      a usable tap target, and the button reads as broken when a tap
-                      lands a few pixels off it. */}
-                  <button type="button" onClick={() => setShowPwd(!showPwd)}
-                    aria-label={showPwd ? 'Hide password' : 'Show password'}
-                    data-testid="login-password-toggle"
-                    className="absolute right-0.5 top-1/2 -translate-y-1/2 p-3 text-slate-500 hover:text-slate-700 rounded-md">
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                <PasswordInput testId="login-password-input" label="password" placeholder="••••••••"
+                  value={password} onChange={e => setPassword(e.target.value)} />
               </Field>
               <button data-testid="login-submit-btn" type="submit" disabled={loading}
                 className="w-full py-3 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
@@ -225,12 +220,12 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field icon={Lock} label="Login password">
-                  <input data-testid="register-password-input" type="password" required value={password} onChange={e => setPassword(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+                  <PasswordInput testId="register-password-input" label="login password" dense
+                    value={password} onChange={e => setPassword(e.target.value)} />
                 </Field>
                 <Field icon={ShieldCheck} label="Transaction PIN">
-                  <input data-testid="register-txnpwd-input" type="password" required value={txnPwd} onChange={e => setTxnPwd(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+                  <PasswordInput testId="register-txnpwd-input" label="transaction PIN" dense
+                    value={txnPwd} onChange={e => setTxnPwd(e.target.value)} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -261,6 +256,35 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// A password field with its reveal toggle. The toggle is padded out to a real
+// tap target: the icon alone is 16px, well under the 24px minimum, and a tap
+// that lands beside it makes the button feel broken.
+function PasswordInput({ value, onChange, testId, label, placeholder, dense = false }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        data-testid={testId}
+        type={show ? 'text' : 'password'}
+        required
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`w-full bg-white border border-slate-300 rounded-md pl-9 pr-11 ${dense ? 'py-2' : 'py-2.5'} text-sm focus:outline-none focus:border-[#0b3b8c]`}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(!show)}
+        aria-label={`${show ? 'Hide' : 'Show'} ${label}`}
+        data-testid={`${testId}-toggle`}
+        className={`absolute right-0.5 top-1/2 -translate-y-1/2 ${dense ? 'p-2.5' : 'p-3'} text-slate-500 hover:text-slate-700 rounded-md`}
+      >
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
     </div>
   );
 }
