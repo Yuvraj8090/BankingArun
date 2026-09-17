@@ -1,0 +1,35 @@
+[Unit]
+Description=AJSPay Python API
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+# Its own account: the Python service needs to read the config and reach the
+# database, and nothing else on the box.
+User=ajspay-api
+Group=ajspay-api
+WorkingDirectory=/srv/ajspay/pyapi
+Environment=AJSPAY_CONFIG=/etc/ajspay/config.json
+ExecStart=/srv/ajspay/pyapi-venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8081 --workers 2 --no-server-header
+Restart=on-failure
+RestartSec=2
+
+# Bound to loopback only; Apache is the only thing that may reach it.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+# Nothing on disk is writable: the service only reads code and config.
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target

@@ -11,6 +11,14 @@ scp scripts/backup-db.sh "$VPS_USER@$VPS_HOST:/srv/ajspay/backup-db.sh"
 # run by hand. Applying it is never automatic: a schema change lands when
 # someone decides it should, not as a side effect of shipping a frontend.
 scp hostinger/migrate.sql "$VPS_USER@$VPS_HOST:/srv/ajspay/migrate.sql"
+# The Python backend ships outside the document root: it is proxied to, never
+# served as files. Its deploy assets travel with it so provisioning reads one
+# copy rather than a second that can drift.
+rm -rf .deploy/pyapi && cp -R pyapi .deploy/pyapi
+rm -rf .deploy/pyapi/.venv .deploy/pyapi/tests/__pycache__ .deploy/pyapi/app/__pycache__
+mkdir -p .deploy/pyapi/deploy
+cp scripts/ajspay-pyapi.service scripts/pyapi-proxy.conf .deploy/pyapi/deploy/
+scp -r .deploy/pyapi/. "$VPS_USER@$VPS_HOST:/srv/ajspay/pyapi/"
 ssh "$VPS_USER@$VPS_HOST" bash -s -- "$revision" <<'REMOTE'
 set -euo pipefail
 revision=$1
@@ -45,6 +53,13 @@ mv -Tf current.next current
 # strand the deploy between the swap and its own rollback, so it only warns.
 sudo -n /usr/bin/systemctl reload php8.5-fpm ||
   echo 'WARNING: could not reload php-fpm; PHP changes in this release are not live yet' >&2
+# Restart the Python service only if it is installed; the port is incremental,
+# so a box that has not been provisioned for it must deploy exactly as before.
+if systemctl list-unit-files ajspay-pyapi.service >/dev/null 2>&1 &&
+   systemctl is-enabled --quiet ajspay-pyapi 2>/dev/null; then
+  sudo -n /usr/bin/systemctl restart ajspay-pyapi ||
+    echo 'WARNING: could not restart the Python service; it is serving the previous code' >&2
+fi
 # A failed smoke check restores the prior release without touching the database.
 if ! curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt | grep -qx "$revision" ||
    [[ "$(curl -sS -o /dev/null -w '%{http_code}' https://ajspay.co.in/api/auth/me)" != 401 ]]; then
