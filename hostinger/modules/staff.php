@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 const ADMIN_ROLES = ['admin', 'branch_manager', 'bank_owner'];
 const KYC_FRAME_MAX = 2000000;  // base64 characters per photo (~1.5 MB image)
+const KYC_FRAME_MAX_PX = 6000;  // guards against a small file describing a huge bitmap
 function staff_user(array $roles): array
 {
     $user = current_user();
@@ -329,10 +330,26 @@ function kyc_frame(array $d, string $key): string
         fail(413, 'Each photo must be under 1.5 MB. Please retake it at a lower resolution.');
     }
     $raw = base64_decode(str_contains($value, ',') ? substr($value, strrpos($value, ',') + 1) : $value, true);
-    if ($raw === false || strlen($raw) < 1000 || !getimagesizefromstring($raw)) {
+    if ($raw === false || strlen($raw) < 1000) {
         fail(400, 'Uploaded frames appear invalid. Please retake photos.');
     }
-    return $value;
+    $info = getimagesizefromstring($raw);
+    // Trust the bytes, never the caller's label: only the two formats a camera
+    // actually produces are accepted, whatever the data URI claims to be.
+    if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) {
+        fail(400, 'Photos must be JPEG or PNG images. Please retake them.');
+    }
+    // A small, highly compressible file can describe an enormous bitmap. The
+    // histogram check decompresses these, so a frame that would allocate
+    // gigabytes is refused before anything tries to open it.
+    if ($info[0] > KYC_FRAME_MAX_PX || $info[1] > KYC_FRAME_MAX_PX || $info[0] < 64 || $info[1] < 64) {
+        fail(400, 'Photos must be between 64 and ' . KYC_FRAME_MAX_PX . ' pixels on a side.');
+    }
+    // Rebuilt from what the server verified, so the stored record carries a
+    // server-issued type rather than whatever prefix the client sent. The value
+    // is rendered back into an <img src> for the reviewer.
+    $mime = $info[2] === IMAGETYPE_JPEG ? 'image/jpeg' : 'image/png';
+    return 'data:' . $mime . ';base64,' . base64_encode($raw);
 }
 
 function rgb_histogram(string $dataUri): ?array
