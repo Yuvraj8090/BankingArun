@@ -204,6 +204,13 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                 <PasswordInput testId="login-password-input" label="password" placeholder="••••••••"
                   value={password} onChange={e => setPassword(e.target.value)} />
               </Field>
+              <div className="flex justify-end -mt-1">
+                <Link to="/forgot-password" data-testid="forgot-password-link"
+                  className="text-[11px] font-semibold text-[#0b3b8c] hover:text-[#092e6f] py-1">
+                  Forgot password?
+                </Link>
+              </div>
+
               <button data-testid="login-submit-btn" type="submit" disabled={loading}
                 className="w-full py-3 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
                 {loading ? 'Validating…' : <>Login <ArrowRight className="w-4 h-4" /></>}

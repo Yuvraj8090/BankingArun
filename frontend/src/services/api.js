@@ -194,6 +194,10 @@ export const api = {
   // transaction password the same way a transfer does.
   updateNominee: async (payload) => (await axios.patch(`${API}/profile/nominee`, payload, getAuthHeaders())).data,
   updateJointHolder: async (payload) => (await axios.patch(`${API}/profile/joint-holder`, payload, getAuthHeaders())).data,
+
+  // Unauthenticated: the member cannot sign in, which is the whole point.
+  forgotPassword: async (email) => (await axios.post(`${API}/auth/forgot-password`, { email })).data,
+  resetPassword: async (payload) => (await axios.post(`${API}/auth/reset-password`, payload)).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
   productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,

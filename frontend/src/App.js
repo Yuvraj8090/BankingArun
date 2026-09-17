@@ -49,6 +49,7 @@ import ReportsPage from './pages/ReportsPage';
 import TutorialOverlay from './components/TutorialOverlay';
 import SecurityCenterPage from './pages/SecurityCenterPage';
 import AuthPage from './pages/AuthPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { Toaster } from 'sonner';
 
 function Loading() {
@@ -291,6 +292,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<AuthRoute isRegister={false} />} />
             <Route path="/open-account" element={<AuthRoute isRegister />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/app" element={<AppHome />} />
             <Route path="/app/:tab" element={<AppShell />} />
             <Route element={<PublicLayout />}>

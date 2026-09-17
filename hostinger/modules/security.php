@@ -7,6 +7,9 @@ declare(strict_types=1);
 const OTP_MAX_ATTEMPTS = 5;   // wrong guesses per OTP before it is burned
 const OTP_MAX_SENDS = 10;     // OTPs a user can request per 15 minutes
 const OTP_PURPOSES = ['login', 'txn', 'pin_reset', 'high_value'];
+// Issued to someone who is not signed in, so it is deliberately not in
+// OTP_PURPOSES: route_otp_send must never mint one of these.
+const OTP_PURPOSE_RESET = 'password_reset';
 const SECRET_CONFIG_KEYS = ['twilio_account_sid', 'twilio_auth_token', 'sendgrid_api_key'];
 
 // --- Runtime config (bank owner's System Config screen) ------------------------------
@@ -462,4 +465,91 @@ function route_passkey_delete(array $d, string $id = ''): void
     $pdo->prepare('DELETE FROM passkeys WHERE id = ? AND user_id = ?')->execute([$id, $user['id']]);
     audit($user, 'PASSKEY_REMOVED', $passkey['label']);
     respond(['status' => 'SUCCESS', 'message' => 'Passkey removed']);
+}
+
+// --- Password recovery -----------------------------------------------------------------
+// The only flow here that runs for someone who is not signed in, which shapes all of it:
+// the reply cannot reveal whether an account exists, the code goes only to the contact
+// already on file, and a successful reset ends every session that was already open.
+function route_forgot_password(array $d): void
+{
+    global $pdo;
+    $email = strtolower(clip($d['email'] ?? '', 150));
+    // Bounded by address and by the address being asked about, so neither the
+    // mail provider nor one member's inbox can be used as a weapon.
+    rate_limit('forgot:' . client_ip(), 8, 3600, 'Too many requests. Please try again later.');
+    if ($email !== '') {
+        rate_limit('forgot-acct:' . $email, 4, 3600, 'Too many requests. Please try again later.');
+    }
+
+    // Always the same answer, whatever was typed. A different reply for a known
+    // address would turn this form into a way of testing who banks here.
+    $reply = ['status' => 'SUCCESS', 'message' =>
+        'If that email is registered, a 6-digit code is on its way. It expires in 5 minutes.'];
+
+    $user = $email === '' ? null : row('SELECT * FROM users WHERE email = ?', [$email]);
+    if (!$user) {
+        respond($reply);
+    }
+
+    $otp = sprintf('%06d', random_int(0, 999999));
+    $pdo->prepare('DELETE FROM otps WHERE user_id = ? AND purpose = ? AND verified = 0')
+        ->execute([$user['id'], OTP_PURPOSE_RESET]);
+    $pdo->prepare('INSERT INTO otps (id, user_id, purpose, otp_hash, channel, expires_at)
+        VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP() + INTERVAL 5 MINUTE)')
+        ->execute([uuid4(), $user['id'], OTP_PURPOSE_RESET, otp_hash($otp), 'email']);
+
+    $cfg = delivery_config();
+    if ($cfg['live_otp']) {
+        send_email($cfg, $user['email'], 'Your AJSPay password reset code',
+            '<p>Your password reset code is <b>' . $otp . '</b>. It expires in 5 minutes.</p>'
+            . '<p>If you did not ask for this, ignore this email and your password stays as it is.</p>');
+    }
+    security_event('PASSWORD_RESET_REQUESTED', 'warning', "Reset code issued for {$user['email']}", $user);
+    respond($reply);
+}
+
+function route_reset_password(array $d): void
+{
+    global $pdo;
+    rate_limit('reset:' . client_ip(), 10, 3600, 'Too many attempts. Please try again later.');
+    $email = strtolower(clip($d['email'] ?? '', 150));
+    $code = clip($d['otp'] ?? '', 6);
+    $new = $d['new_password'] ?? null;
+
+    if (!is_string($new) || strlen($new) < 8 || strlen($new) > 72) {
+        fail(422, 'Your new password must be between 8 and 72 characters.');
+    }
+
+    $user = $email === '' ? null : row('SELECT * FROM users WHERE email = ?', [$email]);
+    // One wording for every failure, so a wrong address and a wrong code are
+    // indistinguishable from outside.
+    $wrong = 'That code is not valid or has expired. Please request a new one.';
+    if (!$user) {
+        fail(400, $wrong);
+    }
+
+    $otp = row('SELECT *, expires_at < UTC_TIMESTAMP() AS expired FROM otps
+        WHERE user_id = ? AND purpose = ? AND verified = 0 ORDER BY created_at DESC LIMIT 1',
+        [$user['id'], OTP_PURPOSE_RESET]);
+    if (!$otp || (int)$otp['expired'] === 1 || (int)$otp['attempts'] >= OTP_MAX_ATTEMPTS) {
+        fail(400, $wrong);
+    }
+    if (!hash_equals($otp['otp_hash'], otp_hash($code))) {
+        $pdo->prepare('UPDATE otps SET attempts = attempts + 1 WHERE id = ?')->execute([$otp['id']]);
+        fail(400, $wrong);
+    }
+
+    $pdo->beginTransaction();
+    $pdo->prepare('UPDATE otps SET verified = 1, verified_at = UTC_TIMESTAMP() WHERE id = ?')->execute([$otp['id']]);
+    // Bumping session_version is the point: whoever forced the member to reset,
+    // or was already riding a stolen session, is signed out by this.
+    $pdo->prepare('UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?')
+        ->execute([password_hash($new, PASSWORD_BCRYPT), $user['id']]);
+    $pdo->commit();
+
+    audit($user, 'PASSWORD_RESET', 'Password reset by emailed code');
+    security_event('PASSWORD_RESET', 'warning', "Password reset for {$user['email']}; all sessions ended", $user);
+    respond(['status' => 'SUCCESS',
+        'message' => 'Your password has been changed and every signed-in device has been logged out.']);
 }
