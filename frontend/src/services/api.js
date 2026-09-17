@@ -184,6 +184,11 @@ export const api = {
   // Content behind the public product pages.
   publicProducts: async () => (await axios.get(`${API}/public/products`)).data,
   publicCaptcha: async () => (await axios.get(`${API}/public/captcha`)).data,
+
+  // Identity documents a member uploads for verification.
+  kycDocuments: async () => (await axios.get(`${API}/kyc/documents`, getAuthHeaders())).data,
+  kycDocumentUpload: async (payload) => (await axios.post(`${API}/kyc/documents`, payload, getAuthHeaders())).data,
+  kycDocumentsQueue: async () => (await axios.get(`${API}/kyc/documents/queue`, getAuthHeaders())).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
   productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,

@@ -490,3 +490,121 @@ function route_kyc_face_match(array $d, string $id = ''): void
 // db.php and api.php, and a zip of the whole backend, to any administrator —
 // useful while setting the server up, and an unnecessary way to read the
 // application's internals once it is running.
+
+// --- KYC documents ---------------------------------------------------------------------
+// What a member uploads for verification, as opposed to the live video capture. The
+// screen that collected these used to show a success message and send nothing.
+const KYC_DOC_KINDS = ['pan', 'aadhaar', 'address'];
+const KYC_DOC_MAX = 4000000;          // base64 characters, ~3 MB of file
+const KYC_DOC_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+
+function kyc_document_payload(array $d): array
+{
+    $kind = clip($d['kind'] ?? '', 20);
+    if (!in_array($kind, KYC_DOC_KINDS, true)) {
+        fail(422, 'kind must be pan, aadhaar or address.');
+    }
+    $value = $d['content'] ?? null;
+    if (!is_string($value) || $value === '') {
+        fail(422, 'Please choose a file to upload.');
+    }
+    if (strlen($value) > KYC_DOC_MAX) {
+        fail(413, 'Each document must be under 3 MB.');
+    }
+    $raw = base64_decode(str_contains($value, ',') ? substr($value, strrpos($value, ',') + 1) : $value, true);
+    if ($raw === false || strlen($raw) < 512) {
+        fail(400, 'That file could not be read. Please choose another.');
+    }
+
+    // The bytes decide the type, never the name or the data URI the browser sent.
+    if (str_starts_with($raw, '%PDF-')) {
+        $mime = 'application/pdf';
+    } else {
+        $info = getimagesizefromstring($raw);
+        if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) {
+            fail(400, 'Documents must be a JPEG, PNG or PDF.');
+        }
+        // A small file can describe an enormous bitmap; reviewers open these.
+        if ($info[0] > KYC_FRAME_MAX_PX || $info[1] > KYC_FRAME_MAX_PX) {
+            fail(400, 'That image is too large to process. Please use a smaller scan.');
+        }
+        $mime = $info[2] === IMAGETYPE_JPEG ? 'image/jpeg' : 'image/png';
+    }
+
+    return [
+        'kind' => $kind,
+        'file_name' => clip($d['file_name'] ?? '', 200) ?: null,
+        'mime' => $mime,
+        'byte_size' => strlen($raw),
+        // Re-encoded from the verified bytes, so the stored record carries a
+        // server-issued type rather than whatever the client claimed.
+        'content_b64' => 'data:' . $mime . ';base64,' . base64_encode($raw),
+    ];
+}
+
+function kyc_document_public(array $r, bool $withContent = false): array
+{
+    $out = [
+        'id' => $r['id'],
+        'kind' => $r['kind'],
+        'file_name' => $r['file_name'],
+        'mime' => $r['mime'],
+        'byte_size' => (int)$r['byte_size'],
+        'status' => $r['status'],
+        'uploaded_at' => $r['uploaded_at'],
+        'review_reason' => $r['review_reason'],
+    ];
+    if ($withContent) {
+        $out['content'] = $r['content_b64'];
+    }
+    return $out;
+}
+
+function route_kyc_documents_mine(array $d): void
+{
+    $user = current_user();
+    // The list is metadata only. A member re-opening the page does not need the
+    // bytes shipped back to them, and a smaller response is a smaller target.
+    respond(['documents' => array_map(
+        fn($r) => kyc_document_public($r),
+        rows('SELECT * FROM kyc_documents WHERE user_id = ? ORDER BY uploaded_at DESC', [$user['id']]))]);
+}
+
+function route_kyc_document_upload(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    rate_limit('kycdoc:' . $user['id'], 20, 3600, 'Too many uploads. Please try again later.');
+    $doc = kyc_document_payload($d);
+
+    // One current document per kind: a re-upload replaces the previous one
+    // rather than leaving a reviewer to guess which is the real copy.
+    $pdo->prepare('DELETE FROM kyc_documents WHERE user_id = ? AND kind = ? AND status = ?')
+        ->execute([$user['id'], $doc['kind'], 'pending_review']);
+
+    $id = uuid4();
+    $pdo->prepare('INSERT INTO kyc_documents (id, user_id, kind, file_name, mime, byte_size, content_b64)
+        VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$id, $user['id'], $doc['kind'], $doc['file_name'], $doc['mime'],
+            $doc['byte_size'], $doc['content_b64']]);
+    audit($user, 'KYC_DOCUMENT_UPLOADED', "{$doc['kind']} ({$doc['byte_size']} bytes)");
+
+    respond(['status' => 'SUCCESS',
+        'message' => 'Document received. Your branch compliance officer will review it.',
+        'document' => kyc_document_public(row('SELECT * FROM kyc_documents WHERE id = ?', [$id]))]);
+}
+
+// Reviewers only: the bytes come back here, and nowhere else.
+function route_kyc_documents_queue(array $d): void
+{
+    staff_user(ADMIN_ROLES);
+    $rows = rows("SELECT d.*, u.name AS user_name, u.email AS user_email
+        FROM kyc_documents d JOIN users u ON u.id = d.user_id
+        WHERE d.status = 'pending_review' ORDER BY d.uploaded_at");
+    respond(['documents' => array_map(function ($r) {
+        $out = kyc_document_public($r, true);
+        $out['user_name'] = $r['user_name'];
+        $out['user_email'] = $r['user_email'];
+        return $out;
+    }, $rows)]);
+}

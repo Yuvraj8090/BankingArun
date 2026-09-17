@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileBadge2, ShieldCheck, UserCheck, Users, Upload, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
+import DocumentUpload from '../components/DocumentUpload';
+import { api } from '../services/api';
 
 export default function KycAccountPage() {
   const { user } = useAuth();
   const { currentTheme } = useBankTheme();
 
-  const [panDoc, setPanDoc] = useState(null);
-  const [aadhaarDoc, setAadhaarDoc] = useState(null);
-  const [addressDoc, setAddressDoc] = useState(null);
-  const [uploading, setUploading] = useState(false);
+  // Keyed by kind, so the page shows what has already been sent for review.
+  const [docs, setDocs] = useState({});
 
   // Nominee update
   const [nomineeName, setNomineeName] = useState(user?.nominee?.name || 'Pooja Sharma');
@@ -21,14 +21,13 @@ export default function KycAccountPage() {
   const [jointName, setJointName] = useState(user?.joint_holder_name || 'Ananya Sharma');
   const [jointPan, setJointPan] = useState('BLTPS4819M');
 
-  const handleKycUpload = (e) => {
-    e.preventDefault();
-    setUploading(true);
-    setTimeout(() => {
-      setUploading(false);
-      toast.success("KYC documents uploaded successfully! Sent to Branch Compliance Officer for verification.");
-    }, 1200);
-  };
+  // What has already been sent for review, so a returning member sees it
+  // rather than being invited to upload the same document again.
+  useEffect(() => {
+    api.kycDocuments()
+      .then(({ documents }) => setDocs(Object.fromEntries((documents || []).map((d) => [d.kind, d]))))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -60,7 +59,7 @@ export default function KycAccountPage() {
             Upload Verified KYC Documents (Aadhaar / PAN / OVD)
           </h2>
 
-          <form onSubmit={handleKycUpload} className="space-y-4 text-xs">
+          <div className="space-y-4 text-xs">
             <div>
               <label className="block text-slate-500 mb-1">Permanent Account Number (PAN Card)</label>
               <div className="flex items-center gap-3">
@@ -70,12 +69,8 @@ export default function KycAccountPage() {
                   value={user?.pan_number || 'ABCPS8492K'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] cursor-pointer border border-slate-200">
-                  <Upload className="w-3.5 h-3.5 inline mr-1" /> Choose File
-                  <input type="file" className="hidden" onChange={() => setPanDoc(true)} />
-                </label>
+                <div className="w-56 shrink-0"><DocumentUpload kind="pan" label="PAN card" hint="JPEG, PNG or PDF, up to 3 MB" existing={docs.pan} onUploaded={(d) => setDocs((v) => ({ ...v, pan: d }))} /></div>
               </div>
-              {panDoc && <span className="text-[10px] text-emerald-700 mt-1 block">✓ PAN document attached</span>}
             </div>
 
             <div>
@@ -87,12 +82,8 @@ export default function KycAccountPage() {
                   value={user?.aadhaar_number || 'XXXX-XXXX-4892'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] cursor-pointer border border-slate-200">
-                  <Upload className="w-3.5 h-3.5 inline mr-1" /> Choose File
-                  <input type="file" className="hidden" onChange={() => setAadhaarDoc(true)} />
-                </label>
+                <div className="w-56 shrink-0"><DocumentUpload kind="aadhaar" label="Aadhaar / UIDAI document" hint="Mask all but the last four digits if you prefer" existing={docs.aadhaar} onUploaded={(d) => setDocs((v) => ({ ...v, aadhaar: d }))} /></div>
               </div>
-              {aadhaarDoc && <span className="text-[10px] text-emerald-700 mt-1 block">✓ Aadhaar document attached</span>}
             </div>
 
             <div>
@@ -104,22 +95,15 @@ export default function KycAccountPage() {
                   value="Electricity Bill - Arya Nagar, Chhutmalpur"
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-600"
                 />
-                <label className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] cursor-pointer border border-slate-200">
-                  <Upload className="w-3.5 h-3.5 inline mr-1" /> Choose File
-                  <input type="file" className="hidden" onChange={() => setAddressDoc(true)} />
-                </label>
+                <div className="w-56 shrink-0"><DocumentUpload kind="address" label="Proof of address" hint="A utility bill or passport, up to 3 MB" existing={docs.address} onUploaded={(d) => setDocs((v) => ({ ...v, address: d }))} /></div>
               </div>
             </div>
 
-            <button
-              data-testid="submit-kyc-docs-btn"
-              type="submit"
-              disabled={uploading}
-              className={`w-full py-3 rounded-xl ${currentTheme.buttonTheme} font-semibold`}
-            >
-              {uploading ? 'Encrypting & Storing Documents...' : 'Submit Documents for Compliance Verification'}
-            </button>
-          </form>
+            <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
+              Each document is sent for review as you upload it. Your branch compliance officer
+              checks them against the originals before your KYC status changes.
+            </p>
+          </div>
         </div>
 
         {/* Joint Holder & Nominee Registration */}
@@ -156,7 +140,7 @@ export default function KycAccountPage() {
 
             <button
               onClick={() => toast.success("Nominee updated successfully!")}
-              className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-emerald-700 font-semibold border border-slate-200"
+              className="w-full py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 hover:text-emerald-800 font-semibold border border-emerald-200 hover:border-emerald-300 transition"
             >
               Update Nominee Registration
             </button>
@@ -193,7 +177,7 @@ export default function KycAccountPage() {
 
             <button
               onClick={() => toast.success("Joint holder authorized on account!")}
-              className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-purple-300 font-semibold border border-slate-200"
+              className="w-full py-2 rounded-xl bg-white hover:bg-blue-50 text-[#0b3b8c] hover:text-[#092e6f] font-semibold border border-blue-200 hover:border-[#0b3b8c] transition"
             >
               Authorize Joint Co-Signatory
             </button>

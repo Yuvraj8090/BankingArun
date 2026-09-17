@@ -897,3 +897,23 @@ CREATE TABLE IF NOT EXISTS captcha_challenges (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_captcha_expiry (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Identity documents a member uploads for verification. Stored inline rather
+-- than on disk: nothing under the document root can then be fetched directly,
+-- and the bytes are only ever handed to an authorised reviewer.
+CREATE TABLE IF NOT EXISTS kyc_documents (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    kind VARCHAR(20) NOT NULL,              -- pan | aadhaar | address
+    file_name VARCHAR(200),
+    mime VARCHAR(40) NOT NULL,
+    byte_size INT NOT NULL,
+    content_b64 MEDIUMTEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending_review',
+    reviewed_by VARCHAR(36),
+    review_reason VARCHAR(255),
+    uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at DATETIME NULL,
+    INDEX idx_kyc_doc_user (user_id, kind),
+    INDEX idx_kyc_doc_status (status, uploaded_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

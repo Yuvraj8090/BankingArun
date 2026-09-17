@@ -155,7 +155,7 @@ export default function CardsChequesPage() {
               data-testid={`cards-tab-${t.k}`}
               onClick={() => setTab(t.k)}
               className={`px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${
-                tab === t.k ? 'border-[#0b3b8c] text-[#0b3b8c]' : 'border-transparent text-slate-600 hover:text-slate-900'
+                tab === t.k ? 'border-[#0b3b8c] text-[#0b3b8c]' : 'border-transparent text-slate-600 hover:text-white'
               }`}
             >
               <t.i className="w-3.5 h-3.5" /> {t.l}
@@ -445,7 +445,7 @@ export default function CardsChequesPage() {
                   setStopChequeNo('');
                 } catch { toast.error('Stop failed'); }
               }}
-              className="w-full py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-slate-900 text-xs font-semibold transition">
+              className="w-full py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold transition">
               Confirm Stop Payment
             </button>
           </div>

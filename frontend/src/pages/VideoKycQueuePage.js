@@ -118,7 +118,7 @@ export default function VideoKycQueuePage() {
                     <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                   </button>
                   <button data-testid={`vkyc-reject-${detail.id}`} onClick={() => decide(detail.id, 'reject')}
-                    className="flex-1 py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 transition">
+                    className="flex-1 py-2.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition">
                     <XCircle className="w-3.5 h-3.5" /> Reject
                   </button>
                 </div>

@@ -96,7 +96,7 @@ export default function AdminPortal() {
               className={`px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${
                 activeTab === t.key
                   ? 'border-[#0b3b8c] text-[#0b3b8c]'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  : 'border-transparent text-slate-600 hover:text-white'
               }`}
             >
               <t.icon className="w-3.5 h-3.5" /> {t.label}
@@ -195,7 +195,7 @@ export default function AdminPortal() {
                         <CheckCircle className="w-3.5 h-3.5" /> Approve
                       </button>
                       <button data-testid={`reject-kyc-${u.id}`} onClick={() => handleKycAction(u.id, 'rejected')}
-                        className="px-3 py-1.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 transition">
+                        className="px-3 py-1.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
                         <XCircle className="w-3.5 h-3.5" /> Reject
                       </button>
                     </div>

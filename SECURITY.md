@@ -132,11 +132,26 @@ listed at the bottom as real work.
 
 ---
 
+## Screens that report success without doing anything
+
+Found while wiring up the document upload. These are worse than a missing
+feature: a member is told a regulated step completed when nothing was sent.
+
+| Screen | What it claims | What happens |
+|---|---|---|
+| KYC documents | "Sent to Branch Compliance Officer" | ✅ **Fixed** — documents are now validated, stored and queued for review |
+| Nominee registration | "Nominee updated successfully!" | ⬜ Still a toast. Nothing is saved. Nomination is a statutory record |
+| Joint co-signatory | "Joint holder authorized on account!" | ⬜ Still a toast. Nothing is saved |
+
+`KycAccountPage` made **zero** API calls before this change. The nominee and
+joint-holder halves still make none.
+
 ## Real gaps worth fixing, in order
 
 These are missing **code**, not missing infrastructure or missing staff:
 
-1. **Password recovery** — there is no reset flow at all. A member who forgets their password currently has no route back in except staff intervention. Needs a single-use, time-bound, out-of-band token.
+1. **Nominee and joint-holder saving** — both buttons lie today. Nomination in particular is a statutory record under the Nidhi Rules.
+2. **Password recovery** — there is no reset flow at all. A member who forgets their password currently has no route back in except staff intervention. Needs a single-use, time-bound, out-of-band token.
 2. **`security.txt`** — one static file so a researcher who finds something knows where to send it.
 3. **SAST in CI** — the deploy workflow builds and ships but never scans. `php -l`, `npm audit`, and a static analyser would catch regressions before they reach the VPS.
 4. **Password strength** — length is checked, nothing else. A breached-password check against the HaveIBeenPwned k-anonymity API is a single request and leaks nothing.

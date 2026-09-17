@@ -77,10 +77,10 @@ export default function PublicNavbar() {
             <span className="hidden md:inline">Video KYC · Passkey sign-in · 24×7 transfers</span>
           </div>
           <div className="flex items-center gap-4">
-            <a href="tel:9105015464" className="hidden sm:flex items-center gap-1 hover:text-slate-900">
+            <a href="tel:9105015464" className="hidden sm:flex items-center gap-1 hover:text-white">
               <Phone className="w-3 h-3" /> 9105015464
             </a>
-            <Link to="/branches" data-testid="public-nav-locator" className="flex items-center gap-1 hover:text-slate-900">
+            <Link to="/branches" data-testid="public-nav-locator" className="flex items-center gap-1 hover:text-white">
               <MapPin className="w-3 h-3" /> Locate Us
             </Link>
           </div>
@@ -102,7 +102,7 @@ export default function PublicNavbar() {
             <Link
               to="/open-account"
               data-testid="public-open-account-cta"
-              className="hidden md:inline-flex px-4 py-2 rounded-md border border-[#0b3b8c] text-[#0b3b8c] text-xs font-semibold hover:bg-[#0b3b8c] hover:text-slate-900 transition items-center gap-1.5"
+              className="hidden md:inline-flex px-4 py-2 rounded-md border border-[#0b3b8c] text-[#0b3b8c] text-xs font-semibold hover:bg-[#0b3b8c] hover:text-white transition items-center gap-1.5"
             >
               <UserPlus className="w-3.5 h-3.5" /> Open Account
             </Link>
