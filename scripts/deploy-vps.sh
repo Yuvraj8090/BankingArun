@@ -18,6 +18,7 @@ rm -rf .deploy/pyapi && cp -R pyapi .deploy/pyapi
 rm -rf .deploy/pyapi/.venv .deploy/pyapi/tests/__pycache__ .deploy/pyapi/app/__pycache__
 mkdir -p .deploy/pyapi/deploy
 cp scripts/ajspay-pyapi.service scripts/pyapi-proxy.conf .deploy/pyapi/deploy/
+ssh "$VPS_USER@$VPS_HOST" 'install -d -m 755 /srv/ajspay/pyapi'
 scp -r .deploy/pyapi/. "$VPS_USER@$VPS_HOST:/srv/ajspay/pyapi/"
 ssh "$VPS_USER@$VPS_HOST" bash -s -- "$revision" <<'REMOTE'
 set -euo pipefail
