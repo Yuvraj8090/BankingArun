@@ -189,6 +189,11 @@ export const api = {
   kycDocuments: async () => (await axios.get(`${API}/kyc/documents`, getAuthHeaders())).data,
   kycDocumentUpload: async (payload) => (await axios.post(`${API}/kyc/documents`, payload, getAuthHeaders())).data,
   kycDocumentsQueue: async () => (await axios.get(`${API}/kyc/documents/queue`, getAuthHeaders())).data,
+
+  // Nomination and joint holding are statutory records, so both take the
+  // transaction password the same way a transfer does.
+  updateNominee: async (payload) => (await axios.patch(`${API}/profile/nominee`, payload, getAuthHeaders())).data,
+  updateJointHolder: async (payload) => (await axios.patch(`${API}/profile/joint-holder`, payload, getAuthHeaders())).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
   productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,

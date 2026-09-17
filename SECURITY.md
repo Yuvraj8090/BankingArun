@@ -41,7 +41,7 @@ listed at the bottom as real work.
 | 9 | Credential stuffing protection | 🟡 | Lockout + per-IP throttling. No IP reputation feed or behavioural analytics |
 | 10 | Session invalidation on logout | ✅ | `session_version` increments; every token issued earlier dies at once |
 | 11 | Concurrent session control | ⬜ | Sessions are stateless; no device list, no "sign out everywhere" |
-| 12 | Step-up authentication | ✅ | Separate transaction password + OTP before transfers |
+| 12 | Step-up authentication | ✅ | Transaction password + OTP before transfers; also required to change a nomination or joint holder |
 | 13 | Secure password recovery | ⬜ | **No reset flow exists at all** — see "Real gaps" |
 | 14 | Device binding / fingerprinting | ⬜ | Not implemented |
 | 15 | PKI | 🟡 | Let's Encrypt TLS to Dec 2026, auto-renewing. No client certificates |
@@ -140,18 +140,19 @@ feature: a member is told a regulated step completed when nothing was sent.
 | Screen | What it claims | What happens |
 |---|---|---|
 | KYC documents | "Sent to Branch Compliance Officer" | ✅ **Fixed** — documents are now validated, stored and queued for review |
-| Nominee registration | "Nominee updated successfully!" | ⬜ Still a toast. Nothing is saved. Nomination is a statutory record |
-| Joint co-signatory | "Joint holder authorized on account!" | ⬜ Still a toast. Nothing is saved |
+| Nominee registration | "Nominee updated successfully!" | ✅ **Fixed** — saved, transaction password required, old → new in the audit trail |
+| Joint co-signatory | "Joint holder authorized on account!" | ✅ **Fixed** — saved, propagates to the member's accounts, removal supported |
 
-`KycAccountPage` made **zero** API calls before this change. The nominee and
-joint-holder halves still make none.
+`KycAccountPage` made **zero** API calls before this work. All three halves —
+documents, nomination and joint holding — now reach the server, and the two
+statutory ones are gated on the transaction password with lockout after five
+wrong attempts.
 
 ## Real gaps worth fixing, in order
 
 These are missing **code**, not missing infrastructure or missing staff:
 
-1. **Nominee and joint-holder saving** — both buttons lie today. Nomination in particular is a statutory record under the Nidhi Rules.
-2. **Password recovery** — there is no reset flow at all. A member who forgets their password currently has no route back in except staff intervention. Needs a single-use, time-bound, out-of-band token.
+1. **Password recovery** — there is no reset flow at all. A member who forgets their password currently has no route back in except staff intervention. Needs a single-use, time-bound, out-of-band token.
 2. **`security.txt`** — one static file so a researcher who finds something knows where to send it.
 3. **SAST in CI** — the deploy workflow builds and ships but never scans. `php -l`, `npm audit`, and a static analyser would catch regressions before they reach the VPS.
 4. **Password strength** — length is checked, nothing else. A breached-password check against the HaveIBeenPwned k-anonymity API is a single request and leaks nothing.

@@ -275,6 +275,71 @@ function debit_account(array $user, mixed $accountNumber, float $total, string $
 }
 
 // --- Auth ----------------------------------------------------------------------------
+// --- Nominee and joint holder ---------------------------------------------------------
+// A nomination is a statutory record: it decides who the deposit is paid to. Changing it
+// is therefore treated like moving money — the transaction password is required, the old
+// and new values both go into the audit trail, and the member is told what changed.
+function route_nominee_update(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    check_txn_password($user, $d['transaction_password'] ?? null,
+        'Wrong transaction password. The nomination has not been changed.');
+
+    $name = clip($d['nominee_name'] ?? '', 150);
+    $relation = clip($d['nominee_relation'] ?? '', 50);
+    if ($name === '') {
+        fail(422, 'Please give the nominee\'s full name.');
+    }
+    if ($relation === '') {
+        fail(422, 'Please state the nominee\'s relationship to you.');
+    }
+
+    $before = $user['nominee_name'] === null ? 'none' : "{$user['nominee_name']} ({$user['nominee_relation']})";
+    $pdo->prepare('UPDATE users SET nominee_name = ?, nominee_relation = ? WHERE id = ?')
+        ->execute([$name, $relation, $user['id']]);
+    audit($user, 'NOMINEE_UPDATED', "$before -> $name ($relation)");
+    security_event('NOMINEE_UPDATED', 'info', "Nomination changed from $before to $name ($relation)", $user);
+
+    respond(['status' => 'SUCCESS',
+        'message' => "Nomination recorded: $name ($relation).",
+        'user' => public_user(row('SELECT * FROM users WHERE id = ?', [$user['id']]))]);
+}
+
+function route_joint_holder_update(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    check_txn_password($user, $d['transaction_password'] ?? null,
+        'Wrong transaction password. The joint holder has not been changed.');
+
+    // Removing a joint holder is as deliberate an act as adding one, so it is
+    // an explicit flag rather than an empty name.
+    $wanted = !empty($d['is_joint']);
+    $name = clip($d['joint_holder_name'] ?? '', 150);
+    if ($wanted && $name === '') {
+        fail(422, 'Please give the joint holder\'s full name.');
+    }
+    $pan = strtoupper(clip($d['joint_holder_pan'] ?? '', 10));
+    if ($wanted && $pan !== '' && !preg_match('/\A[A-Z]{5}[0-9]{4}[A-Z]\z/', $pan)) {
+        fail(422, 'The joint holder\'s PAN must look like ABCDE1234F.');
+    }
+
+    $before = (int)$user['is_joint'] === 1 ? ($user['joint_holder_name'] ?? 'unnamed') : 'none';
+    $pdo->prepare('UPDATE users SET is_joint = ?, joint_holder_name = ? WHERE id = ?')
+        ->execute([$wanted ? 1 : 0, $wanted ? $name : null, $user['id']]);
+    // Every account the member holds carries the same joint flag.
+    $pdo->prepare('UPDATE accounts SET is_joint = ? WHERE user_id = ?')->execute([$wanted ? 1 : 0, $user['id']]);
+
+    $after = $wanted ? $name : 'none';
+    audit($user, 'JOINT_HOLDER_UPDATED', "$before -> $after" . ($wanted && $pan !== '' ? " PAN $pan" : ''));
+    security_event('JOINT_HOLDER_UPDATED', 'warning', "Joint holder changed from $before to $after", $user);
+
+    respond(['status' => 'SUCCESS',
+        'message' => $wanted ? "$name recorded as joint holder." : 'Joint holder removed from the account.',
+        'user' => public_user(row('SELECT * FROM users WHERE id = ?', [$user['id']]))]);
+}
+
 // Opening an account is a counter action, not a self-service one: a Nidhi has to
 // see the applicant's identity documents first. The public site raises an enquiry
 // instead (route_public_enquiry), and a verified applicant is opened here by staff.
@@ -817,6 +882,8 @@ $routes = [
     'GET /admin/rbi-reports' => 'route_rbi_reports',
     'GET /admin/config' => 'route_admin_config_get',
     'PUT /admin/config' => 'route_admin_config_set',
+    'PATCH /profile/nominee' => 'route_nominee_update',
+    'PATCH /profile/joint-holder' => 'route_joint_holder_update',
     'GET /kyc/documents' => 'route_kyc_documents_mine',
     'POST /kyc/documents' => 'route_kyc_document_upload',
     'GET /kyc/documents/queue' => 'route_kyc_documents_queue',
