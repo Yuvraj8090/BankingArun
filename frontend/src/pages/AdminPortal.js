@@ -69,7 +69,7 @@ export default function AdminPortal() {
           <div>
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-md bg-[#0b3b8c] flex items-center justify-center">
-                <Lock className="w-4.5 h-4.5 text-slate-900" />
+                <Lock className="w-4 h-4 text-white" />
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">

@@ -107,7 +107,7 @@ export default function SecurityPage() {
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5 text-slate-900" />
+            <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Security &amp; Login</h1>

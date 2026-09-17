@@ -176,9 +176,14 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                   <input data-testid="login-password-input" type={showPwd ? 'text' : 'password'} required
                     value={password} onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-11 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+                  {/* The padding is the point: the icon is 16px, which is far below
+                      a usable tap target, and the button reads as broken when a tap
+                      lands a few pixels off it. */}
                   <button type="button" onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700">
+                    aria-label={showPwd ? 'Hide password' : 'Show password'}
+                    data-testid="login-password-toggle"
+                    className="absolute right-0.5 top-1/2 -translate-y-1/2 p-3 text-slate-500 hover:text-slate-700 rounded-md">
                     {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
