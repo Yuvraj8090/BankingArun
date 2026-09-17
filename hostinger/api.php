@@ -843,6 +843,7 @@ $routes = [
     'GET /public/features' => 'route_public_features',
     'GET /public/schemes' => 'route_public_schemes',
     'GET /public/products' => 'route_public_products',
+    'GET /public/captcha' => 'route_public_captcha',
     'POST /public/enquiry' => 'route_public_enquiry',
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Building2, Lock, User, Mail, Phone, PiggyBank,
-  ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, Gift
+  ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, Gift, RefreshCw
 } from 'lucide-react';
 import Brand from '../components/Brand';
 import { toast } from 'sonner';
@@ -40,6 +40,8 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
   const [interest, setInterest] = useState('savings');
   const [notes, setNotes] = useState('');
   const [enquirySent, setEnquirySent] = useState(false);
+  const [captcha, setCaptcha] = useState(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
 
   // Prefill referral from URL ?ref=
   useEffect(() => {
@@ -70,6 +72,14 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
   // A Nidhi cannot enrol a member off a web form — identity documents have to be
   // seen and verified — so this raises an enquiry and the sales desk takes it
   // from there. No account is created here and no credentials are collected.
+  const newCaptcha = useCallback(async () => {
+    setCaptchaAnswer('');
+    try { setCaptcha(await api.publicCaptcha()); }
+    catch { setCaptcha(null); }
+  }, []);
+
+  useEffect(() => { if (isRegister) newCaptcha(); }, [isRegister, newCaptcha]);
+
   const doEnquiry = async (e) => {
     e?.preventDefault();
     if (!name.trim() || !phone.trim()) return toast.error('Please give us your name and phone number');
@@ -82,11 +92,16 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
         interest,
         notes: notes.trim() || undefined,
         referral_code: referralCode.trim() || undefined,
+        captcha_id: captcha?.captcha_id,
+        captcha_answer: captchaAnswer.trim(),
       });
       setEnquirySent(true);
       toast.success(r.message);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Could not send your enquiry. Please call 9105015464.');
+      // The image is spent whether the answer was right or wrong, so the one on
+      // screen is already invalid — replace it rather than let them retype it.
+      newCaptcha();
     } finally { setLoading(false); }
   };
 
@@ -275,6 +290,36 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                   placeholder="A good time to call, your nearest branch, or a question"
                   className="w-full bg-white border border-slate-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
               </label>
+
+              <div>
+                <span className="block text-[11px] text-slate-600 mb-1 font-medium">
+                  Type the number shown
+                </span>
+                <div className="flex items-center gap-2">
+                  {captcha ? (
+                    <img src={captcha.image} alt="Verification number"
+                      data-testid="enquiry-captcha-image"
+                      className="h-14 w-40 rounded-md border border-slate-300 bg-white shrink-0" />
+                  ) : (
+                    <div className="h-14 w-40 rounded-md border border-slate-300 bg-slate-50 shrink-0
+                      flex items-center justify-center text-[10px] text-slate-500 text-center px-2">
+                      Could not load the image
+                    </div>
+                  )}
+                  <button type="button" onClick={newCaptcha} data-testid="enquiry-captcha-refresh"
+                    aria-label="Show a different number"
+                    className="p-3 rounded-md border border-slate-300 text-slate-600 hover:border-[#0b3b8c] hover:text-[#0b3b8c] shrink-0">
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                  <input data-testid="enquiry-captcha-input" required value={captchaAnswer}
+                    onChange={e => setCaptchaAnswer(e.target.value.replace(/\D/g, ''))}
+                    inputMode="numeric" autoComplete="off" maxLength={6} placeholder="12345"
+                    className="w-full bg-white border border-slate-300 rounded-md px-3 py-2.5 text-sm tracking-[0.3em] font-mono focus:outline-none focus:border-[#0b3b8c]" />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Can't read it? Use the refresh button for a new number, or call 9105015464.
+                </p>
+              </div>
 
               <button data-testid="enquiry-submit-btn" type="submit" disabled={loading}
                 className="w-full py-3 rounded-md bg-[#c8102e] hover:bg-[#a30d25] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">

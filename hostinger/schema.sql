@@ -885,3 +885,15 @@ INSERT IGNORE INTO site_products (id, group_key, slug, title, tagline, summary, 
 ('prod-investments-sovereign-gold-bonds', 'investments', 'sovereign-gold-bonds', 'Sovereign Gold Bonds', 'Gold holdings without storing metal.', 'Sovereign Gold Bonds are issued by the Reserve Bank of India in tranches. When a tranche opens, you can place a subscription request from your account and the holding is recorded in your name.', '["Issued by the RBI in tranches","No storage or making charges","Interest in addition to the gold price","Held in your own name"]', '[["Issuer","Reserve Bank of India"],["Availability","Only while a tranche is open"],["Tenure","Eight years, exit allowed from the fifth"]]', '["An active AJSPay account with completed KYC"]', NULL, 'mutual_funds', 160, 'active'),
 ('prod-investments-insurance', 'investments', 'insurance', 'Insurance', 'Term, health and motor cover.', 'Compare the term, health and motor plans listed in your account and start an application. Cover is underwritten by our insurance partners, who assess and issue the policy.', '["Term life, family health and motor cover","Plan details and premiums in-app","Issued by insurance partners","Nominee recorded with the policy"]', '[["Term cover","From ₹8,450 a year"],["Family health floater","From ₹14,200 a year"],["Motor cover","From ₹7,100 a year"]]', '["PAN and Aadhaar","Health declaration where the plan requires it"]', 'Insurance is underwritten by our partners. Premiums shown are indicative and depend on age, cover and underwriting.', 'insurance', 170, 'active'),
 ('prod-support-grievance-redressal', 'support', 'grievance-redressal', 'Grievance Redressal', 'How to raise a complaint and what happens next.', 'Raise a complaint from Support inside the member portal and you get a ticket number immediately. Complaints mentioning fraud are marked high priority and routed to the grievance desk first.', '["Ticket number as soon as you file","Fraud reports prioritised","Track status in your account","Escalation if the first response does not resolve it"]', '[["Level 1","Grievance Redressal Desk, from the member portal"],["Level 2","Nodal officer at the head office"],["Toll-free","9105015464, 24×7"],["Cyber fraud helpline","1930"]]', '["Your account details","Transaction reference for the disputed entry"]', NULL, NULL, 180, 'active');
+
+-- One row per CAPTCHA served. The answer is never stored, only a salted hash of
+-- it, and a row is spent the moment it is used so an answer cannot be replayed.
+CREATE TABLE IF NOT EXISTS captcha_challenges (
+    id VARCHAR(36) PRIMARY KEY,
+    code_hash CHAR(64) NOT NULL,
+    ip VARCHAR(45),
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_captcha_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

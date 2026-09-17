@@ -317,3 +317,99 @@ function route_security_audit(array $d): void
         'integrity' => $integrity,
     ]);
 }
+
+// --- CAPTCHA ---------------------------------------------------------------------------
+// A public form that reaches the sales desk is worth a bot's time, so the enquiry form
+// carries one. The answer never leaves the server: only a salted hash is kept, the row is
+// spent on first use, and it expires in five minutes.
+const CAPTCHA_TTL = 300;
+const CAPTCHA_DIGITS = 5;
+
+function captcha_hash(string $code): string
+{
+    global $config;
+    return hash_hmac('sha256', strtolower(trim($code)), $config['token_secret']);
+}
+
+function captcha_image(string $code): string
+{
+    $w = 160;
+    $h = 56;
+    $img = imagecreatetruecolor($w, $h);
+    imagefill($img, 0, 0, imagecolorallocate($img, 247, 249, 252));
+
+    // Noise first, so it sits behind the digits rather than obscuring them.
+    for ($i = 0; $i < 420; $i++) {
+        imagesetpixel($img, random_int(0, $w - 1), random_int(0, $h - 1),
+            imagecolorallocate($img, random_int(150, 215), random_int(150, 215), random_int(160, 220)));
+    }
+    for ($i = 0; $i < 4; $i++) {
+        imageline($img, random_int(0, $w), random_int(0, $h), random_int(0, $w), random_int(0, $h),
+            imagecolorallocate($img, random_int(150, 200), random_int(160, 205), random_int(180, 220)));
+    }
+
+    // Each digit gets its own position, angle and shade, so the glyphs do not
+    // line up into something a template matcher can read in one pass.
+    $font = 5;
+    $x = 16;
+    foreach (str_split($code) as $digit) {
+        $ink = imagecolorallocate($img, random_int(10, 60), random_int(30, 80), random_int(90, 150));
+        $glyph = imagecreatetruecolor(12, 20);
+        imagefill($glyph, 0, 0, imagecolorallocate($glyph, 247, 249, 252));
+        imagestring($glyph, $font, 1, 2, $digit, $ink);
+        $rotated = imagerotate($glyph, random_int(-26, 26), imagecolorallocate($glyph, 247, 249, 252));
+        imagecopy($img, $rotated, $x, random_int(8, 20), 0, 0, imagesx($rotated), imagesy($rotated));
+        imagedestroy($glyph);
+        imagedestroy($rotated);
+        $x += random_int(24, 30);
+    }
+
+    ob_start();
+    imagepng($img);
+    $png = (string)ob_get_clean();
+    imagedestroy($img);
+    return $png;
+}
+
+function route_public_captcha(array $d): void
+{
+    global $pdo;
+    // Cheap to serve but not free: a bot should not be able to mint these endlessly.
+    rate_limit('captcha:' . client_ip(), 40, 3600, 'Too many attempts. Please try again later.');
+
+    // Opportunistic cleanup, so the table cannot grow without bound.
+    $pdo->prepare('DELETE FROM captcha_challenges WHERE expires_at < ?')->execute([now_utc()]);
+
+    $code = '';
+    for ($i = 0; $i < CAPTCHA_DIGITS; $i++) {
+        $code .= random_int(0, 9);
+    }
+    $id = uuid4();
+    $pdo->prepare('INSERT INTO captcha_challenges (id, code_hash, ip, expires_at) VALUES (?, ?, ?, ?)')
+        ->execute([$id, captcha_hash($code), client_ip(),
+            gmdate('Y-m-d H:i:s', time() + CAPTCHA_TTL)]);
+
+    respond(['captcha_id' => $id, 'expires_in' => CAPTCHA_TTL,
+        'image' => 'data:image/png;base64,' . base64_encode(captcha_image($code))]);
+}
+
+// Spends the challenge whether or not the answer was right: one image, one attempt,
+// so a wrong guess cannot be retried against the same picture.
+function captcha_verify(array $d): void
+{
+    global $pdo;
+    $id = clip($d['captcha_id'] ?? '', 36);
+    $answer = clip($d['captcha_answer'] ?? '', 16);
+    if ($id === '' || $answer === '') {
+        fail(422, 'Please enter the number shown in the image.');
+    }
+    $row = row('SELECT * FROM captcha_challenges WHERE id = ?', [$id]);
+    $pdo->prepare('UPDATE captcha_challenges SET used_at = ? WHERE id = ? AND used_at IS NULL')
+        ->execute([now_utc(), $id]);
+    if (!$row || $row['used_at'] !== null || $row['expires_at'] < gmdate('Y-m-d H:i:s')) {
+        fail(400, 'That verification image has expired. Please try the new one.');
+    }
+    if (!hash_equals($row['code_hash'], captcha_hash($answer))) {
+        fail(400, 'The number did not match. Please try the new image.');
+    }
+}

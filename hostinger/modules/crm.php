@@ -328,6 +328,8 @@ function route_public_enquiry(array $d): void
     // this is otherwise free to flood the sales desk with junk.
     rate_limit('enquiry:' . client_ip(), 5, 3600,
         'Too many enquiries from this connection. Please try again later, or call us on 9105015464.');
+    // Checked first: a bot should not get as far as having its input validated.
+    captcha_verify($d);
 
     need($d, 'name', 'phone');
     $name = clip($d['name'], 150);
