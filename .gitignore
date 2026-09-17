@@ -1,3 +1,9 @@
 __pycache__/
 hostinger/config.local.php
 .deploy/
+
+# Local secrets: JWT, admin and third-party API keys. Never commit.
+backend/.env
+.env
+.env.*
+!.env.example
