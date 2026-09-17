@@ -275,8 +275,14 @@ function debit_account(array $user, mixed $accountNumber, float $total, string $
 }
 
 // --- Auth ----------------------------------------------------------------------------
+// Opening an account is a counter action, not a self-service one: a Nidhi has to
+// see the applicant's identity documents first. The public site raises an enquiry
+// instead (route_public_enquiry), and a verified applicant is opened here by staff.
+const ACCOUNT_OPEN_ROLES = ['bank_owner', 'admin', 'branch_manager', 'staff'];
+
 function route_register(array $d): void
 {
+    $opener = staff_user(ACCOUNT_OPEN_ROLES);
     global $pdo;
     need($d, 'name', 'email', 'phone', 'password', 'transaction_password');
     $email = strtolower(clip($d['email'], 150));
@@ -338,11 +344,15 @@ function route_register(array $d): void
     $code = strtoupper(clip($d['referral_code'] ?? '', 12));
     $bonus = $code === '' ? null : apply_referral_bonus($userId, $name, $email, $accountNumber, $initial, $code);
     $user = row('SELECT * FROM users WHERE id = ?', [$userId]);
-    audit($user, 'USER_REGISTER', "Opened account $accountNumber");
+    audit($opener, 'ACCOUNT_OPENED', "$accountNumber for {$user['email']}");
     $pdo->commit();
 
-    respond(['token' => start_session($user), 'user' => public_user($user),
-        'account_number' => $accountNumber, 'referral_bonus' => $bonus]);
+    // No session is started. The teller who opened the account must stay
+    // themselves; handing them the new member's token would let a counter
+    // action turn into acting as that member.
+    respond(['status' => 'SUCCESS', 'user' => public_user($user),
+        'account_number' => $accountNumber, 'referral_bonus' => $bonus,
+        'message' => "Account $accountNumber opened for {$user['name']}."]);
 }
 
 function route_login(array $d): void
@@ -745,7 +755,6 @@ function route_upi_qr(array $d): void
 // --- Router ------------------------------------------------------------------------------
 $routes = [
     // Auth & accounts
-    'POST /auth/register' => 'route_register',
     'POST /auth/login' => 'route_login',
     'GET /auth/me' => 'route_me',
     'POST /auth/logout' => 'route_logout',
@@ -849,6 +858,7 @@ $routes = [
     'POST /privacy/respond' => 'route_privacy_respond',
     // Member register and AML screening (modules/register.php)
     'GET /register/members' => 'route_register_list',
+    'POST /register/account' => 'route_register',
     'POST /register/admit' => 'route_register_admit',
     'POST /register/shares' => 'route_register_shares',
     'GET /screening/watchlist' => 'route_watchlist_list',
