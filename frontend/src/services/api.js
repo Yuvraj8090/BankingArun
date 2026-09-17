@@ -183,6 +183,7 @@ export const api = {
 
   // Content behind the public product pages.
   publicProducts: async () => (await axios.get(`${API}/public/products`)).data,
+  publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
   productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,
   productUpdate: async (id, payload) => (await axios.patch(`${API}/products/${id}`, payload, getAuthHeaders())).data,

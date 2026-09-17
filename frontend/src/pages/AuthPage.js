@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Building2, ShieldCheck, Lock, User, Mail, Phone, CreditCard,
+  Building2, Lock, User, Mail, Phone, PiggyBank,
   ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, Gift
 } from 'lucide-react';
 import Brand from '../components/Brand';
@@ -23,7 +23,7 @@ const bufToB64u = (buf) => {
 };
 
 export default function AuthPage({ onSuccess, defaultIsRegister }) {
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   // The two tabs are real URLs, so the route decides which form shows. Holding
   // this in state meant switching tabs changed the address bar while the form
@@ -33,13 +33,13 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // register fields
+  // enquiry fields
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [txnPwd, setTxnPwd] = useState('');
-  const [pan, setPan] = useState('');
-  const [aadhaar, setAadhaar] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [interest, setInterest] = useState('savings');
+  const [notes, setNotes] = useState('');
+  const [enquirySent, setEnquirySent] = useState(false);
 
   // Prefill referral from URL ?ref=
   useEffect(() => {
@@ -67,24 +67,27 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
     finally { setLoading(false); }
   };
 
-  const doRegister = async (e) => {
+  // A Nidhi cannot enrol a member off a web form — identity documents have to be
+  // seen and verified — so this raises an enquiry and the sales desk takes it
+  // from there. No account is created here and no credentials are collected.
+  const doEnquiry = async (e) => {
     e?.preventDefault();
-    if (!name || !email || !password || !txnPwd) return toast.error('Fill all mandatory fields');
+    if (!name.trim() || !phone.trim()) return toast.error('Please give us your name and phone number');
     setLoading(true);
     try {
-      const r = await register({
-        name, email, phone: phone || '+91 98765 43210',
-        password, transaction_password: txnPwd,
-        pan_number: pan || 'ABCDE1234F',
-        aadhaar_number: aadhaar || '987654321098',
-        account_type: 'savings', initial_deposit: 1000,
-        referral_code: referralCode || null
+      const r = await api.publicEnquiry({
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        interest,
+        notes: notes.trim() || undefined,
+        referral_code: referralCode.trim() || undefined,
       });
-      if (r.referral_bonus) toast.success(`Welcome bonus ₹${r.referral_bonus} credited!`);
-      else toast.success('Account created successfully');
-      onSuccess?.(r.user?.role || 'retail');
-    } catch (err) { toast.error(err.response?.data?.detail || 'Registration failed'); }
-    finally { setLoading(false); }
+      setEnquirySent(true);
+      toast.success(r.message);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not send your enquiry. Please call 9105015464.');
+    } finally { setLoading(false); }
   };
 
   const passkeyLogin = async () => {
@@ -119,7 +122,10 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 grid grid-cols-1 lg:grid-cols-5">
       {/* Left panel — brand and what this institution actually is. The content is
           centred rather than stretched, so the panel does not open with a void. */}
-      <div className="lg:col-span-2 bg-[#0b3b8c] text-white px-8 py-10 lg:px-12 lg:py-14 flex flex-col justify-center">
+      {/* Hidden below lg: on a phone this panel is a screenful of marketing the
+          member has to scroll past to reach the form they came for. The brand
+          is already in the header above. */}
+      <div className="hidden lg:col-span-2 bg-[#0b3b8c] text-white px-8 py-10 lg:px-12 lg:py-14 lg:flex flex-col justify-center">
         <div className="max-w-sm mx-auto w-full space-y-8">
           <Brand variant="stacked" height={68} onDark />
 
@@ -200,59 +206,87 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
 
             </form>
           ) : (
-            <form onSubmit={doRegister} className="space-y-3">
-              <Field icon={User} label="Full name (as per PAN)">
-                <input data-testid="register-name-input" required value={name} onChange={e => setName(e.target.value)}
-                  placeholder="Rahul Sharma"
-                  className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#0b3b8c]" />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field icon={Mail} label="Email">
-                  <input data-testid="register-email-input" type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#0b3b8c]" />
-                </Field>
-                <Field icon={Phone} label="Phone">
-                  <input value={phone} onChange={e => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[#0b3b8c]" />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field icon={Lock} label="Login password">
-                  <PasswordInput testId="register-password-input" label="login password" dense
-                    value={password} onChange={e => setPassword(e.target.value)} />
-                </Field>
-                <Field icon={ShieldCheck} label="Transaction PIN">
-                  <PasswordInput testId="register-txnpwd-input" label="transaction PIN" dense
-                    value={txnPwd} onChange={e => setTxnPwd(e.target.value)} />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field icon={CreditCard} label="PAN (optional)">
-                  <input value={pan} onChange={e => setPan(e.target.value.toUpperCase())} placeholder="ABCDE1234F"
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm font-mono focus:outline-none focus:border-[#0b3b8c]" />
-                </Field>
-                <Field icon={CreditCard} label="Aadhaar (optional)">
-                  <input value={aadhaar} onChange={e => setAadhaar(e.target.value)} placeholder="XXXX-XXXX-XXXX"
-                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm font-mono focus:outline-none focus:border-[#0b3b8c]" />
-                </Field>
-              </div>
-              <Field icon={Gift} label="Referral code (optional)">
-                <input data-testid="register-referral-input" value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())}
-                  placeholder="Your friend's code — both get ₹500"
-                  className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm font-mono focus:outline-none focus:border-[#0b3b8c]" />
-              </Field>
-              {referralCode && (
-                <div className="p-2 rounded-md bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-center gap-2">
-                  <Gift className="w-3.5 h-3.5" /> Referral <b className="font-mono">{referralCode}</b> applied — you'll receive ₹500 bonus.
+            enquirySent ? (
+              <div className="text-center py-6 space-y-4" data-testid="enquiry-sent">
+                <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                 </div>
-              )}
-              <button data-testid="register-submit-btn" type="submit" disabled={loading}
+                <div className="space-y-1.5">
+                  <h2 className="text-lg font-bold text-slate-900">Thank you, {name.split(' ')[0]}</h2>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Our team will call you on <b className="text-slate-900">{phone}</b> within one working day to
+                    arrange your document verification and complete the opening.
+                  </p>
+                </div>
+                <div className="p-3 rounded-md bg-slate-50 border border-slate-200 text-left text-[11px] text-slate-600 space-y-1.5">
+                  <p className="font-semibold text-slate-900">Please keep ready</p>
+                  <p>PAN card, Aadhaar or another officially valid document, and a recent photograph.</p>
+                </div>
+                <a href="tel:9105015464" className="inline-flex items-center gap-2 text-xs font-semibold text-[#0b3b8c]">
+                  <Phone className="w-3.5 h-3.5" /> Or call us now on 9105015464
+                </a>
+              </div>
+            ) : (
+            <form onSubmit={doEnquiry} className="space-y-3" data-testid="enquiry-form">
+              <div className="p-3 rounded-md bg-blue-50 border border-blue-100 text-[11px] text-[#0b3b8c] leading-relaxed">
+                Membership needs your documents verified in person, so this form starts the process rather
+                than opening the account. Tell us how to reach you and our team will take it from there.
+              </div>
+
+              <Field icon={User} label="Full name">
+                <input data-testid="enquiry-name-input" required value={name} onChange={e => setName(e.target.value)}
+                  placeholder="Rahul Sharma" autoComplete="name"
+                  className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+              </Field>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field icon={Phone} label="Mobile number">
+                  <input data-testid="enquiry-phone-input" required value={phone} onChange={e => setPhone(e.target.value)}
+                    placeholder="98765 43210" inputMode="tel" autoComplete="tel"
+                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+                </Field>
+                <Field icon={Mail} label="Email (optional)">
+                  <input data-testid="enquiry-email-input" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email"
+                    className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+                </Field>
+              </div>
+
+              <Field icon={PiggyBank} label="What are you interested in?">
+                <select data-testid="enquiry-interest-input" value={interest} onChange={e => setInterest(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]">
+                  <option value="savings">Savings account</option>
+                  <option value="deposit">Fixed or recurring deposit</option>
+                  <option value="loan">A loan</option>
+                  <option value="other">Something else</option>
+                </select>
+              </Field>
+
+              <Field icon={Gift} label="Referral code (optional)">
+                <input data-testid="enquiry-referral-input" value={referralCode}
+                  onChange={e => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="If a member introduced you"
+                  className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[#0b3b8c]" />
+              </Field>
+
+              <label className="block">
+                <span className="block text-[11px] text-slate-600 mb-1 font-medium">Anything else? (optional)</span>
+                <textarea data-testid="enquiry-notes-input" rows={2} value={notes} onChange={e => setNotes(e.target.value)}
+                  placeholder="A good time to call, your nearest branch, or a question"
+                  className="w-full bg-white border border-slate-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+              </label>
+
+              <button data-testid="enquiry-submit-btn" type="submit" disabled={loading}
                 className="w-full py-3 rounded-md bg-[#c8102e] hover:bg-[#a30d25] text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
-                {loading ? 'Opening account…' : <>Submit application <ArrowRight className="w-4 h-4" /></>}
+                {loading ? 'Sending…' : <>Request a call back <ArrowRight className="w-4 h-4" /></>}
               </button>
+
+              <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                We use these details only to contact you about membership. No account is opened until your
+                documents are verified.
+              </p>
             </form>
+            )
           )}
         </div>
       </div>

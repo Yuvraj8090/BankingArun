@@ -14,7 +14,7 @@ const CRM_MANAGE_ROLES = ['admin', 'branch_manager', 'bank_owner'];
 const CRM_CHANNELS = ['call', 'visit', 'email', 'sms', 'whatsapp', 'note'];
 const CRM_OUTCOMES = ['reached', 'no_answer', 'callback', 'resolved', 'escalated'];
 const LEAD_STAGES = ['new', 'contacted', 'documents', 'enrolled', 'lost'];
-const LEAD_SOURCES = ['walk_in', 'referral', 'agent', 'campaign', 'phone'];
+const LEAD_SOURCES = ['walk_in', 'referral', 'agent', 'campaign', 'phone', 'website'];
 const TASK_STATUSES = ['open', 'done', 'cancelled'];
 
 // --- Member 360 --------------------------------------------------------------------------
@@ -313,4 +313,59 @@ function route_crm_task_update(array $d, string $id = ''): void
         ->execute([$status, clip($d['completion_note'] ?? '', 500) ?: null, $status, now_utc(), $id]);
     audit($staff, 'CRM_TASK_' . strtoupper($status), $task['title']);
     respond(['status' => 'SUCCESS', 'message' => "Task marked $status."]);
+}
+
+// --- Public membership enquiry ---------------------------------------------------------
+// A Nidhi may not enrol a member off a web form: identity documents have to be seen and
+// verified. So the public site takes an enquiry, drops it into the same pipeline a walk-in
+// lands in, and the sales desk carries it from 'new' through 'documents' to 'enrolled'.
+const ENQUIRY_INTERESTS = ['savings', 'deposit', 'loan', 'other'];
+
+function route_public_enquiry(array $d): void
+{
+    global $pdo;
+    // Unauthenticated and public, so it is rate limited by address: a form like
+    // this is otherwise free to flood the sales desk with junk.
+    rate_limit('enquiry:' . client_ip(), 5, 3600,
+        'Too many enquiries from this connection. Please try again later, or call us on 9105015464.');
+
+    need($d, 'name', 'phone');
+    $name = clip($d['name'], 150);
+    $phone = clip($d['phone'], 30);
+    if (mb_strlen($name) < 2) {
+        fail(422, 'Please tell us your full name.');
+    }
+    // Indian mobile numbers, with or without the country code and separators.
+    $digits = preg_replace('/\D+/', '', $phone);
+    if (!preg_match('/^(91)?[6-9]\d{9}$/', $digits)) {
+        fail(422, 'Please enter a valid 10-digit Indian mobile number.');
+    }
+    $email = clip($d['email'] ?? '', 150);
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        fail(422, 'That email address does not look right.');
+    }
+    $interest = clip($d['interest'] ?? '', 30);
+    if ($interest !== '' && !in_array($interest, ENQUIRY_INTERESTS, true)) {
+        fail(422, 'Please choose what you are interested in.');
+    }
+
+    $parts = array_filter([
+        clip($d['notes'] ?? '', 400),
+        empty($d['referral_code']) ? '' : 'Referral code: ' . clip($d['referral_code'], 40),
+    ], fn($part) => $part !== '');
+    $notes = implode(' | ', $parts);
+
+    // Someone enquiring twice should not become two pipelines, and the reply must
+    // not reveal whether a number is already on file — that would turn this form
+    // into a way of testing who is a member.
+    $existing = row('SELECT id FROM crm_leads WHERE phone = ? AND stage NOT IN (?, ?)',
+        [$phone, 'lost', 'enrolled']);
+    if (!$existing) {
+        $pdo->prepare('INSERT INTO crm_leads (id, name, phone, email, source, interest, stage, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([uuid4(), $name, $phone, $email ?: null, 'website',
+                $interest ?: null, 'new', $notes ?: null]);
+    }
+    respond(['status' => 'SUCCESS',
+        'message' => 'Thank you. Our team will call you within one working day to arrange your document verification.']);
 }

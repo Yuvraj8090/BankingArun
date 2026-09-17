@@ -102,7 +102,7 @@ function AuthRoute({ isRegister }) {
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" data-testid="auth-brand-home"><Brand variant="compact" height={34} /></Link>
-          <Link to="/" data-testid="auth-back-btn" className="text-xs text-slate-600 hover:text-slate-900">
+          <Link to="/" data-testid="auth-back-btn" className="text-xs text-slate-600 hover:text-slate-900 py-2 px-1 -mr-1">
             ← Back to public site
           </Link>
         </div>

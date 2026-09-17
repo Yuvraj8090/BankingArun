@@ -834,6 +834,7 @@ $routes = [
     'GET /public/features' => 'route_public_features',
     'GET /public/schemes' => 'route_public_schemes',
     'GET /public/products' => 'route_public_products',
+    'POST /public/enquiry' => 'route_public_enquiry',
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only
