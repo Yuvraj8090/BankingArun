@@ -534,3 +534,14 @@ INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribu
     6000.00, NULL, 432000.00, 3849700.00, 'maturity', 'active',
     'Brochure p8. 72 monthly instalments, held to year 21.',
     '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]');
+
+-- INSERT IGNORE alone was not enough: production already held this plan as a
+-- draft, so the insert was skipped and the plan stayed hidden. The update runs
+-- either way, which is what makes this migration idempotent whether the row
+-- was already there or has just been created.
+UPDATE schemes SET status = 'active',
+    tenure_months = 252, contribution_months = 72,
+    contribution_amount = 6000.00, total_deposit = 432000.00, maturity_amount = 3849700.00,
+    slabs = '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]',
+    notes = 'Brochure p8. 72 monthly instalments, held to year 21.'
+    WHERE code = 'AJS-SL-21Y';
