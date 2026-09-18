@@ -965,3 +965,17 @@ UPDATE schemes SET status = 'active',
     slabs = '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]',
     notes = 'Brochure p8. 72 monthly instalments, held to year 21.'
     WHERE code = 'AJS-SL-21Y';
+
+-- The last two brochure plans, activated on the owner's instruction. Both price
+-- well above the cap on their own printed figures -- the fixed deposit triples in
+-- eight years, the monthly-income plan returns half as much again over five --
+-- so every row carries the mark the rate card puts on an over-cap slab.
+UPDATE schemes SET status = 'active',
+    slabs = '[{"unit":2500,"deposit":2500,"maturity":7500},{"unit":3000,"deposit":3000,"maturity":9000},{"unit":3500,"deposit":3500,"maturity":10500},{"unit":4000,"deposit":4000,"maturity":12000},{"unit":4500,"deposit":4500,"maturity":13500},{"unit":5000,"deposit":5000,"maturity":15000},{"unit":5500,"deposit":5500,"maturity":16500},{"unit":6000,"deposit":6000,"maturity":18000},{"unit":7000,"deposit":7000,"maturity":21000},{"unit":8000,"deposit":8000,"maturity":24000},{"unit":9000,"deposit":9000,"maturity":27000},{"unit":10000,"deposit":10000,"maturity":30000},{"unit":12000,"deposit":12000,"maturity":36000},{"unit":14000,"deposit":14000,"maturity":42000},{"unit":15000,"deposit":15000,"maturity":45000},{"unit":17000,"deposit":17000,"maturity":51000},{"unit":18000,"deposit":18000,"maturity":54000},{"unit":20000,"deposit":20000,"maturity":60000},{"unit":25000,"deposit":25000,"maturity":75000},{"unit":30000,"deposit":30000,"maturity":90000},{"unit":33000,"deposit":33000,"maturity":99000},{"unit":35000,"deposit":35000,"maturity":105000},{"unit":40000,"deposit":40000,"maturity":120000},{"unit":45000,"deposit":45000,"maturity":135000},{"unit":50000,"deposit":50000,"maturity":150000},{"unit":60000,"deposit":60000,"maturity":180000},{"unit":70000,"deposit":70000,"maturity":210000},{"unit":80000,"deposit":80000,"maturity":240000},{"unit":90000,"deposit":90000,"maturity":270000},{"unit":100000,"deposit":100000,"maturity":300000},{"unit":125000,"deposit":125000,"maturity":375000},{"unit":150000,"deposit":150000,"maturity":450000}]',
+    notes = 'Brochure p10-11. Every amount triples over eight years.'
+    WHERE code = 'AJS-FD-8Y';
+
+UPDATE schemes SET status = 'active',
+    slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]',
+    notes = 'Brochure p9. Monthly payout for sixty months; the maturity column is the total received.'
+    WHERE code = 'AJS-MIS-5Y';
