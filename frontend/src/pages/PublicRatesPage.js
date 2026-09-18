@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Percent, Info, ChevronRight, RefreshCw, ShieldCheck, Building2 } from 'lucide-react';
+import { Percent, Info, ChevronRight, RefreshCw, ShieldCheck, Building2, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 
 const TYPE_LABEL = {
@@ -79,9 +79,9 @@ export default function PublicRatesPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-start gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-[#0b3b8c] shrink-0 mt-0.5" />
-          <p className="text-[11px] text-slate-600 leading-relaxed">
+        <div className="bg-[#141414] border border-[#f5c518]/40 rounded-lg p-4 flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-[#f5c518] shrink-0 mt-0.5" />
+          <p className="text-[11px] text-slate-300 leading-relaxed">
             {disclosure} The Nidhi Rules, 2014 cap what we may pay on a deposit at <strong>{cap}% a year</strong>.
             Where a plan's printed figures work out above that, the row is marked — ask your branch
             before depositing against it.
@@ -89,13 +89,16 @@ export default function PublicRatesPage() {
         </div>
 
         {Object.entries(byType).map(([type, list]) => (
-          <div key={type} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2">
-              <Percent className="w-4 h-4 text-[#0b3b8c]" />
-              <h2 className="font-semibold text-slate-900 text-sm">{TYPE_LABEL[type] || type} plans</h2>
+          <div key={type} className="bg-[#141414] border border-[#2a2a2a] rounded-lg overflow-hidden">
+            {/* The printed plan book's own treatment: a gold pill on black. */}
+            <div className="px-6 py-4 flex items-center gap-2 border-b border-[#2a2a2a]">
+              <Percent className="w-4 h-4 text-[#f5c518]" />
+              <h2 className="font-bold text-sm tracking-wide px-3 py-1 rounded-full bg-[#f5c518] text-[#141414]">
+                {TYPE_LABEL[type] || type} plans
+              </h2>
             </div>
 
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[#2a2a2a]">
               {list.map((s) => {
                 const open = openCode === s.code;
                 const payIn = s.contribution_months && s.contribution_months < s.tenure_months
@@ -105,11 +108,11 @@ export default function PublicRatesPage() {
                     <button
                       onClick={() => setOpenCode(open ? null : s.code)}
                       aria-expanded={open}
-                      className="w-full text-left px-6 py-4 hover:bg-slate-50 flex items-center justify-between gap-4"
+                      className="w-full text-left px-6 py-4 hover:bg-[#1d1d1d] transition flex items-center justify-between gap-4"
                     >
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900">{s.name}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
+                        <div className="text-sm font-bold text-white">{s.name}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
                           {years(s.tenure_months)} term
                           {payIn && <> · paid in for {payIn} months, then held</>}
                           {s.payout_type === 'monthly' && <> · paid out every month</>}
@@ -117,44 +120,49 @@ export default function PublicRatesPage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-lg font-bold text-[#0b3b8c] leading-none">
+                        <div className="text-xl font-bold text-[#f5c518] leading-none tabular-nums">
                           {s.effective_rate_pa === null ? '—' : `${s.effective_rate_pa}%`}
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-1">a year</div>
+                        <div className="text-[10px] text-slate-400 mt-1">a year</div>
                       </div>
                     </button>
 
                     {open && (
                       <div className="px-6 pb-5 -mt-1">
-                        <div className="overflow-x-auto border border-slate-200 rounded-md">
+                        <div className="overflow-x-auto border border-[#3a3a3a] rounded-md">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
+                            {/* Deep red header on black, as the plan book prints it. */}
+                            <thead className="bg-[#8b0d22] text-[10px] uppercase tracking-wide text-[#f5c518]">
                               <tr>
-                                <th className="p-2.5 font-semibold">{UNIT_LABEL[s.scheme_type]}</th>
-                                <th className="p-2.5 font-semibold text-right">You pay in total</th>
-                                <th className="p-2.5 font-semibold text-right">
+                                <th className="p-2.5 font-bold">{UNIT_LABEL[s.scheme_type]}</th>
+                                <th className="p-2.5 font-bold text-right">You pay in total</th>
+                                <th className="p-2.5 font-bold text-right">
                                   {s.payout_type === 'monthly' ? 'You receive in total' : 'You receive on maturity'}
                                 </th>
-                                <th className="p-2.5 font-semibold text-right">Effective a year</th>
+                                <th className="p-2.5 font-bold text-right">Effective a year</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-[#2a2a2a]">
                               {s.slabs.map((slab, i) => (
-                                <tr key={i} className="hover:bg-slate-50">
-                                  <td className="p-2.5 font-semibold text-slate-900 tabular-nums">₹{inr(slab.unit)}</td>
-                                  <td className="p-2.5 text-right text-slate-700 tabular-nums">₹{inr(slab.deposit)}</td>
-                                  <td className="p-2.5 text-right font-semibold text-slate-900 tabular-nums">₹{inr(slab.maturity)}</td>
-                                  <td className="p-2.5 text-right tabular-nums">
-                                    <span className={slab.exceeds_cap ? 'font-semibold text-[#c8102e]' : 'text-slate-600'}>
+                                // Red is decoration in this palette, so a row that prices above
+                                // the cap is marked by its own tint and a badge rather than by
+                                // text colour alone, which would disappear into the styling.
+                                <tr key={i} className={slab.exceeds_cap ? 'bg-[#2a0f14]' : 'hover:bg-[#1d1d1d]'}>
+                                  <td className="p-2.5 font-bold text-white tabular-nums whitespace-nowrap">₹{inr(slab.unit)}</td>
+                                  <td className="p-2.5 text-right text-slate-300 tabular-nums whitespace-nowrap">₹{inr(slab.deposit)}</td>
+                                  <td className="p-2.5 text-right font-bold text-[#f5c518] tabular-nums whitespace-nowrap">₹{inr(slab.maturity)}</td>
+                                  <td className="p-2.5 text-right tabular-nums whitespace-nowrap">
+                                    <span className={slab.exceeds_cap ? 'font-bold text-white' : 'text-slate-300'}>
                                       {slab.effective_rate_pa === null ? '—' : `${slab.effective_rate_pa}%`}
                                     </span>
-                                    {/* Marked on the row it applies to. A plan can hold rows that
-                                        price differently, and averaging that away would hide it. */}
                                     {slab.exceeds_cap && (
-                                      <span className="block text-[10px] font-semibold text-[#c8102e]">above the cap</span>
+                                      <span className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded
+                                        bg-[#f5c518] text-[#141414] text-[9px] font-bold uppercase tracking-wide">
+                                        <AlertTriangle className="w-2.5 h-2.5" /> above cap
+                                      </span>
                                     )}
                                     {slab.off_headline && !slab.exceeds_cap && (
-                                      <span className="block text-[10px] text-amber-700">differs from the plan rate</span>
+                                      <span className="block text-[10px] text-amber-300">differs from the plan rate</span>
                                     )}
                                   </td>
                                 </tr>
@@ -162,7 +170,7 @@ export default function PublicRatesPage() {
                             </tbody>
                           </table>
                         </div>
-                        {s.notes && <p className="text-[11px] text-slate-500 mt-2">{s.notes}</p>}
+                        {s.notes && <p className="text-[11px] text-slate-400 mt-2">{s.notes}</p>}
                       </div>
                     )}
                   </div>
