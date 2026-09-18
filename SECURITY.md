@@ -107,7 +107,8 @@ listed at the bottom as real work.
 | 10 | Secret management | 🟡 | Root-owned file outside the web root. Not a vault |
 | 11 | VPC subnet isolation | ➖ | Single host |
 | 12 | Database auditing | 🟡 | `audit_logs` and `security_events` record application actions. No MariaDB-level query log |
-| 13 | Secure CI/CD | 🟡 | Deploy key is `restrict`ed and single-purpose; security scan gates the build; smoke-checked with rollback. No signed commits, no required review |
+| 12a | Least privilege on the database | ✅ | Four accounts, each with only what it needs: the web app has no DDL rights, so an injection against it cannot alter or drop a table; backups are dump-only; migrations hold DDL and are reachable only through a root-owned credential; remote reads are `SELECT` only over an SSH tunnel |
+| 13 | Secure CI/CD | 🟡 | Deploy key is `restrict`ed and single-purpose; security scan gates the build; schema applied after the dump and before the swap, so a failed migration leaves the running release untouched; smoke-checked with rollback. No signed commits, no required review |
 | 14 | SBOM | ⬜ | Not generated |
 | 15 | CSPM | ➖ | No cloud posture to manage |
 
