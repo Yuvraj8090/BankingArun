@@ -139,9 +139,46 @@ Notes:
 - Exit codes: `0` all clear, `2` it ran but something failed and needs a look, `1` it
   could not run at all. Point hPanel's cron email at yourself to see the report.
 
-### 8. Turn on live OTP (optional)
+### 8. Create the mailboxes
 
-Sign in as the bank owner and open **System Config**. Enter your Twilio and SendGrid keys and switch on live OTP. The keys are encrypted before they are stored, and only ever shown back masked. Until you do this, the app runs in demo mode and shows the OTP on screen.
+Two addresses on the same domain, and only one of them is a mailbox anyone has to read.
+
+In hPanel open **Emails → Email Accounts** for `ajspay.in` and create:
+
+| Address | What it is for |
+|---|---|
+| `alerts@ajspay.in` | The account the app signs into to send OTPs and alerts. Nobody reads it. |
+| `support@ajspay.in` | A real mailbox staff read. Every mail the app sends carries it as Reply-To. |
+
+Then under **Emails → Forwarders**, point `alerts@` and `grievance@` at `support@`, so a
+reply to an OTP mail and a grievance notice both land in the one inbox. A grievance
+address is not optional for a Nidhi — name its officer under **System Config →
+Compliance officers** as well.
+
+Hostinger adds the MX, SPF and DKIM records for the domain itself when the mailbox is
+created. Check them under **Emails → DNS settings**; without SPF and DKIM, OTP mail goes
+to spam.
+
+Outbound limits: Hostinger caps sending per mailbox per day (a few hundred on the lower
+plans). That is enough for OTP traffic at this size, but it is a real ceiling — if you
+outgrow it, put a SendGrid key in and the app falls back to the API relay on its own.
+
+### 9. Turn on live OTP (optional)
+
+Sign in as the bank owner and open **System Config**.
+
+- **Email mailbox (SMTP)** — host `smtp.hostinger.com`, port `465`, the mailbox address
+  `alerts@ajspay.in` and its password, and `support@ajspay.in` as the support address.
+- **Twilio SMS credentials** — for OTPs over SMS.
+- **SendGrid** — leave blank unless you want the API relay instead of the mailbox. It is
+  only used when the SMTP fields are empty.
+
+Then switch on live OTP. The mailbox password and the API keys are encrypted before they
+are stored and only ever shown back masked. Until you do this, the app runs in demo mode
+and shows the OTP on screen.
+
+If a mail does not arrive, the failing SMTP step is in the PHP error log as
+`AJSPay SMTP: ...` — the command that was refused, never the password.
 
 ## Security built in
 

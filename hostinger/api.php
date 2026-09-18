@@ -355,6 +355,7 @@ function route_register(array $d): void
         fail(422, 'A valid email address is required.');
     }
     // bcrypt silently ignores everything past 72 bytes, so cap it rather than pretend.
+    assert_password_acceptable($d['password'] ?? null, [$d['name'] ?? '', strstr((string)($d['email'] ?? ''), '@', true)]);
     if (!is_string($d['password']) || strlen($d['password']) < 8 || strlen($d['password']) > 72) {
         fail(422, 'Password must be 8 to 72 characters.');
     }

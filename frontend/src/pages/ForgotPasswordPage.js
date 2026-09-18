@@ -112,6 +112,10 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setPassword(e.target.value)} autoComplete="new-password"
                 className={`${input} pl-3`} />
             </label>
+            <p className="text-[10px] text-slate-400 -mt-2 leading-relaxed">
+              At least 8 characters, and not one that has appeared in a known breach.
+              We check this without your password leaving our server.
+            </p>
             <label className="block">
               <span className="block text-[11px] text-slate-600 mb-1 font-medium">Confirm new password</span>
               <input data-testid="forgot-confirm-password" type="password" required value={confirm}

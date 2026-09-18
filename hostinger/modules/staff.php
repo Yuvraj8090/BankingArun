@@ -219,10 +219,16 @@ function route_admin_config_get(array $d): void
         'twilio_from_number' => $cfg['twilio_from_number'],
         'sendgrid_api_key_masked' => mask_secret($cfg['sendgrid_api_key']),
         'sendgrid_from_email' => $cfg['sendgrid_from_email'],
+        'smtp_host' => $cfg['smtp_host'],
+        'smtp_port' => $cfg['smtp_port'],
+        'smtp_user' => $cfg['smtp_user'],
+        'smtp_password_masked' => mask_secret($cfg['smtp_password']),
+        'support_email' => $cfg['support_email'],
         'referral_reward_amount' => (float)($saved['referral_reward_amount'] ?? REFERRAL_REWARD_DEFAULT),
         'face_match_auto_threshold' => (float)($saved['face_match_auto_threshold'] ?? 92.0),
         'twilio_configured' => $cfg['twilio_account_sid'] !== '',
         'sendgrid_configured' => $cfg['sendgrid_api_key'] !== '',
+        'smtp_configured' => $cfg['smtp_host'] !== '' && $cfg['smtp_user'] !== '' && $cfg['smtp_password'] !== '',
         // Named under the Consumer Protection Act, and published to members on
         // every ticket and in the privacy notice.
         'grievance_officer_name' => $saved['grievance_officer_name'] ?? '',
@@ -251,24 +257,33 @@ function route_admin_config_set(array $d): void
             $merged = array_merge(system_config(), $data);
             $hasSms = !empty($merged['twilio_account_sid']) && !empty($merged['twilio_auth_token'])
                 && !empty($merged['twilio_from_number']);
-            $hasEmail = !empty($merged['sendgrid_api_key']) && !empty($merged['sendgrid_from_email']);
+            $hasSmtp = !empty($merged['smtp_host']) && !empty($merged['smtp_user'])
+                && !empty($merged['smtp_password']);
+            $hasEmail = $hasSmtp
+                || (!empty($merged['sendgrid_api_key']) && !empty($merged['sendgrid_from_email']));
             if (!$hasSms && !$hasEmail) {
                 fail(422, 'Live OTP needs a way to send the code. Enter the Twilio keys for SMS, or the '
-                    . 'SendGrid key for email, and save those first. Until then members can use an '
-                    . 'authenticator app or a passkey, which need no third party at all.');
+                    . 'mailbox SMTP password (or a SendGrid key) for email, and save those first. Until '
+                    . 'then members can use an authenticator app or a passkey, which need no third party '
+                    . 'at all.');
             }
         }
         $data['live_otp'] = (bool)$d['live_otp'];
         $changed[] = 'live_otp';
     }
     foreach (['twilio_account_sid' => 64, 'twilio_auth_token' => 128, 'twilio_from_number' => 20,
-        'sendgrid_api_key' => 128, 'sendgrid_from_email' => 150] as $key => $max) {
+        'sendgrid_api_key' => 128, 'sendgrid_from_email' => 150, 'smtp_host' => 150, 'smtp_port' => 5,
+        'smtp_user' => 150, 'smtp_password' => 128, 'support_email' => 150] as $key => $max) {
         $value = clip($d[$key] ?? '', $max);
         if ($value === '') {
             continue;  // blank means "keep the current value"
         }
-        if ($key === 'sendgrid_from_email' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
-            fail(422, 'sendgrid_from_email must be a valid email address.');
+        if (in_array($key, ['sendgrid_from_email', 'smtp_user', 'support_email'], true)
+            && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            fail(422, "$key must be a valid email address.");
+        }
+        if ($key === 'smtp_port' && !in_array($value, ['465', '587'], true)) {
+            fail(422, 'smtp_port must be 465 (TLS) or 587 (STARTTLS).');
         }
         $data[$key] = in_array($key, SECRET_CONFIG_KEYS, true) ? encrypt_secret($value) : $value;
         $changed[] = $key;

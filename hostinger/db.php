@@ -40,6 +40,15 @@ $config = [
     'twilio_from_number'  => '',
     'sendgrid_api_key'    => '',
     'sendgrid_from_email' => 'alerts@ajspay.in',
+    // Email delivery. The domain's own Hostinger mailbox over authenticated SMTP is
+    // the primary route; leave the SMTP fields blank to fall back to SendGrid's API.
+    'smtp_host'           => 'smtp.hostinger.com',
+    'smtp_port'           => '465',     // 465 implicit TLS, or 587 STARTTLS
+    'smtp_user'           => '',        // the full mailbox address, e.g. alerts@ajspay.in
+    'smtp_password'       => '',
+    // Reply-To on everything we send. A member who hits reply on an OTP mail must
+    // reach a mailbox someone actually reads, not a send-only address.
+    'support_email'       => 'support@ajspay.in',
 ];
 if (is_file(__DIR__ . '/config.local.php')) {
     $config = array_merge($config, require __DIR__ . '/config.local.php');

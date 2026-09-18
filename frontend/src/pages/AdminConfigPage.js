@@ -10,7 +10,7 @@ export default function AdminConfigPage() {
   const [showSecrets, setShowSecrets] = useState({});
 
   const load = async () => {
-    try { const r = await api.adminConfigGet(); setCfg(r); setForm({ live_otp: r.live_otp, twilio_from_number: r.twilio_from_number, sendgrid_from_email: r.sendgrid_from_email, referral_reward_amount: r.referral_reward_amount, face_match_auto_threshold: r.face_match_auto_threshold }); }
+    try { const r = await api.adminConfigGet(); setCfg(r); setForm({ live_otp: r.live_otp, twilio_from_number: r.twilio_from_number, sendgrid_from_email: r.sendgrid_from_email, smtp_host: r.smtp_host, smtp_port: r.smtp_port, smtp_user: r.smtp_user, support_email: r.support_email, referral_reward_amount: r.referral_reward_amount, face_match_auto_threshold: r.face_match_auto_threshold }); }
     catch { toast.error('Director access required'); }
   };
   useEffect(() => { load(); }, []);
@@ -23,6 +23,7 @@ export default function AdminConfigPage() {
       if (form.twilio_account_sid) payload.twilio_account_sid = form.twilio_account_sid;
       if (form.twilio_auth_token) payload.twilio_auth_token = form.twilio_auth_token;
       if (form.sendgrid_api_key) payload.sendgrid_api_key = form.sendgrid_api_key;
+      if (form.smtp_password) payload.smtp_password = form.smtp_password;
       const r = await api.adminConfigSet(payload);
       toast.success(r.message);
       load();
@@ -51,11 +52,12 @@ export default function AdminConfigPage() {
           <div>
             <div className="font-semibold text-slate-900 text-sm">Live OTP delivery</div>
             <div className="text-[11px] text-slate-500 mt-0.5">
-              When enabled, OTPs are sent through real Twilio SMS and SendGrid Email. When disabled, OTPs remain mocked and shown in the JSON response for demo.
+              When enabled, OTPs are sent through real Twilio SMS and real email. When disabled, OTPs remain mocked and shown in the JSON response for demo.
             </div>
             <div className="text-[11px] text-slate-500 mt-2">
               {cfg.twilio_configured ? <span className="text-emerald-700 font-semibold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Twilio configured</span> : <span className="text-amber-700 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Twilio not configured</span>}
-              {cfg.sendgrid_configured ? <span className="text-emerald-700 font-semibold flex items-center gap-1 mt-0.5"><CheckCircle2 className="w-3 h-3" /> SendGrid configured</span> : <span className="text-amber-700 flex items-center gap-1 mt-0.5"><AlertCircle className="w-3 h-3" /> SendGrid not configured</span>}
+              {cfg.smtp_configured ? <span className="text-emerald-700 font-semibold flex items-center gap-1 mt-0.5"><CheckCircle2 className="w-3 h-3" /> Mailbox SMTP configured</span> : <span className="text-amber-700 flex items-center gap-1 mt-0.5"><AlertCircle className="w-3 h-3" /> Mailbox SMTP not configured</span>}
+              {cfg.sendgrid_configured ? <span className="text-emerald-700 font-semibold flex items-center gap-1 mt-0.5"><CheckCircle2 className="w-3 h-3" /> SendGrid fallback configured</span> : <span className="text-slate-500 flex items-center gap-1 mt-0.5">SendGrid fallback not configured</span>}
             </div>
           </div>
           <Toggle testId="live-otp-toggle" checked={form.live_otp}
@@ -86,8 +88,41 @@ export default function AdminConfigPage() {
         </div>
       </Section>
 
+      {/* Mailbox SMTP — the route email actually takes unless it is left blank */}
+      <Section title="Email mailbox (SMTP)" icon={Mail}>
+        <p className="text-[11px] text-slate-500 mb-3">
+          The domain's own mailbox, e.g. the one created in Hostinger under Emails. Filling this in
+          makes it the route every OTP and alert takes; SendGrid below is only used when it is blank.
+          Replies to anything we send go to the support address.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <PlainInput label="SMTP host" placeholder="smtp.hostinger.com"
+            value={form.smtp_host || ''}
+            onChange={v => setForm(f => ({ ...f, smtp_host: v }))}
+            testId="cfg-smtp-host" />
+          <PlainInput label="Port (465 TLS, or 587 STARTTLS)" placeholder="465"
+            value={form.smtp_port || ''}
+            onChange={v => setForm(f => ({ ...f, smtp_port: v }))}
+            testId="cfg-smtp-port" />
+          <PlainInput label="Mailbox address (also the From address)" placeholder="alerts@ajspay.in"
+            value={form.smtp_user || ''}
+            onChange={v => setForm(f => ({ ...f, smtp_user: v }))}
+            testId="cfg-smtp-user" />
+          <SecretInput label="Mailbox password"
+            placeholder={cfg.smtp_password_masked || 'Enter the mailbox password'}
+            value={form.smtp_password || ''}
+            onChange={v => setForm(f => ({ ...f, smtp_password: v }))}
+            show={showSecrets.smtp} onToggle={() => setShowSecrets(s => ({ ...s, smtp: !s.smtp }))}
+            testId="cfg-smtp-pass" />
+          <PlainInput label="Support address (Reply-To)" placeholder="support@ajspay.in"
+            value={form.support_email || ''}
+            onChange={v => setForm(f => ({ ...f, support_email: v }))}
+            testId="cfg-support-email" />
+        </div>
+      </Section>
+
       {/* SendGrid */}
-      <Section title="SendGrid Email credentials" icon={Mail}>
+      <Section title="SendGrid Email credentials (fallback)" icon={Mail}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <SecretInput label="API Key"
             placeholder={cfg.sendgrid_api_key_masked || 'Enter SendGrid API key (SG…)'}

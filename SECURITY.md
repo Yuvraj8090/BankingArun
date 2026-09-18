@@ -36,7 +36,7 @@ listed at the bottom as real work.
 | 4 | FIDO2 / WebAuthn | ✅ | `passkeys`, `passkey_challenges`; register at Security & Passkeys |
 | 5 | JWT best practices | 🟡 | HMAC-SHA256 signed, 30-minute TTL, `session_version` revocation claim. Uses HS256, not RS256/ES256 — see "Decisions needed" |
 | 6 | OAuth 2.0 / OIDC | ⬜ | No third-party identity federation. Only needed if you want "sign in with…" |
-| 7 | Strong password policy | 🟡 | 8–72 characters enforced (`api.php:293`). No complexity rule, no breached-password check |
+| 7 | Strong password policy | ✅ | 8–72 characters, rejects a password containing the member's own name or email, and checks Have I Been Pwned by k-anonymity — only five characters of the SHA-1 leave the server |
 | 8 | Account lockout | ✅ | 5 consecutive failures → 15-minute lock, in `route_login` |
 | 9 | Credential stuffing protection | 🟡 | Lockout + per-IP throttling. No IP reputation feed or behavioural analytics |
 | 10 | Session invalidation on logout | ✅ | `session_version` increments; every token issued earlier dies at once |
@@ -152,7 +152,7 @@ wrong attempts.
 
 These are missing **code**, not missing infrastructure or missing staff:
 
-1. **Password strength** — length is checked, nothing else. A breached-password check against the HaveIBeenPwned k-anonymity API is a single request and leaks nothing.
+1. **No change-password route.** A signed-in member cannot change their own password; they have to go through the forgotten-password flow to do it. Found while wiring the strength check.
 2. **Concurrent session control** — no way for a member to see or end sessions on other devices.
 3. **Encryption at rest** — database files and backups are unencrypted. A stolen backup is readable.
 
