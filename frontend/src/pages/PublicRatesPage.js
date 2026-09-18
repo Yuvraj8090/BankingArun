@@ -18,8 +18,10 @@ const inr = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 
 const years = (months) => (months % 12 === 0 ? `${months / 12} year` : `${months} month`);
 
 // The public rate card. Every figure comes from the scheme master, so what is
-// advertised here is exactly what the back office has approved — a plan held in
-// draft because it breaches the deposit cap never reaches this page.
+// advertised here is exactly what the back office has approved. A plan may be
+// published whose printed figures work out above the Nidhi cap; where that is
+// so, the rate is marked on the row it applies to rather than being averaged
+// away or left for the reader to work out.
 export default function PublicRatesPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -80,8 +82,9 @@ export default function PublicRatesPage() {
         <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-[#0b3b8c] shrink-0 mt-0.5" />
           <p className="text-[11px] text-slate-600 leading-relaxed">
-            {disclosure} The Nidhi Rules, 2014 cap what we may pay on a deposit at <strong>{cap}% a year</strong>,
-            and no plan on this page pays more than that.
+            {disclosure} The Nidhi Rules, 2014 cap what we may pay on a deposit at <strong>{cap}% a year</strong>.
+            Where a plan's printed figures work out above that, the row is marked — ask your branch
+            before depositing against it.
           </p>
         </div>
 
@@ -141,8 +144,18 @@ export default function PublicRatesPage() {
                                   <td className="p-2.5 font-semibold text-slate-900 tabular-nums">₹{inr(slab.unit)}</td>
                                   <td className="p-2.5 text-right text-slate-700 tabular-nums">₹{inr(slab.deposit)}</td>
                                   <td className="p-2.5 text-right font-semibold text-slate-900 tabular-nums">₹{inr(slab.maturity)}</td>
-                                  <td className="p-2.5 text-right text-slate-600 tabular-nums">
-                                    {slab.effective_rate_pa === null ? '—' : `${slab.effective_rate_pa}%`}
+                                  <td className="p-2.5 text-right tabular-nums">
+                                    <span className={slab.exceeds_cap ? 'font-semibold text-[#c8102e]' : 'text-slate-600'}>
+                                      {slab.effective_rate_pa === null ? '—' : `${slab.effective_rate_pa}%`}
+                                    </span>
+                                    {/* Marked on the row it applies to. A plan can hold rows that
+                                        price differently, and averaging that away would hide it. */}
+                                    {slab.exceeds_cap && (
+                                      <span className="block text-[10px] font-semibold text-[#c8102e]">above the cap</span>
+                                    )}
+                                    {slab.off_headline && !slab.exceeds_cap && (
+                                      <span className="block text-[10px] text-amber-700">differs from the plan rate</span>
+                                    )}
                                   </td>
                                 </tr>
                               ))}

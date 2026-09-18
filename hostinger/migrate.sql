@@ -514,3 +514,23 @@ CREATE TABLE IF NOT EXISTS sessions (
     INDEX idx_session_user (user_id, revoked_at),
     INDEX idx_session_expiry (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The 3-year monthly plan was already seeded, deliberately held as a draft with
+-- a note that its printed maturity works out above the cap. Activating it is the
+-- owner's decision, taken knowingly; the slab table from the brochure goes in
+-- with it so every denomination is rated rather than just the headline. The
+-- rates page flags each slab that prices above the cap -- see scheme_public().
+UPDATE schemes SET status = 'active',
+    contribution_amount = 6000.00, total_deposit = 216000.00, maturity_amount = 249300.00,
+    slabs = '[{"unit":500,"deposit":18000,"maturity":21975},{"unit":1000,"deposit":36000,"maturity":43950},{"unit":1500,"deposit":54000,"maturity":65925},{"unit":2000,"deposit":72000,"maturity":87900},{"unit":3000,"deposit":108000,"maturity":124650},{"unit":4000,"deposit":144000,"maturity":166200},{"unit":5000,"deposit":180000,"maturity":207750},{"unit":6000,"deposit":216000,"maturity":249300}]',
+    notes = 'Brochure p7. Printed as 10.5%; the figures work out higher. The 500-2000 rows and the 3000-6000 rows do not agree with each other in the brochure.'
+    WHERE code = 'AJS-RD-3Y';
+
+-- The 21-year Shubh Lakshmi payout is genuinely new; the 6, 11 and 16 year
+-- payouts were seeded but this one was not.
+INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
+    contribution_amount, principal_amount, total_deposit, maturity_amount, payout_type, status, notes, slabs) VALUES
+('sch-sl-21y', 'AJS-SL-21Y', 'Shubh Lakshmi payout at 21', 'recurring', 252, 72,
+    6000.00, NULL, 432000.00, 3849700.00, 'maturity', 'active',
+    'Brochure p8. 72 monthly instalments, held to year 21.',
+    '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]');
