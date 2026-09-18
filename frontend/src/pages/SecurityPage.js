@@ -25,6 +25,20 @@ export default function SecurityPage() {
   const [confirmPwd, setConfirmPwd] = useState('');
   const [changingPwd, setChangingPwd] = useState(false);
 
+  const [sessions, setSessions] = useState(null);
+
+  const loadSessions = async () => {
+    try { setSessions((await api.activeSessions()).sessions); }
+    catch { setSessions([]); }
+  };
+  useEffect(() => { loadSessions(); }, []);
+
+  const endSession = async (s) => {
+    if (!window.confirm(`Sign out ${s.device}?`)) return;
+    try { toast.success((await api.revokeSession(s.id)).message); loadSessions(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not end that session.'); }
+  };
+
   const changePassword = async () => {
     if (newPwd !== confirmPwd) return toast.error('The two new passwords do not match.');
     setChangingPwd(true);
@@ -184,6 +198,59 @@ export default function SecurityPage() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Where you are signed in */}
+      <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-[#0b3b8c]" /> Where you are signed in
+            </h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              If you do not recognise a device, sign it out and change your password.
+            </p>
+          </div>
+          <button type="button" onClick={loadSessions} data-testid="sessions-refresh"
+            className="px-3 py-2 rounded-md border border-slate-200 text-xs text-slate-700 hover:border-[#0b3b8c] hover:text-[#0b3b8c] flex items-center gap-1.5 transition">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {sessions === null ? (
+            <p className="p-5 text-xs text-slate-500 flex items-center gap-2">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…
+            </p>
+          ) : sessions.length === 0 ? (
+            <p className="p-5 text-xs text-slate-500">No other sessions.</p>
+          ) : sessions.map((s) => (
+            <div key={s.id} data-testid={`session-${s.id}`} className="p-4 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-slate-900">{s.device}</span>
+                  {s.is_current && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      this device
+                    </span>
+                  )}
+                  {s.is_impersonation && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                      support session
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 font-mono truncate">{s.ip}</p>
+                <p className="text-[11px] text-slate-500">Last active {new Date(s.last_seen_at + 'Z').toLocaleString('en-IN')}</p>
+              </div>
+              {!s.is_current && (
+                <button type="button" onClick={() => endSession(s)} data-testid={`session-revoke-${s.id}`}
+                  className="px-3 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 hover:border-[#c8102e] hover:text-[#c8102e] shrink-0 transition">
+                  Sign out
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

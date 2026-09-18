@@ -85,6 +85,17 @@ function start_session(array $user, ?array $impersonator = null, ?int $ttl = nul
         $claims['imp_email'] = $impersonator['email'];
         $claims['imp_ver'] = (int)$impersonator['session_version'];
     }
+    // Recorded so the member can see where they are signed in and end a session
+    // from another device. The id travels inside the signed payload, so it
+    // cannot be swapped for someone else's.
+    global $pdo;
+    $sid = uuid4();
+    $pdo->prepare('INSERT INTO sessions (id, user_id, user_agent, ip, is_impersonation, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)')
+        ->execute([$sid, $user['id'], clip($_SERVER['HTTP_USER_AGENT'] ?? '', 255) ?: null,
+            client_ip(), $impersonator !== null ? 1 : 0, gmdate('Y-m-d H:i:s', $expires)]);
+    $claims['sid'] = $sid;
+
     $payload = b64url(json_encode($claims));
     $token = $payload . '.' . sign($payload);
     session_cookie($token, $expires);
@@ -113,6 +124,23 @@ function current_user(): array
     if (!$user || (int)$user['session_version'] !== (int)($claims['ver'] ?? -1)) {
         fail(401, 'Invalid session token.');
     }
+    // Tokens issued before this table existed carry no sid. They are still
+    // signed, so the claim cannot be stripped by a client — an absent sid means
+    // a legitimately older token, and it keeps working until it expires.
+    if (isset($claims['sid'])) {
+        global $pdo;
+        $session = row('SELECT * FROM sessions WHERE id = ?', [(string)$claims['sid']]);
+        if (!$session || $session['revoked_at'] !== null) {
+            fail(401, 'This session was ended from another device. Please sign in again.');
+        }
+        // Written at most once a minute: a timestamp on every request would turn
+        // each read into a write.
+        if (strtotime($session['last_seen_at']) < time() - 60) {
+            $pdo->prepare('UPDATE sessions SET last_seen_at = ?, ip = ? WHERE id = ?')
+                ->execute([now_utc(), client_ip(), $session['id']]);
+        }
+    }
+
     // An impersonated session stays valid only while the owner's own session
     // does, so the owner logging out ends every impersonation they started.
     global $IMPERSONATOR;
@@ -275,6 +303,76 @@ function debit_account(array $user, mixed $accountNumber, float $total, string $
 }
 
 // --- Auth ----------------------------------------------------------------------------
+// --- Where you are signed in -----------------------------------------------------------
+// A member could sign out everywhere, by logging out, but could not see where "everywhere"
+// was or end one device without ending the rest.
+function describe_device(?string $agent): string
+{
+    $agent = (string)$agent;
+    $browser = match (true) {
+        str_contains($agent, 'Edg/') => 'Edge',
+        str_contains($agent, 'OPR/') || str_contains($agent, 'Opera') => 'Opera',
+        str_contains($agent, 'Chrome') => 'Chrome',
+        str_contains($agent, 'Firefox') => 'Firefox',
+        str_contains($agent, 'Safari') => 'Safari',
+        default => 'Unknown browser',
+    };
+    $platform = match (true) {
+        str_contains($agent, 'iPhone') => 'iPhone',
+        str_contains($agent, 'iPad') => 'iPad',
+        str_contains($agent, 'Android') => 'Android',
+        str_contains($agent, 'Windows') => 'Windows',
+        str_contains($agent, 'Mac OS') || str_contains($agent, 'Macintosh') => 'Mac',
+        str_contains($agent, 'Linux') => 'Linux',
+        default => 'unknown device',
+    };
+    return "$browser on $platform";
+}
+
+function route_sessions_list(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    $pdo->prepare('DELETE FROM sessions WHERE expires_at < ?')->execute([now_utc()]);
+
+    $claims = peek_session_claims();
+    $currentSid = (string)($claims['sid'] ?? '');
+    $rows = rows('SELECT * FROM sessions WHERE user_id = ? AND revoked_at IS NULL
+        ORDER BY last_seen_at DESC', [$user['id']]);
+
+    respond(['sessions' => array_map(fn($r) => [
+        'id' => $r['id'],
+        'device' => describe_device($r['user_agent']),
+        // Only the network the session came from, never a precise location:
+        // the member can recognise their own, and nothing more is stored.
+        'ip' => $r['ip'],
+        'is_impersonation' => (int)$r['is_impersonation'] === 1,
+        'is_current' => $r['id'] === $currentSid,
+        'signed_in_at' => $r['created_at'],
+        'last_seen_at' => $r['last_seen_at'],
+    ], $rows)]);
+}
+
+function route_session_revoke(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = current_user();
+    // Scoped to the caller's own rows, so an id belonging to someone else
+    // matches nothing rather than ending their session.
+    $session = row('SELECT * FROM sessions WHERE id = ? AND user_id = ?', [$id, $user['id']]);
+    if (!$session) {
+        fail(404, 'That session no longer exists.');
+    }
+    $claims = peek_session_claims();
+    if ($session['id'] === (string)($claims['sid'] ?? '')) {
+        fail(400, 'That is this device. Use Log out to end this session.');
+    }
+    $pdo->prepare('UPDATE sessions SET revoked_at = ? WHERE id = ?')->execute([now_utc(), $session['id']]);
+    audit($user, 'SESSION_REVOKED', describe_device($session['user_agent']) . ' from ' . $session['ip']);
+    security_event('SESSION_REVOKED', 'info', 'Member ended a session on another device', $user);
+    respond(['status' => 'SUCCESS', 'message' => 'That device has been signed out.']);
+}
+
 // --- Changing your own password --------------------------------------------------------
 // A member could not do this at all: the only way to change a password was to pretend to
 // have forgotten it. Re-authentication is required, because a screen left open in a branch
@@ -925,6 +1023,7 @@ $routes = [
     'GET /admin/config' => 'route_admin_config_get',
     'PUT /admin/config' => 'route_admin_config_set',
     'POST /auth/change-password' => 'route_change_password',
+    'GET /auth/sessions' => 'route_sessions_list',
     'PATCH /profile/nominee' => 'route_nominee_update',
     'PATCH /profile/joint-holder' => 'route_joint_holder_update',
     'GET /kyc/documents' => 'route_kyc_documents_mine',
@@ -1019,6 +1118,7 @@ $paramRoutes = [
     ['DELETE', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_delete'],
     ['PATCH', '#^/agents/([\w-]{1,64})$#', 'route_agent_update'],
     ['DELETE', '#^/agents/([\w-]{1,64})$#', 'route_agent_delete'],
+    ['DELETE', '#^/auth/sessions/([\w-]{1,64})$#', 'route_session_revoke'],
     ['PATCH', '#^/branches/([\w-]{1,64})$#', 'route_branch_update'],
     ['DELETE', '#^/branches/([\w-]{1,64})$#', 'route_branch_delete'],
     ['PATCH', '#^/products/([\w-]{1,64})$#', 'route_product_update'],

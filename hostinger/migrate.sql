@@ -497,3 +497,20 @@ CREATE TABLE IF NOT EXISTS kyc_documents (
     INDEX idx_kyc_doc_user (user_id, kind),
     INDEX idx_kyc_doc_status (status, uploaded_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One row per signed-in device. The token stays stateless and signed; this table
+-- is what lets a member see where they are signed in and end a session from
+-- somewhere else, which a bare session_version counter cannot do.
+CREATE TABLE IF NOT EXISTS sessions (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    user_agent VARCHAR(255),
+    ip VARCHAR(45),
+    is_impersonation TINYINT(1) NOT NULL DEFAULT 0,
+    revoked_at DATETIME NULL,
+    expires_at DATETIME NOT NULL,
+    last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_session_user (user_id, revoked_at),
+    INDEX idx_session_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
