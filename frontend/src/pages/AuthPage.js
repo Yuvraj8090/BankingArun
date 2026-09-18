@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Building2, Lock, User, Mail, Phone, PiggyBank,
-  ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, Gift, RefreshCw
+  ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, RefreshCw
 } from 'lucide-react';
 import Brand from '../components/Brand';
 import { toast } from 'sonner';
@@ -270,13 +270,6 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                   <option value="loan">A loan</option>
                   <option value="other">Something else</option>
                 </select>
-              </Field>
-
-              <Field icon={Gift} label="Referral code (optional)">
-                <input data-testid="enquiry-referral-input" value={referralCode}
-                  onChange={e => setReferralCode(e.target.value.toUpperCase())}
-                  placeholder="If a member introduced you"
-                  className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[#0b3b8c]" />
               </Field>
 
               <label className="block">

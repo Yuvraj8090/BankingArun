@@ -29,6 +29,7 @@ export const api = {
   // Open to anyone: the plans actually on sale and the company's registration
   // particulars. No token — this is what the public site renders.
   publicSchemes: async () => (await axios.get(`${API}/public/schemes`)).data,
+  publicMarketRates: async () => (await axios.get(`${API}/public/market-rates`)).data,
   // Member register and share allotment (Nidhi Rules 11)
   registerMembers: async (params) => (await axios.get(`${API}/register/members`, { ...getAuthHeaders(), params })).data,
   registerAdmit: async (payload) => (await axios.post(`${API}/register/admit`, payload, getAuthHeaders())).data,

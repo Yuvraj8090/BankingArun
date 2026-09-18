@@ -9,44 +9,75 @@ import {
 } from 'lucide-react';
 
 export default function PublicHomePage() {
-  // Unauthenticated: the public features list needs no session.
   const [features, setFeatures] = useState(null);
+  const [siteProducts, setSiteProducts] = useState([]);
+  const [marketRates, setMarketRates] = useState(null);
   useEffect(() => {
     api.publicFeatures().then((d) => setFeatures(d.features)).catch(() => setFeatures([]));
+    api.publicProducts().then((d) => setSiteProducts(d.products || [])).catch(() => setSiteProducts([]));
+    api.publicMarketRates().then(setMarketRates).catch(() => setMarketRates(null));
   }, []);
+
+  const fact = (path, label) => siteProducts.find((p) => p.path === path)?.facts
+    ?.find(([name]) => name === label)?.[1] || null;
+  const clean = (value) => value?.replace(/[–—]/g, '-') || null;
+  const numberFrom = (value) => {
+    const match = String(value || '').match(/\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : null;
+  };
+
+  const savingsRate = clean(fact('personal/savings-account', 'Interest rate'));
+  const fdOneToTwo = clean(fact('personal/fixed-deposits', '1 year to 2 years'));
+  const fdTwoToThree = clean(fact('personal/fixed-deposits', '2 years to 3 years'));
+  const seniorBonus = clean(fact('personal/fixed-deposits', 'Senior citizen bonus'));
+  const homeLoanRate = clean(fact('loans/home-loan', 'Interest rate'));
+  const personalLoanRate = clean(fact('loans/personal-loan', 'Interest rate'));
+  const vehicleLoanRate = clean(fact('loans/vehicle-loan', 'Interest rate'));
+  const goldLoanRate = clean(fact('loans/gold-loan', 'Interest rate'));
+  const educationLoanRate = clean(fact('loans/education-loan', 'Interest rate'));
 
   // Calculators
   const [calcType, setCalcType] = useState('emi');
   const [emiAmount, setEmiAmount] = useState(500000);
   const [emiTenure, setEmiTenure] = useState(36);
-  const emiRate = 8.5;
-  const r = (emiRate / 12) / 100;
-  const monthlyEmi = Math.round((emiAmount * r * Math.pow(1 + r, emiTenure)) / (Math.pow(1 + r, emiTenure) - 1));
+  const emiRate = numberFrom(homeLoanRate);
+  const monthlyRate = emiRate === null ? null : (emiRate / 12) / 100;
+  const monthlyEmi = monthlyRate === null ? null : Math.round(
+    (emiAmount * monthlyRate * Math.pow(1 + monthlyRate, emiTenure))
+      / (Math.pow(1 + monthlyRate, emiTenure) - 1)
+  );
 
   const [fdPrincipal, setFdPrincipal] = useState(100000);
   const [fdTenureMonths, setFdTenureMonths] = useState(24);
-  const fdRate = 7.25;
-  const fdMaturity = Math.round(fdPrincipal * Math.pow(1 + (fdRate / 400), (4 * (fdTenureMonths / 12))));
-  const fdInterest = fdMaturity - fdPrincipal;
+  const fdRate = numberFrom(fdTenureMonths <= 24 ? fdOneToTwo : fdTwoToThree);
+  const fdMaturity = fdRate === null ? null
+    : Math.round(fdPrincipal * Math.pow(1 + (fdRate / 400), (4 * (fdTenureMonths / 12))));
+  const fdInterest = fdMaturity === null ? null : fdMaturity - fdPrincipal;
 
-  const rateTicker = [
-    { label: 'Savings A/C', value: '4.00% p.a.' },
-    { label: 'Fixed Deposit (1-2 Yrs)', value: '7.25% p.a.' },
-    { label: 'Senior Citizen FD', value: '7.75% p.a.' },
-    { label: 'Home Loan', value: '8.40% p.a.' },
-    { label: 'Personal Loan', value: '10.50% p.a.' },
-    { label: 'Gold Loan', value: '7.90% p.a.' },
-    { label: 'USD / INR', value: '₹83.24' },
-    { label: 'RBI Repo Rate', value: '6.50%' }
-  ];
+  const currentRates = [
+    { label: 'Savings A/C', value: savingsRate },
+    { label: 'Fixed Deposit (1-2 Yrs)', value: fdOneToTwo },
+    { label: 'Fixed Deposit (2-3 Yrs)', value: fdTwoToThree },
+    { label: 'Senior Citizen FD bonus', value: seniorBonus },
+    { label: 'Home Loan', value: homeLoanRate },
+    { label: 'Personal Loan', value: personalLoanRate },
+    { label: 'Vehicle Loan', value: vehicleLoanRate },
+    { label: 'Gold Loan', value: goldLoanRate },
+    { label: 'Education Loan', value: educationLoanRate },
+    marketRates?.usd_inr && {
+      label: 'USD / INR (ECB daily)',
+      value: `₹${Number(marketRates.usd_inr.rate).toFixed(2)} as of ${marketRates.usd_inr.as_of}`
+    }
+  ].filter((item) => item?.value);
+  const rateTicker = currentRates.length ? currentRates : [{ label: 'Rates', value: 'Loading current values...' }];
 
   // Every product tile is its own page at its own URL.
   const products = [
-    { icon: PiggyBank, label: 'Savings Account', desc: 'Zero balance, 4.00% p.a.', to: '/personal/savings-account', color: 'text-blue-800' },
-    { icon: HomeIcon, label: 'Home Loan', desc: 'From 8.40% p.a. · 30 yrs', to: '/loans/home-loan', color: 'text-emerald-700' },
-    { icon: Car, label: 'Vehicle Loan', desc: 'From 8.75% p.a.', to: '/loans/vehicle-loan', color: 'text-slate-700' },
+    { icon: PiggyBank, label: 'Savings Account', desc: savingsRate ? `Zero balance, ${savingsRate}` : 'Zero-balance member account', to: '/personal/savings-account', color: 'text-blue-800' },
+    { icon: HomeIcon, label: 'Home Loan', desc: homeLoanRate || 'Buy, build or transfer', to: '/loans/home-loan', color: 'text-emerald-700' },
+    { icon: Car, label: 'Vehicle Loan', desc: vehicleLoanRate || 'New and used vehicles', to: '/loans/vehicle-loan', color: 'text-slate-700' },
     { icon: CreditCard, label: 'Debit & Credit Cards', desc: 'Freeze, limits, UPI', to: '/personal/debit-cards', color: 'text-[#c8102e]' },
-    { icon: TrendingUp, label: 'Fixed Deposit', desc: 'Up to 7.75% for seniors', to: '/personal/fixed-deposits', color: 'text-blue-800' },
+    { icon: TrendingUp, label: 'Fixed Deposit', desc: fdOneToTwo ? `1-2 years: ${fdOneToTwo}` : 'Flexible deposit tenures', to: '/personal/fixed-deposits', color: 'text-blue-800' },
     { icon: Briefcase, label: 'Corporate Banking', desc: 'Bulk NEFT · Trade finance', to: '/corporate/current-account', color: 'text-slate-700' },
     { icon: GraduationCap, label: 'Education Loan', desc: 'Study in India or abroad', to: '/loans/education-loan', color: 'text-emerald-700' },
     { icon: Umbrella, label: 'Insurance', desc: 'Term · Health · Motor', to: '/investments/insurance', color: 'text-[#c8102e]' }
@@ -251,7 +282,9 @@ export default function PublicHomePage() {
                 <div>
                   <div className="flex justify-between text-slate-700 mb-1">
                     <span>Tenure ({emiTenure} months / {(emiTenure/12).toFixed(1)} yrs)</span>
-                    <span className="font-bold text-[#0b3b8c]">{emiRate}% p.a.</span>
+                    <span className="font-bold text-[#0b3b8c]">
+                      {emiRate === null ? 'Current rate unavailable' : `${emiRate}% p.a.`}
+                    </span>
                   </div>
                   <input type="range" min="12" max="120" step="6"
                     value={emiTenure} onChange={(e) => setEmiTenure(Number(e.target.value))}
@@ -260,7 +293,7 @@ export default function PublicHomePage() {
                 <div className="p-4 rounded-md bg-blue-50 border border-blue-100 text-center">
                   <p className="text-slate-600 text-[11px]">Estimated Monthly EMI</p>
                   <h3 data-testid="public-emi-result" className="text-3xl font-bold text-[#0b3b8c] mt-1">
-                    ₹{monthlyEmi.toLocaleString('en-IN')}
+                    {monthlyEmi === null ? '-' : `₹${monthlyEmi.toLocaleString('en-IN')}`}
                   </h3>
                 </div>
               </div>
@@ -278,20 +311,24 @@ export default function PublicHomePage() {
                 <div>
                   <div className="flex justify-between text-slate-700 mb-1">
                     <span>Tenure ({fdTenureMonths} months)</span>
-                    <span className="font-bold text-[#0b3b8c]">{fdRate}% p.a.</span>
+                    <span className="font-bold text-[#0b3b8c]">
+                      {fdRate === null ? 'Current rate unavailable' : `${fdRate}% p.a.`}
+                    </span>
                   </div>
-                  <input type="range" min="6" max="60" step="6"
+                  <input type="range" min="12" max="36" step="6"
                     value={fdTenureMonths} onChange={(e) => setFdTenureMonths(Number(e.target.value))}
                     className="w-full accent-blue-800 cursor-pointer" />
                 </div>
                 <div className="p-4 rounded-md bg-blue-50 border border-blue-100 text-center">
                   <p className="text-slate-600 text-[11px]">Maturity Payout</p>
                   <h3 data-testid="public-fd-result" className="text-3xl font-bold text-[#0b3b8c] mt-1">
-                    ₹{fdMaturity.toLocaleString('en-IN')}
+                    {fdMaturity === null ? '-' : `₹${fdMaturity.toLocaleString('en-IN')}`}
                   </h3>
-                  <p className="text-[11px] text-emerald-700 font-semibold mt-1">
-                    +₹{fdInterest.toLocaleString('en-IN')} interest earned
-                  </p>
+                  {fdInterest !== null && (
+                    <p className="text-[11px] text-emerald-700 font-semibold mt-1">
+                      +₹{fdInterest.toLocaleString('en-IN')} interest earned
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -312,11 +349,11 @@ export default function PublicHomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { n: '4.00%', l: 'Savings interest p.a.', to: '/personal/savings-account' },
-            { n: '7.75%', l: 'Peak FD rate for seniors', to: '/personal/fixed-deposits' },
+            savingsRate && { n: savingsRate, l: 'Savings interest', to: '/personal/savings-account' },
+            seniorBonus && { n: seniorBonus, l: 'Senior citizen FD bonus', to: '/personal/fixed-deposits' },
             { n: '24×7', l: 'IMPS & UPI transfers', to: '/personal/savings-account' },
             { n: '₹0', l: 'Minimum balance', to: '/personal/salary-account' }
-          ].map((s) => (
+          ].filter(Boolean).map((s) => (
             <Link key={s.l} to={s.to} className="bg-white border border-slate-200 rounded-lg p-5 text-center hover:border-[#0b3b8c] transition">
               <div className="text-2xl font-bold text-[#0b3b8c]">{s.n}</div>
               <div className="text-xs text-slate-600 mt-1">{s.l}</div>

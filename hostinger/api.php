@@ -1054,6 +1054,7 @@ $routes = [
     // Regulated-capability register (modules/compliance.php)
     'GET /public/features' => 'route_public_features',
     'GET /public/schemes' => 'route_public_schemes',
+    'GET /public/market-rates' => 'route_public_market_rates',
     'GET /public/products' => 'route_public_products',
     'GET /public/captcha' => 'route_public_captcha',
     'POST /auth/forgot-password' => 'route_forgot_password',

@@ -235,6 +235,67 @@ const COMPANY_IDENTITY = [
     'verify_at' => 'https://www.mca.gov.in',
 ];
 
+const ECB_DAILY_RATES_URL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
+
+function ecb_usd_inr_from_xml(string $body): ?array
+{
+    if (!function_exists('simplexml_load_string')) {
+        return null;
+    }
+    $xml = simplexml_load_string($body, SimpleXMLElement::class,
+        LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+    if ($xml === false) {
+        return null;
+    }
+    $dates = $xml->xpath('//*[local-name()="Cube"][@time]') ?: [];
+    $nodes = $xml->xpath('//*[local-name()="Cube"][@currency]') ?: [];
+    $rates = [];
+    foreach ($nodes as $node) {
+        $attrs = $node->attributes();
+        $rates[(string)$attrs['currency']] = (float)$attrs['rate'];
+    }
+    $usd = $rates['USD'] ?? 0.0;
+    $inr = $rates['INR'] ?? 0.0;
+    if (!$dates || $usd <= 0 || $inr <= 0) {
+        return null;
+    }
+    return ['rate' => round($inr / $usd, 4), 'as_of' => (string)$dates[0]->attributes()['time']];
+}
+
+function ecb_usd_inr(): ?array
+{
+    // ponytail: one shared hourly file cache; move to a shared store only if the API becomes multi-host.
+    $cachePath = sys_get_temp_dir() . '/ajspay-ecb-usd-inr.json';
+    $cached = is_file($cachePath) ? json_decode((string)file_get_contents($cachePath), true) : null;
+    if (is_array($cached) && filemtime($cachePath) >= time() - 3600) {
+        return $cached;
+    }
+
+    $ch = curl_init(ECB_DAILY_RATES_URL);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 5,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_USERAGENT => 'AJSPay-Public-Rates',
+    ]);
+    $body = curl_exec($ch);
+    $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $rate = $status === 200 && is_string($body) ? ecb_usd_inr_from_xml($body) : null;
+    if ($rate !== null) {
+        file_put_contents($cachePath, json_encode($rate), LOCK_EX);
+        return $rate;
+    }
+    return is_array($cached) ? $cached : null;
+}
+
+function route_public_market_rates(array $d): void
+{
+    respond([
+        'usd_inr' => ecb_usd_inr(),
+        'source' => 'European Central Bank daily reference rates',
+    ]);
+}
+
 // Open to anyone, no login: the plans on sale and the terms attached to them.
 // Draft plans are never listed, so a scheme over the deposit cap cannot be
 // advertised even by accident.
