@@ -107,7 +107,7 @@ listed at the bottom as real work.
 | 10 | Secret management | 🟡 | Root-owned file outside the web root. Not a vault |
 | 11 | VPC subnet isolation | ➖ | Single host |
 | 12 | Database auditing | 🟡 | `audit_logs` and `security_events` record application actions. No MariaDB-level query log |
-| 13 | Secure CI/CD | 🟡 | Deploy key is `restrict`ed and single-purpose; smoke-checked with rollback. No signed commits, no required review |
+| 13 | Secure CI/CD | 🟡 | Deploy key is `restrict`ed and single-purpose; security scan gates the build; smoke-checked with rollback. No signed commits, no required review |
 | 14 | SBOM | ⬜ | Not generated |
 | 15 | CSPM | ➖ | No cloud posture to manage |
 
@@ -122,13 +122,13 @@ listed at the bottom as real work.
 | 5 | Out-of-band confirmation | ✅ | OTP on transfers; transaction password separate from login |
 | 6 | Bug bounty | 🏢 | A commercial programme |
 | 7 | Penetration testing | 🏢 | Engage a third party. **Nothing in this file substitutes for it** |
-| 8 | SAST in CI | ⬜ | Real gap — see below |
+| 8 | SAST in CI | 🟡 | `scripts/security-scan.sh` gates every deploy: PHP syntax, tracked secrets, interpolated SQL, debug output, `display_errors`, hover contrast, npm advisories, security.txt expiry. Not a full static analyser |
 | 9 | DAST | ⬜ | Not set up |
 | 10 | IAST | ⬜ | Not set up |
 | 11 | Incident response plan | 🏢 | Needs writing by you; who is called, what is switched off, who tells members |
 | 12 | Regulatory compliance | 🏢 | `compliance.php` gates services by authorisation and enforces the 12.5% Nidhi cap. **Actual compliance is a compliance officer's judgement, not a code property** |
 | 13 | Chaos / resilience testing | ⬜ | Deploy rollback is tested by use; failure injection is not |
-| 14 | Responsible disclosure | ⬜ | No `security.txt` — real gap, cheap to fix |
+| 14 | Responsible disclosure | ✅ | `/.well-known/security.txt`, RFC 9116, with scope and an expiry the CI scan watches |
 
 ---
 
@@ -152,12 +152,9 @@ wrong attempts.
 
 These are missing **code**, not missing infrastructure or missing staff:
 
-1. **Password recovery** — there is no reset flow at all. A member who forgets their password currently has no route back in except staff intervention. Needs a single-use, time-bound, out-of-band token.
-2. **`security.txt`** — one static file so a researcher who finds something knows where to send it.
-3. **SAST in CI** — the deploy workflow builds and ships but never scans. `php -l`, `npm audit`, and a static analyser would catch regressions before they reach the VPS.
-4. **Password strength** — length is checked, nothing else. A breached-password check against the HaveIBeenPwned k-anonymity API is a single request and leaks nothing.
-5. **Concurrent session control** — no way for a member to see or end sessions on other devices.
-6. **Encryption at rest** — database files and backups are unencrypted. A stolen backup is readable.
+1. **Password strength** — length is checked, nothing else. A breached-password check against the HaveIBeenPwned k-anonymity API is a single request and leaks nothing.
+2. **Concurrent session control** — no way for a member to see or end sessions on other devices.
+3. **Encryption at rest** — database files and backups are unencrypted. A stolen backup is readable.
 
 ## Decisions needed from you
 

@@ -21,6 +21,10 @@ jobs:
           cache-dependency-path: frontend/yarn.lock
       - name: Install dependencies
         run: corepack enable && cd frontend && yarn install --frozen-lockfile --non-interactive
+      # Runs before the build, so a release that fails a security check is never
+      # packaged, let alone shipped.
+      - name: Security scan
+        run: bash scripts/security-scan.sh
       - name: Build and check deployment package
         run: bash scripts/build-vps.sh
       - name: Configure deployment SSH

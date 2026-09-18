@@ -1,0 +1,24 @@
+# Aadhunik Jeewan Sanchay Nidhi Limited — responsible disclosure
+#
+# If you have found a security issue in this service, please tell us before
+# telling anyone else, and give us a reasonable chance to fix it. We will not
+# pursue action against research that stays within the guidance below.
+
+Contact: mailto:support@ajspay.in
+Contact: tel:+91-9105015464
+Expires: 2027-09-18T13:33:31Z
+Preferred-Languages: en, hi
+Canonical: https://ajspay.co.in/.well-known/security.txt
+
+# In scope
+#   ajspay.co.in and its /api endpoints
+#
+# Out of scope, and please do not attempt these
+#   Denial of service or load testing of any kind
+#   Social engineering of members or of our staff
+#   Physical access to branches
+#   Testing against accounts that are not your own
+#
+# Please include what you did, what you saw, and how we can reproduce it.
+# Do not access, modify or retain another member's data to prove an issue —
+# a description is enough, and we will verify it ourselves.
