@@ -198,6 +198,7 @@ export const api = {
   // Unauthenticated: the member cannot sign in, which is the whole point.
   forgotPassword: async (email) => (await axios.post(`${API}/auth/forgot-password`, { email })).data,
   resetPassword: async (payload) => (await axios.post(`${API}/auth/reset-password`, payload)).data,
+  changePassword: async (payload) => (await axios.post(`${API}/auth/change-password`, payload, getAuthHeaders())).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
   productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,

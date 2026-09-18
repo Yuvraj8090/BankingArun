@@ -39,7 +39,7 @@ listed at the bottom as real work.
 | 7 | Strong password policy | ✅ | 8–72 characters, rejects a password containing the member's own name or email, and checks Have I Been Pwned by k-anonymity — only five characters of the SHA-1 leave the server |
 | 8 | Account lockout | ✅ | 5 consecutive failures → 15-minute lock, in `route_login` |
 | 9 | Credential stuffing protection | 🟡 | Lockout + per-IP throttling. No IP reputation feed or behavioural analytics |
-| 10 | Session invalidation on logout | ✅ | `session_version` increments; every token issued earlier dies at once |
+| 10 | Session invalidation on logout | ✅ | `session_version` increments on logout, password change and password reset; every token issued earlier dies at once |
 | 11 | Concurrent session control | ⬜ | Sessions are stateless; no device list, no "sign out everywhere" |
 | 12 | Step-up authentication | ✅ | Transaction password + OTP before transfers; also required to change a nomination or joint holder |
 | 13 | Secure password recovery | ⬜ | **No reset flow exists at all** — see "Real gaps" |
@@ -152,9 +152,8 @@ wrong attempts.
 
 These are missing **code**, not missing infrastructure or missing staff:
 
-1. **No change-password route.** A signed-in member cannot change their own password; they have to go through the forgotten-password flow to do it. Found while wiring the strength check.
-2. **Concurrent session control** — no way for a member to see or end sessions on other devices.
-3. **Encryption at rest** — database files and backups are unencrypted. A stolen backup is readable.
+1. **Concurrent session control** — no way for a member to see or end sessions on other devices.
+2. **Encryption at rest** — database files and backups are unencrypted. A stolen backup is readable.
 
 ## Decisions needed from you
 

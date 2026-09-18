@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Fingerprint, ShieldCheck, Smartphone, Key, Trash2, PlusCircle, RefreshCw, Mail, Phone, CheckCircle2 } from 'lucide-react';
+import { Fingerprint, ShieldCheck, Smartphone, Key, Trash2, PlusCircle, RefreshCw, Mail, Phone, CheckCircle2, Lock } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
@@ -20,6 +20,23 @@ const bufToB64u = (buf) => {
 };
 
 export default function SecurityPage() {
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [changingPwd, setChangingPwd] = useState(false);
+
+  const changePassword = async () => {
+    if (newPwd !== confirmPwd) return toast.error('The two new passwords do not match.');
+    setChangingPwd(true);
+    try {
+      const r = await api.changePassword({ current_password: currentPwd, new_password: newPwd });
+      toast.success(r.message);
+      setCurrentPwd(''); setNewPwd(''); setConfirmPwd('');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Could not change the password.');
+    } finally { setChangingPwd(false); }
+  };
+
   const [passkeys, setPasskeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
@@ -167,6 +184,48 @@ export default function SecurityPage() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Change password */}
+      <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div className="p-5 border-b border-slate-100">
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <Lock className="w-4 h-4 text-[#0b3b8c]" /> Change your password
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Every other signed-in device is logged out when you change it. This one stays in.
+          </p>
+        </div>
+        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs items-end">
+          <label className="block">
+            <span className="block text-[11px] text-slate-600 mb-1">Current password</span>
+            <input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)}
+              data-testid="change-current-password" autoComplete="current-password"
+              className="w-full border border-slate-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] text-slate-600 mb-1">New password</span>
+            <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)}
+              data-testid="change-new-password" autoComplete="new-password"
+              className="w-full border border-slate-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] text-slate-600 mb-1">Confirm new password</span>
+            <input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)}
+              data-testid="change-confirm-password" autoComplete="new-password"
+              className="w-full border border-slate-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+          </label>
+          <div className="md:col-span-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={changePassword} disabled={changingPwd || !currentPwd || !newPwd}
+              data-testid="change-password-btn"
+              className="px-5 py-2.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold disabled:opacity-50 transition">
+              {changingPwd ? 'Changing…' : 'Change password'}
+            </button>
+            <p className="text-[11px] text-slate-500">
+              At least 8 characters, and not one that has appeared in a known breach.
+            </p>
+          </div>
         </div>
       </div>
 

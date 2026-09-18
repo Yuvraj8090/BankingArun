@@ -275,6 +275,47 @@ function debit_account(array $user, mixed $accountNumber, float $total, string $
 }
 
 // --- Auth ----------------------------------------------------------------------------
+// --- Changing your own password --------------------------------------------------------
+// A member could not do this at all: the only way to change a password was to pretend to
+// have forgotten it. Re-authentication is required, because a screen left open in a branch
+// should not be enough to take an account over.
+function route_change_password(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+
+    // The same lockout the login uses, keyed separately so a run at this does
+    // not lock the member out of signing in, and vice versa.
+    $identifier = 'chpwd:' . $user['id'];
+    if (recent_fails($identifier) >= MAX_FAILS) {
+        fail(429, 'Too many wrong attempts. Please try again in 15 minutes.');
+    }
+    if (!is_string($d['current_password'] ?? null) || !password_verify($d['current_password'], $user['password_hash'])) {
+        record_fail($identifier, $user['email']);
+        security_event('PASSWORD_CHANGE_FAILED', 'warning', 'Wrong current password', $user);
+        fail(400, 'Your current password is not right.');
+    }
+    clear_fails($identifier);
+
+    $new = $d['new_password'] ?? null;
+    assert_password_acceptable($new, [$user['name'], strstr($user['email'], '@', true)]);
+    if (is_string($new) && password_verify($new, $user['password_hash'])) {
+        fail(422, 'That is your current password. Please choose a different one.');
+    }
+
+    // Bumping the version signs out every device holding a token, which is the
+    // point of changing a password. The caller is then handed a fresh one, so
+    // the device doing the changing is the only one that stays in.
+    $pdo->prepare('UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?')
+        ->execute([password_hash($new, PASSWORD_BCRYPT), $user['id']]);
+    $fresh = row('SELECT * FROM users WHERE id = ?', [$user['id']]);
+
+    audit($user, 'PASSWORD_CHANGED', 'Changed from the security screen');
+    security_event('PASSWORD_CHANGED', 'warning', 'Password changed; other sessions revoked', $user);
+    respond(['status' => 'SUCCESS', 'token' => start_session($fresh),
+        'message' => 'Password changed. Every other signed-in device has been logged out.']);
+}
+
 // --- Nominee and joint holder ---------------------------------------------------------
 // A nomination is a statutory record: it decides who the deposit is paid to. Changing it
 // is therefore treated like moving money — the transaction password is required, the old
@@ -883,6 +924,7 @@ $routes = [
     'GET /admin/rbi-reports' => 'route_rbi_reports',
     'GET /admin/config' => 'route_admin_config_get',
     'PUT /admin/config' => 'route_admin_config_set',
+    'POST /auth/change-password' => 'route_change_password',
     'PATCH /profile/nominee' => 'route_nominee_update',
     'PATCH /profile/joint-holder' => 'route_joint_holder_update',
     'GET /kyc/documents' => 'route_kyc_documents_mine',
