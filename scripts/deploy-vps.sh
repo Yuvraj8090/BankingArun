@@ -45,6 +45,23 @@ test "$(cat "$release/version.txt")" = "$revision"
 chmod +x /srv/ajspay/backup-db.sh
 /srv/ajspay/backup-db.sh
 
+# Schema first, and only after the dump above: the new code expects the new
+# tables, so a swap without them would answer 500 on anything that touches one.
+# Running before the swap means a failed migration leaves the site on the
+# release it is already serving, untouched.
+if [[ -f /etc/ajspay/migrate.cnf ]]; then
+  if [[ -f /srv/ajspay/migrate.sql ]]; then
+    echo 'Applying migrate.sql'
+    mariadb --defaults-file=/etc/ajspay/migrate.cnf ajspay < /srv/ajspay/migrate.sql
+    echo 'Schema is current'
+  fi
+else
+  echo 'ERROR: /etc/ajspay/migrate.cnf is missing, so the schema cannot be brought up to date.' >&2
+  echo '       Deploying anyway would ship code that expects tables the database does not have.' >&2
+  echo '       Run scripts/grant-migrate.sh as root on the VPS once, then deploy again.' >&2
+  exit 1
+fi
+
 previous=$(readlink current || true)
 ln -s "$release" current.next
 mv -Tf current.next current
