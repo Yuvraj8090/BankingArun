@@ -6,6 +6,7 @@ anything consuming it, even though both mean the same number.
 """
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
@@ -34,6 +35,13 @@ def out(row: dict[str, Any]) -> dict[str, Any]:
             shaped[key] = bool(int(value))
         elif key in TIME_COLUMNS:
             shaped[key] = str(value).replace(' ', 'T') + '+00:00'
+        elif isinstance(value, (datetime, date)):
+            # PDO hands PHP the raw column text and out() leaves anything not in
+            # TIME_COLUMNS alone, so those reach the client as "2026-09-16
+            # 14:18:14". The driver here returns a datetime instead, which the
+            # JSON encoder would render with a T and silently change the shape
+            # of every timestamp the two backends do not both convert.
+            shaped[key] = str(value)
         else:
             shaped[key] = value
     return shaped
