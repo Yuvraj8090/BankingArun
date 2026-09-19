@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, X, Send, Sparkles } from 'lucide-react';
+import { Bot, X, Send, Sparkles, ChevronRight } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function ChatbotWidget() {
@@ -76,21 +76,31 @@ export default function ChatbotWidget() {
             </button>
           </div>
 
-          {/* Quick suggestions */}
-          <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 overflow-x-auto flex gap-1.5 scrollbar-none">
-            {quickPrompts.map((p, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSend(p)}
-                className="whitespace-nowrap px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#0b3b8c]/30 text-[10px] text-slate-600 hover:text-[#0b3b8c] border border-slate-200 transition"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3 text-xs bg-slate-50">
+            {messages.length === 0 && !loading && (
+              <div className="py-2">
+                <p className="text-[11px] text-slate-500 px-1 pb-2.5 leading-relaxed">
+                  Ask me anything about your account, or start with one of these.
+                </p>
+                <div className="space-y-2">
+                  {quickPrompts.map((p, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(p)}
+                      data-testid={`chatbot-suggestion-${idx}`}
+                      className="w-full text-left flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl
+                        bg-white border border-slate-200 text-[11px] text-slate-700 leading-snug
+                        hover:border-[#0b3b8c] hover:text-[#0b3b8c] hover:bg-blue-50/60 transition"
+                    >
+                      <span>{p}</span>
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {messages.map((m, idx) => (
               <div
                 key={idx}
