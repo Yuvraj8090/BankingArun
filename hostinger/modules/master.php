@@ -297,8 +297,10 @@ function route_public_market_rates(array $d): void
 }
 
 // Open to anyone, no login: the plans on sale and the terms attached to them.
-// Draft plans are never listed, so a scheme over the deposit cap cannot be
-// advertised even by accident.
+// Draft plans are never listed. A published plan may still price above the cap —
+// several do, on the owner's instruction — so scheme_public() rates every
+// denomination and marks the ones that exceed it rather than the listing
+// filtering them out.
 function route_public_schemes(array $d): void
 {
     $schemes = array_map('scheme_public', rows(

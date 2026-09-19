@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter
 
 from .db import rows
+from .schemes import NIDHI_MAX_DEPOSIT_RATE, scheme_public
 
 router = APIRouter()
 
@@ -50,3 +51,35 @@ def public_products() -> dict:
         "SELECT * FROM site_products WHERE status = 'active' ORDER BY sort_order, title"
     )
     return {"products": [product_public(r) for r in found]}
+
+
+# The registered particulars, as modules/master.php states them. Kept as literals
+# rather than read from a table because they are what the registrar holds: they
+# change by filing a form, not by an admin editing a field.
+COMPANY_IDENTITY = {
+    "legal_name": "Aadhunik Jeewan Sanchay Nidhi Limited",
+    "cin": "U65990UP2019PLN121746",
+    "pan": "AASCA7672B",
+    "tan": "MRTA12278A",
+    "incorporated_on": "2019-09-27",
+    "company_type": "Public company limited by shares, Nidhi under the Companies Act, 2013",
+    "registered_office": "V Fatehpur Bhado, PO Chutmalpur, Saharanpur, Uttar Pradesh 247662",
+    "corporate_office": "Arya Nagar, Kamalpur Road, Chhutmalpur, Saharanpur, Uttar Pradesh 247662",
+    "phone": "9105015464",
+    "verify_at": "https://www.mca.gov.in",
+}
+
+
+@router.get("/public/schemes")
+def public_schemes() -> dict:
+    found = rows(
+        "SELECT * FROM schemes WHERE status = :status "
+        "ORDER BY scheme_type, tenure_months, code",
+        {"status": "active"},
+    )
+    return {
+        "company": COMPANY_IDENTITY,
+        "schemes": [scheme_public(r) for r in found],
+        "max_rate_pa": NIDHI_MAX_DEPOSIT_RATE,
+        "disclosure": "Returns are the amounts the scheme itself promises.",
+    }

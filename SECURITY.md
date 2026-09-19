@@ -75,7 +75,7 @@ listed at the bottom as real work.
 | 3 | Secure cookie attributes | ✅ | `HttpOnly`, `Secure`, `SameSite=Lax` |
 | 4 | Input validation | ✅ | Every route validates; `clip()` bounds every string |
 | 5 | Parameterized queries | ✅ | 103 prepared statements; the one dynamic query builds `?` placeholders |
-| 6 | XXE prevention | ➖ | **No XML is parsed anywhere** — the class of bug is not reachable |
+| 6 | XXE prevention | ✅ | XML *is* parsed — `ecb_usd_inr_from_xml()` reads the ECB daily rates feed. Not reachable: the body comes from a hardcoded HTTPS URL rather than a request, PHP 8 disables external entity loading by default, and `LIBXML_NONET` is passed as well |
 | 7 | API rate limiting | ✅ | Global per-IP, per-route keys, login lockout, CAPTCHA throttle |
 | 8 | API gateway | ➖ | Single application behind Apache; a gateway would add a hop, not safety |
 | 9 | GraphQL controls | ➖ | No GraphQL |

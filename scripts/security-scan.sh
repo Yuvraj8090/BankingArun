@@ -66,6 +66,7 @@ done <<'CLAIMS'
 No reset flow exists at all|route_reset_password
 no device list|route_sessions_list
 No complexity rule, no breached-password check|password_is_breached
+No XML is parsed anywhere|simplexml_load_string
 CLAIMS
 [[ -z "$stale" ]] && ok "SECURITY.md not stale" || bad "SECURITY.md not stale" "claims something missing that is built:$stale"
 
