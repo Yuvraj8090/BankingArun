@@ -40,6 +40,13 @@ systemctl is-active --quiet ajspay-pyapi || { journalctl -u ajspay-pyapi -n 20 -
 # Health check on loopback before Apache is told about the service at all.
 curl -fsS --max-time 5 http://127.0.0.1:8081/api/_py/health
 
+# The deploy publishes route moves through this wrapper rather than holding any
+# privilege of its own over Apache's configuration.
+install -m 755 /srv/ajspay/pyapi/deploy/ajspay-apply-proxy /usr/local/sbin/ajspay-apply-proxy
+printf 'ajspay-deploy ALL=(root) NOPASSWD: /usr/local/sbin/ajspay-apply-proxy\n' > /etc/sudoers.d/ajspay-deploy-proxy
+chmod 440 /etc/sudoers.d/ajspay-deploy-proxy
+visudo -c -q -f /etc/sudoers.d/ajspay-deploy-proxy
+
 a2enmod -q proxy proxy_http
 install -m 644 /srv/ajspay/pyapi/deploy/pyapi-proxy.conf /etc/apache2/conf-available/ajspay-pyapi.conf
 

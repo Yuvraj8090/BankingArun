@@ -17,7 +17,7 @@ scp hostinger/migrate.sql "$VPS_USER@$VPS_HOST:/srv/ajspay/migrate.sql"
 rm -rf .deploy/pyapi && cp -R pyapi .deploy/pyapi
 rm -rf .deploy/pyapi/.venv .deploy/pyapi/tests/__pycache__ .deploy/pyapi/app/__pycache__
 mkdir -p .deploy/pyapi/deploy
-cp scripts/ajspay-pyapi.service scripts/pyapi-proxy.conf .deploy/pyapi/deploy/
+cp scripts/ajspay-pyapi.service scripts/pyapi-proxy.conf scripts/ajspay-apply-proxy .deploy/pyapi/deploy/
 ssh "$VPS_USER@$VPS_HOST" 'install -d -m 755 /srv/ajspay/pyapi'
 scp -r .deploy/pyapi/. "$VPS_USER@$VPS_HOST:/srv/ajspay/pyapi/"
 ssh "$VPS_USER@$VPS_HOST" bash -s -- "$revision" <<'REMOTE'
@@ -77,6 +77,10 @@ if systemctl list-unit-files ajspay-pyapi.service >/dev/null 2>&1 &&
    systemctl is-enabled --quiet ajspay-pyapi 2>/dev/null; then
   sudo -n /usr/bin/systemctl restart ajspay-pyapi ||
     echo 'WARNING: could not restart the Python service; it is serving the previous code' >&2
+  # The proxy map in the repository is the record of which routes have moved;
+  # applying it here keeps the running configuration equal to it.
+  sudo -n /usr/local/sbin/ajspay-apply-proxy ||
+    echo 'WARNING: could not apply the proxy map; routes are unchanged' >&2
 fi
 # A failed smoke check restores the prior release without touching the database.
 if ! curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt | grep -qx "$revision" ||

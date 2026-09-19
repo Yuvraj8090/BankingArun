@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Installs the proxy map the release carries and reloads Apache. Root-owned and
+# called through a single sudoers grant, so the deploy account can publish a
+# route move without holding any broader privilege: this script is the only
+# thing it may run as root, and this file is the only thing the script touches.
+set -euo pipefail
+src=/srv/ajspay/pyapi/deploy/pyapi-proxy.conf
+dst=/etc/apache2/conf-available/ajspay-pyapi.conf
+[[ -f "$src" ]] || { echo "No proxy map in the release" >&2; exit 1; }
+install -m 644 "$src" "$dst"
+apache2ctl configtest
+systemctl reload apache2
+echo "Proxied routes:"
+grep -oP '^ProxyPass \K/\S+' "$dst" || echo "  (none)"
