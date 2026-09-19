@@ -12,6 +12,8 @@ from typing import Any
 from fastapi import APIRouter
 
 from .db import rows
+from .capabilities import enabled_capabilities
+from .rows import out
 from .schemes import NIDHI_MAX_DEPOSIT_RATE, scheme_public
 
 router = APIRouter()
@@ -83,3 +85,15 @@ def public_schemes() -> dict:
         "max_rate_pa": NIDHI_MAX_DEPOSIT_RATE,
         "disclosure": "Returns are the amounts the scheme itself promises.",
     }
+
+
+@router.get("/public/features")
+def public_features() -> dict:
+    """Which services may be offered at all. Carries no regulatory detail."""
+    return {"features": enabled_capabilities()}
+
+
+@router.get("/branches/locator")
+def branches_locator() -> dict:
+    """The branch and ATM network behind the public locator."""
+    return {"branches": [out(r) for r in rows("SELECT * FROM branches ORDER BY id")]}
