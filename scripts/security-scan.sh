@@ -53,7 +53,23 @@ else
   note "npm audit (high+)" "skipped — no node_modules"
 fi
 
-# 8. The disclosure contact must not silently expire.
+# 8. A status file that claims something is missing after it was built is worse
+# than no status file: it sends the reader looking for work already done. This
+# caught a row still saying there was no password reset flow weeks after there
+# was one.
+stale=""
+while IFS='|' read -r claim fn; do
+  if grep -q "$claim" SECURITY.md 2>/dev/null && grep -rq "$fn" hostinger 2>/dev/null; then
+    stale="$stale $claim"
+  fi
+done <<'CLAIMS'
+No reset flow exists at all|route_reset_password
+no device list|route_sessions_list
+No complexity rule, no breached-password check|password_is_breached
+CLAIMS
+[[ -z "$stale" ]] && ok "SECURITY.md not stale" || bad "SECURITY.md not stale" "claims something missing that is built:$stale"
+
+# 9. The disclosure contact must not silently expire.
 if [[ -f frontend/public/.well-known/security.txt ]]; then
   exp=$(grep -i '^Expires:' frontend/public/.well-known/security.txt | head -1 | cut -d' ' -f2)
   if python3 -c "

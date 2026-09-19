@@ -42,7 +42,7 @@ listed at the bottom as real work.
 | 10 | Session invalidation on logout | ✅ | `session_version` increments on logout, password change and password reset; every token issued earlier dies at once |
 | 11 | Concurrent session control | ✅ | A member sees every signed-in device with its network and last activity, and can end any of them from another; a support session is labelled as such |
 | 12 | Step-up authentication | ✅ | Transaction password + OTP before transfers; also required to change a nomination or joint holder |
-| 13 | Secure password recovery | ⬜ | **No reset flow exists at all** — see "Real gaps" |
+| 13 | Secure password recovery | ✅ | Six-digit code, HMAC-stored, five minutes, five wrong guesses, single use. The reply is identical whether or not the address is registered, and a reset ends every other session |
 | 14 | Device binding / fingerprinting | 🟡 | Each session records its user agent and network so a member can recognise and end it. No cryptographic device binding |
 | 15 | PKI | 🟡 | Let's Encrypt TLS to Dec 2026, auto-renewing. No client certificates |
 
