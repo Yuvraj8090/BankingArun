@@ -39,3 +39,9 @@ def rows(sql: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]
 def row(sql: str, params: dict[str, Any] | None = None) -> dict[str, Any] | None:
     found = rows(sql, params)
     return found[0] if found else None
+
+
+def execute(sql: str, params: dict[str, Any] | None = None) -> int:
+    """A write. Parameterised like every read; values are never formatted in."""
+    with engine().begin() as conn:
+        return conn.execute(text(sql), params or {}).rowcount

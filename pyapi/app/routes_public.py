@@ -9,11 +9,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from .db import rows
+from .auth import current_user
 from .capabilities import enabled_capabilities
 from .rows import out
+from .users import impersonation_state, public_user
 from .schemes import NIDHI_MAX_DEPOSIT_RATE, scheme_public
 
 router = APIRouter()
@@ -97,3 +99,19 @@ def public_features() -> dict:
 def branches_locator() -> dict:
     """The branch and ATM network behind the public locator."""
     return {"branches": [out(r) for r in rows("SELECT * FROM branches ORDER BY id")]}
+
+
+@router.get("/auth/me")
+def auth_me(request: Request) -> dict:
+    """Who is signed in, and what the app may show them.
+
+    `features` tells the app which regulated services to offer; see
+    capabilities.py. The member row goes through public_user(), which is what
+    keeps the password hashes and the TOTP material off the wire.
+    """
+    user = current_user(request)
+    return {
+        "user": public_user(user),
+        "features": enabled_capabilities(),
+        "impersonation": impersonation_state(getattr(request.state, "impersonator", None)),
+    }

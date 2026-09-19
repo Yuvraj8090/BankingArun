@@ -63,3 +63,28 @@ def read_claims(token: str, secret: str) -> dict[str, Any] | None:
     if not isinstance(claims, dict) or int(claims.get("exp", 0)) < int(time.time()):
         return None
     return claims
+
+
+def verify_token(token: str, secret: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Claims and a reason, so a caller can tell a forgery from an expiry.
+
+    read_claims() folds both into None, which is right for a guard that must not
+    care. A handler answering a member does care: the PHP says "Invalid session
+    token" for a bad signature and "Session expired" for a stale one, and
+    collapsing the two would tell someone their session had timed out when in
+    fact their token had been tampered with.
+    """
+    if not token or "." not in token:
+        return None, "missing"
+    payload, _, signature = token.partition(".")
+    if not hmac.compare_digest(sign(payload, secret), signature):
+        return None, "forged"
+    try:
+        claims = json.loads(b64url_decode(payload))
+    except Exception:
+        return None, "forged"
+    if not isinstance(claims, dict):
+        return None, "forged"
+    if int(claims.get("exp", 0)) < int(time.time()):
+        return None, "expired"
+    return claims, None
