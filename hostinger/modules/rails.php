@@ -379,6 +379,23 @@ function rail_settle(array $railTxn, string $status, array $fields = [], array $
 
     $pdo->beginTransaction();
     try {
+        // Re-read the row under a lock and decide from that, not from the copy
+        // the caller handed in. Every caller reads it without one and outside a
+        // transaction, and the two that matter — the partner's webhook and the
+        // cron reconciler — are built to chase the same row at the same time.
+        // Checking the caller's snapshot let both pass, and a failed payout was
+        // then reversed twice: the member's balance rose by the amount of a
+        // transfer that never left.
+        $locked = row('SELECT * FROM rail_transactions WHERE id = ? FOR UPDATE', [$railTxn['id']]);
+        if (!$locked) {
+            $pdo->rollBack();
+            return 'no longer present';
+        }
+        if ($locked['status'] !== 'PENDING') {
+            $pdo->rollBack();
+            return 'already ' . $locked['status'];
+        }
+        $railTxn = $locked;
         if ($railTxn['direction'] === 'payout') {
             if ($status === 'SUCCESS') {
                 // The money really left. The member's debit, held as PENDING
