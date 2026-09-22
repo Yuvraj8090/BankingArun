@@ -62,3 +62,10 @@ if __name__ == '__main__':
         if name.startswith('test_'):
             fn()
             print(f'PASS {name}')
+
+
+def test_card_pin_never_survives() -> None:
+    from app.users import public_card
+    shaped = public_card({'id': 'c1', 'card_number': '4111111111111111', 'pin_hash': '$2y$10$abc'})
+    assert 'pin_hash' not in shaped
+    assert '$2y$' not in repr(shaped)

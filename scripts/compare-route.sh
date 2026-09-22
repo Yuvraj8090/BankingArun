@@ -6,7 +6,10 @@
 # session, and never leaves this machine — nothing is echoed, stored, or written
 # to a file, and the shell is asked not to keep it in history.
 set -uo pipefail
-route=${1:-/api/auth/me}
+# Several routes on one login, so a member's password is typed once rather than
+# once per route.
+routes=("${@:-/api/auth/me}")
+[[ $# -eq 0 ]] && routes=(/api/auth/me /api/accounts)
 
 read -rp "Member email: " email
 read -rsp "Password: " password; echo
@@ -35,21 +38,20 @@ PY
 )
 [[ -n "$token" ]] || { echo "No session cookie came back."; exit 1; }
 
-# The same token to both: one through Apache, one straight to the service.
-curl -fsS --max-time 10 -H "Authorization: Bearer $token" "https://ajspay.co.in$route"      > /tmp/cmp.php.json 2>/dev/null
-curl -fsS --max-time 10 -H "Authorization: Bearer $token" "http://127.0.0.1:8081$route"     > /tmp/cmp.py.json  2>/dev/null
-
 echo
-echo "route: $route"
-echo "  php:    $(wc -c < /tmp/cmp.php.json) bytes"
-echo "  python: $(wc -c < /tmp/cmp.py.json) bytes"
-if cmp -s /tmp/cmp.php.json /tmp/cmp.py.json; then
-  echo "  BYTE-IDENTICAL"
-else
-  echo "  DIFFERS at:"
-  cmp -l /tmp/cmp.php.json /tmp/cmp.py.json 2>/dev/null | head -3 | while read -r pos _ _; do
-    start=$(( pos > 50 ? pos - 50 : 1 ))
-    echo "    php: ...$(cut -c${start}-$((pos+30)) /tmp/cmp.php.json)"
-    echo "    py : ...$(cut -c${start}-$((pos+30)) /tmp/cmp.py.json)"
-  done
-fi
+for route in "${routes[@]}"; do
+  # The same token to both: one through Apache, one straight to the service.
+  curl -fsS --max-time 10 -H "Authorization: Bearer $token" "https://ajspay.co.in$route"  > /tmp/cmp.php.json 2>/dev/null
+  curl -fsS --max-time 10 -H "Authorization: Bearer $token" "http://127.0.0.1:8081$route" > /tmp/cmp.py.json  2>/dev/null
+  if cmp -s /tmp/cmp.php.json /tmp/cmp.py.json; then
+    printf '  %-26s IDENTICAL (%s bytes)\n' "$route" "$(wc -c < /tmp/cmp.php.json)"
+  else
+    printf '  %-26s DIFFERS  php=%s py=%s\n' "$route" \
+      "$(wc -c < /tmp/cmp.php.json)" "$(wc -c < /tmp/cmp.py.json)"
+    cmp -l /tmp/cmp.php.json /tmp/cmp.py.json 2>/dev/null | head -2 | while read -r pos _ _; do
+      start=$(( pos > 50 ? pos - 50 : 1 ))
+      echo "      php: ...$(cut -c${start}-$((pos+30)) /tmp/cmp.php.json)"
+      echo "      py : ...$(cut -c${start}-$((pos+30)) /tmp/cmp.py.json)"
+    done
+  fi
+done

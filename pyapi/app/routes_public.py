@@ -15,7 +15,7 @@ from .db import rows
 from .auth import current_user
 from .capabilities import enabled_capabilities
 from .rows import out
-from .users import impersonation_state, public_user
+from .users import impersonation_state, public_card, public_user
 from .schemes import NIDHI_MAX_DEPOSIT_RATE, scheme_public
 
 router = APIRouter()
@@ -114,4 +114,32 @@ def auth_me(request: Request) -> dict:
         "user": public_user(user),
         "features": enabled_capabilities(),
         "impersonation": impersonation_state(getattr(request.state, "impersonator", None)),
+    }
+
+
+@router.get("/accounts")
+def accounts(request: Request) -> dict:
+    """A member's own accounts, deposits and cards.
+
+    Every query is scoped to the signed-in member's id rather than to anything
+    the request supplies, so there is no id to tamper with.
+    """
+    user = current_user(request)
+    owner = {"uid": user["id"]}
+    account_rows = [out(r) for r in rows(
+        "SELECT * FROM accounts WHERE user_id = :uid ORDER BY created_at, id", owner)]
+    deposit_rows = [out(r) for r in rows(
+        "SELECT * FROM deposits WHERE user_id = :uid ORDER BY created_at, id", owner)]
+    card_rows = [public_card(r) for r in rows(
+        "SELECT * FROM cards WHERE user_id = :uid ORDER BY created_at, id", owner)]
+
+    savings = sum(float(a.get("balance") or 0) for a in account_rows)
+    deposited = sum(float(d.get("principal_amount") or 0) for d in deposit_rows)
+    return {
+        "accounts": account_rows,
+        "deposits": deposit_rows,
+        "cards": card_rows,
+        "net_worth": savings + deposited,
+        "total_savings_balance": savings,
+        "total_deposits_balance": deposited,
     }
