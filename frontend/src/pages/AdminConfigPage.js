@@ -1,11 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle2, Percent, UserCheck} from 'lucide-react';
+import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle2, Percent, UserCheck, Send } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
 export default function AdminConfigPage() {
   const [cfg, setCfg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [testTo, setTestTo] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
+  // Tests what is stored, not what is typed: sending with unsaved credentials
+  // would report on a configuration that is not the one in use.
+  const runTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult(await api.testSms(testTo));
+    } catch (e) {
+      setTestResult({ ok: false, reason: e.response?.data?.detail || 'The test could not be run.' });
+    } finally { setTesting(false); }
+  };
   const [form, setForm] = useState({});
   const [showSecrets, setShowSecrets] = useState({});
 
@@ -181,6 +196,55 @@ export default function AdminConfigPage() {
             value={form.face_match_auto_threshold ?? 92}
             onChange={v => setForm(f => ({ ...f, face_match_auto_threshold: parseFloat(v) }))}
             testId="cfg-face-threshold" />
+        </div>
+      </Section>
+
+      <Section title="Check that SMS actually works" icon={Send}>
+        <div className="space-y-3">
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            Sends one real message and reports what the provider said. Save your credentials first —
+            this tests what is stored, not what is typed above.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Send a test to</span>
+              <input value={testTo} onChange={(e) => setTestTo(e.target.value.replace(/\D/g, ''))}
+                data-testid="cfg-test-number" placeholder="10-digit mobile" maxLength={10} inputMode="numeric"
+                className="w-48 border border-slate-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
+            </label>
+            <button type="button" onClick={runTest} disabled={testing || testTo.length !== 10}
+              data-testid="cfg-test-btn"
+              className="px-5 py-2.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold disabled:opacity-50 transition">
+              {testing ? 'Sending…' : 'Send test SMS'}
+            </button>
+          </div>
+
+          {testResult && (
+            <div data-testid="cfg-test-result"
+              className={`p-3 rounded-md border text-[11px] leading-relaxed ${
+                testResult.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                              : 'bg-rose-50 border-[#c8102e]/40 text-slate-800'}`}>
+              <p className="font-semibold">
+                {testResult.ok ? `Accepted for ${testResult.sent_to}` : 'Not sent'}
+              </p>
+              {/* The provider's own words. "Failed" gives an operator nothing to act on. */}
+              <p className="mt-0.5">{testResult.reason}</p>
+              {testResult.provider_code && (
+                <p className="mt-0.5 text-slate-500">Twilio code {testResult.provider_code}</p>
+              )}
+              <p className="mt-1.5 text-slate-500">
+                Live OTP is {testResult.live_otp ? 'on' : 'off'} · SMS{' '}
+                {testResult.sms_configured ? 'configured' : 'not configured'} · Email{' '}
+                {testResult.email_configured ? 'configured' : 'not configured'}
+              </p>
+            </div>
+          )}
+
+          <p className="text-[10px] text-slate-500 leading-relaxed">
+            On a Twilio trial account a message only reaches numbers you have verified in Twilio, and the
+            sender shows as a number. Showing your business name instead needs DLT registration with TRAI,
+            which is done on the operator portals, not here.
+          </p>
         </div>
       </Section>
 

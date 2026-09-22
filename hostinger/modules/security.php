@@ -745,3 +745,77 @@ function assert_password_acceptable(mixed $password, array $context = []): void
             . 'it is not about this account, but attackers try published passwords first.');
     }
 }
+
+// --- Delivery self-test ----------------------------------------------------------------
+// "Failed" tells an operator nothing they can act on. This reports what the provider
+// actually said, so a trial account refusing an unverified number reads as exactly that
+// rather than as a broken configuration.
+function twilio_probe(array $cfg, string $to): array
+{
+    if (!sms_configured($cfg)) {
+        return ['ok' => false, 'reason' => 'Twilio is not set up yet. Enter the Account SID, Auth Token and From number above, and save.'];
+    }
+    $ch = curl_init('https://api.twilio.com/2010-04-01/Accounts/' . rawurlencode($cfg['twilio_account_sid']) . '/Messages.json');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query([
+            'To' => $to,
+            'From' => $cfg['twilio_from_number'],
+            'Body' => 'AJSPay test message. If you received this, SMS delivery is working.',
+        ]),
+        CURLOPT_USERPWD => $cfg['twilio_account_sid'] . ':' . $cfg['twilio_auth_token'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 12,
+    ]);
+    $body = (string)curl_exec($ch);
+    $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $network = curl_error($ch);
+
+    if ($status === 0) {
+        return ['ok' => false, 'reason' => 'Could not reach Twilio: ' . ($network ?: 'no response')];
+    }
+    $decoded = json_decode($body, true);
+    if ($status >= 200 && $status < 300) {
+        return ['ok' => true, 'reason' => 'Twilio accepted the message. It should arrive shortly.',
+            'provider_status' => $decoded['status'] ?? null];
+    }
+    // Twilio's own wording, which names the actual problem — an unverified number
+    // on a trial account, a wrong token, a From number that is not yours.
+    $detail = is_array($decoded) ? ($decoded['message'] ?? '') : '';
+    $code = is_array($decoded) ? ($decoded['code'] ?? null) : null;
+    return ['ok' => false,
+        'reason' => $detail !== '' ? $detail : "Twilio refused the request (HTTP $status).",
+        'provider_code' => $code];
+}
+
+function route_delivery_test(array $d): void
+{
+    $staff = staff_user(['bank_owner']);
+    // A send costs money and reaches a real handset, so it is bounded.
+    rate_limit('delivery-test:' . $staff['id'], 10, 3600,
+        'Too many test messages. Please wait before trying again.');
+
+    $to = clip($d['to'] ?? '', 20);
+    $digits = preg_replace('/\D+/', '', $to);
+    if (!preg_match('/^(91)?[6-9]\d{9}$/', $digits)) {
+        fail(422, 'Enter a 10-digit Indian mobile number to send the test to.');
+    }
+    $e164 = '+91' . substr($digits, -10);
+
+    $cfg = delivery_config();
+    $result = twilio_probe($cfg, $e164);
+    // Recorded because it is a real message to a real number, chargeable, sent
+    // by a named person.
+    audit($staff, 'DELIVERY_TEST', "SMS to $e164 — " . ($result['ok'] ? 'accepted' : 'refused'));
+
+    respond([
+        'ok' => $result['ok'],
+        'sent_to' => $e164,
+        'reason' => $result['reason'],
+        'provider_code' => $result['provider_code'] ?? null,
+        'live_otp' => (bool)$cfg['live_otp'],
+        // What is configured, never the values themselves.
+        'sms_configured' => sms_configured($cfg),
+        'email_configured' => email_configured($cfg),
+    ]);
+}

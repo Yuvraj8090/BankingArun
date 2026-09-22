@@ -1069,6 +1069,7 @@ $routes = [
     'GET /admin/rbi-reports' => 'route_rbi_reports',
     'GET /admin/config' => 'route_admin_config_get',
     'PUT /admin/config' => 'route_admin_config_set',
+    'POST /admin/config/test-sms' => 'route_delivery_test',
     'POST /auth/change-password' => 'route_change_password',
     'GET /auth/sessions' => 'route_sessions_list',
     'PATCH /profile/nominee' => 'route_nominee_update',
