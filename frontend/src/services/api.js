@@ -201,6 +201,10 @@ export const api = {
   resetPassword: async (payload) => (await axios.post(`${API}/auth/reset-password`, payload)).data,
   changePassword: async (payload) => (await axios.post(`${API}/auth/change-password`, payload, getAuthHeaders())).data,
   activeSessions: async () => (await axios.get(`${API}/auth/sessions`, getAuthHeaders())).data,
+
+  // Opening an account is a counter action: staff only, after the applicant's
+  // documents have been seen.
+  openAccount: async (payload) => (await axios.post(`${API}/register/account`, payload, getAuthHeaders())).data,
   revokeSession: async (id) => (await axios.delete(`${API}/auth/sessions/${id}`, getAuthHeaders())).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,

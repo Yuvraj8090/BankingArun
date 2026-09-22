@@ -348,6 +348,9 @@ function LeadsTab() {
   const [stage, setStage] = useState('');
   const [page, setPage] = useState(1);
   const [adding, setAdding] = useState(false);
+  const [opening, setOpening] = useState(null);
+  const [account, setAccount] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', source: 'walk_in', interest: 'deposit', notes: '' });
 
   const load = useCallback(async () => {
@@ -363,6 +366,32 @@ function LeadsTab() {
       setForm({ name: '', phone: '', email: '', source: 'walk_in', interest: 'deposit', notes: '' });
       load();
     } catch (e) { toast.error(e.response?.data?.detail || 'Could not add this lead'); }
+  };
+
+  // The lead's own id goes with it, which is what carries a referral code
+  // through to the bonus without anyone retyping it.
+  useEffect(() => {
+    if (!opening) return;
+    setAccount({
+      name: opening.name || '', email: opening.email || '', phone: opening.phone || '',
+      password: '', transaction_password: '', pan_number: '', initial_deposit: 1000,
+    });
+  }, [opening]);
+
+  const openAccount = async () => {
+    setSaving(true);
+    try {
+      const r = await api.openAccount({ ...account, lead_id: opening.id });
+      toast.success(r.message);
+      if (r.referral_bonus) {
+        toast.success(`Referral bonus of ₹${r.referral_bonus} paid to both sides.`);
+      }
+      setOpening(null);
+      setAccount(null);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Could not open the account');
+    } finally { setSaving(false); }
   };
 
   const advance = async (lead, next) => {
@@ -398,6 +427,48 @@ function LeadsTab() {
           <UserPlus className="w-3.5 h-3.5" /> New lead
         </button>
       </div>
+
+      {opening && account && (
+        <Modal
+          testId="crm-open-account-modal"
+          wide
+          title={`Open an account for ${opening.name}`}
+          subtitle="Only after their identity documents have been seen and verified at the counter."
+          onClose={() => { setOpening(null); setAccount(null); }}
+          footer={<>
+            <button onClick={() => { setOpening(null); setAccount(null); }}
+              className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+            <button data-testid="crm-confirm-open-account" onClick={openAccount}
+              disabled={saving || !account.name || !account.email || !account.phone
+                || !account.password || !account.transaction_password}
+              className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
+              {saving ? 'Opening…' : 'Open account'}
+            </button>
+          </>}
+        >
+          <div className="space-y-3">
+            {opening.referral_code && (
+              <div className="p-2.5 rounded-md bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900">
+                This enquiry came through referral <b className="font-mono">{opening.referral_code}</b>.
+                The bonus pays to both sides on opening — you do not need to enter the code.
+              </div>
+            )}
+            <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+              The member signs in with the password you set here. Give it to them in person and ask
+              them to change it from Security &amp; Passkeys.
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Field label="Full name" value={account.name} onChange={(v) => setAccount({ ...account, name: v })} testId="open-name" />
+              <Field label="Phone" value={account.phone} onChange={(v) => setAccount({ ...account, phone: v })} testId="open-phone" />
+              <Field label="Email" value={account.email} onChange={(v) => setAccount({ ...account, email: v })} testId="open-email" />
+              <Field label="PAN (optional)" value={account.pan_number} onChange={(v) => setAccount({ ...account, pan_number: v.toUpperCase() })} />
+              <Field label="Login password" value={account.password} onChange={(v) => setAccount({ ...account, password: v })} testId="open-password" />
+              <Field label="Transaction password" value={account.transaction_password} onChange={(v) => setAccount({ ...account, transaction_password: v })} testId="open-txnpwd" />
+              <Field label="Opening deposit" value={String(account.initial_deposit)} onChange={(v) => setAccount({ ...account, initial_deposit: Number(v.replace(/\D/g, '')) || 0 })} />
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {adding && (
         <Modal
@@ -468,6 +539,12 @@ function LeadsTab() {
                         {l.lost_reason && <div className="text-[10px] text-slate-500 mt-0.5">{l.lost_reason}</div>}
                       </td>
                       <td className="p-3 text-right whitespace-nowrap">
+                        {l.stage !== 'enrolled' && l.stage !== 'lost' && (
+                          <button onClick={() => setOpening(l)} data-testid={`crm-open-account-${l.id}`}
+                            className="ml-2 text-[11px] font-semibold text-emerald-700 hover:underline">
+                            open account
+                          </button>
+                        )}
                         {['contacted', 'documents', 'enrolled', 'lost']
                           .filter((s) => s !== l.stage && l.stage !== 'enrolled' && l.stage !== 'lost')
                           .map((s) => (
