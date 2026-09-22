@@ -40,8 +40,12 @@ if [[ ! -L /srv/ajspay/current ]]; then
   seed="/srv/ajspay/releases/seed-$(date -u +%Y%m%dT%H%M%SZ)"
   install -d -m 755 "$seed"
   cp -a /var/www/ajspay/. "$seed/"
-  rm -f "$seed/config.local.php"
+  rm -f "$seed/config.local.php" "$seed/config.rails.php"
   ln -s /etc/ajspay/config.local.php "$seed/config.local.php"
+  # The rail's partner credentials live beside the database ones and outlive a
+  # release the same way. Linked even when absent, so dropping the file into
+  # /etc/ajspay later needs no redeploy.
+  ln -s /etc/ajspay/config.rails.php "$seed/config.rails.php"
   chown -R ajspay-deploy:ajspay-deploy "$seed"
   ln -s "$seed" /srv/ajspay/current.next
   mv -Tf /srv/ajspay/current.next /srv/ajspay/current

@@ -35,6 +35,7 @@ import StatementsPage from './pages/StatementsPage';
 import ReferralPage from './pages/ReferralPage';
 import StandingInstructionsPage from './pages/StandingInstructionsPage';
 import AdminConfigPage from './pages/AdminConfigPage';
+import RailsPage from './pages/RailsPage';
 import SchemesPage from './pages/SchemesPage';
 import AgentsPage from './pages/AgentsPage';
 import BranchAdminPage from './pages/BranchAdminPage';
@@ -168,6 +169,7 @@ function AppShell() {
     referrals: <ReferralPage />,
     'standing-instructions': <StandingInstructionsPage />,
     'admin-config': <AdminConfigPage />,
+    rails: <RailsPage />,
     schemes: <SchemesPage />,
     agents: <AgentsPage />,
     'branch-admin': <BranchAdminPage />,

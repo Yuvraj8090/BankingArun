@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 while IFS= read -r -d '' file; do
   php -l "$file" > /dev/null
-done < <(find hostinger -name '*.php' ! -name config.local.php -print0)
+done < <(find hostinger -name '*.php' ! -name config.local.php ! -name config.rails.php -print0)
 (
   cd frontend
   # Existing lint warnings remain visible without blocking the production build.
@@ -31,7 +31,8 @@ root = Path(sys.argv[1])
 for name in ('index.html', 'api.php', 'db.php', 'cron.php', '.htaccess', 'version.txt'):
     assert (root / name).is_file(), name
 for path in root.rglob('*'):
-    assert path.name != 'config.local.php', path
+    # Either of these in a release tarball would publish live credentials.
+    assert path.name not in ('config.local.php', 'config.rails.php'), path
     assert path.name != '.env' and not path.name.startswith('.env.'), path
     assert path.suffix not in ('.sql', '.log', '.pem', '.key'), path
 assert list((root / 'static/js').glob('*.js')), 'Missing frontend JavaScript'

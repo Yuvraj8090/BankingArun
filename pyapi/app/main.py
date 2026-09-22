@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from . import routes_public
+from . import routes_public, routes_rails
 
 log = logging.getLogger("ajspay")
 
@@ -23,6 +23,8 @@ app = FastAPI(title="AJSPay API", docs_url=None, redoc_url=None, openapi_url=Non
 # PHP's allowed_origins list exists for the same reason and stays authoritative.
 
 app.include_router(routes_public.router, prefix="/api")
+# The owner's payment-rail screen. Settlement stays in the PHP; see rails.py.
+app.include_router(routes_rails.router, prefix="/api")
 
 
 @app.exception_handler(SQLAlchemyError)

@@ -2,7 +2,7 @@ import {
   LayoutDashboard, ArrowRightLeft, CreditCard, PiggyBank, Banknote,
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
   GanttChartSquare, Building2, Video, ShieldCheck, FileText, Gift, Repeat, Settings2,
-  Layers, ClipboardList, Contact2, BarChart3, BookUser, FileLock2, Gavel, Award
+  Layers, ClipboardList, Contact2, BarChart3, BookUser, FileLock2, Gavel, Award, Radio
 } from 'lucide-react';
 
 // Role → sidebar menu. The same list is the access rule for /app/* URLs:
@@ -81,6 +81,7 @@ export const NAV_BY_ROLE = {
     { id: 'branch-admin', label: 'Branch & ATM Network', icon: MapPin, testId: 'tab-branch-admin' },
     { id: 'public-pages', label: 'Public Pages', icon: FileText, testId: 'tab-public-pages' },
     { id: 'member-ranks', label: 'Member Standings', icon: Award, testId: 'tab-member-ranks' },
+    { id: 'rails', label: 'Payment Rails', icon: Radio, testId: 'tab-rails' },
     { id: 'admin-config', label: 'System Config (Twilio/SendGrid)', icon: Settings2, testId: 'tab-admin-config' },
     { id: 'admin', label: 'All Branches', icon: Building2, testId: 'tab-admin' },
     { id: 'staff', label: 'Staff Console', icon: Users, testId: 'tab-staff' },

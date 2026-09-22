@@ -15,7 +15,7 @@ ok() { note "$1" "ok"; }
 if ! command -v php >/dev/null 2>&1; then
   bad "php syntax" "php is not on PATH, so nothing was linted"
 else
-  errors=$(find hostinger -name '*.php' ! -name config.local.php -print0 \
+  errors=$(find hostinger -name '*.php' ! -name config.local.php ! -name config.rails.php -print0 \
     | xargs -0 -n1 php -l 2>&1 | grep -E '^(Parse|Fatal) error' || true)
   [[ -z "$errors" ]] && ok "php syntax" || bad "php syntax" "$errors"
 fi

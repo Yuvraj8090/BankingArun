@@ -19,7 +19,12 @@ install -d -m 755 -o ajspay-deploy -g ajspay-deploy /srv/ajspay/pyapi
 # Both backends must read one source of truth for the token secret, or a session
 # minted by one is rejected by the other. PHP is the only thing that can parse a
 # PHP array reliably, so PHP is what exports it.
-php -r '$c = require "/etc/ajspay/config.local.php"; echo json_encode($c);' > /etc/ajspay/config.json
+# config.rails.php is merged in the same order db.php merges it, so the Python
+# service resolves the rail settings to exactly what the PHP resolves them to.
+# Missing rail file is not an error: the rail then falls back to its defaults.
+php -r '$c = require "/etc/ajspay/config.local.php";
+    if (is_file("/etc/ajspay/config.rails.php")) { $c = array_merge($c, require "/etc/ajspay/config.rails.php"); }
+    echo json_encode($c);' > /etc/ajspay/config.json
 chown root:ajspay-api /etc/ajspay/config.json
 chmod 640 /etc/ajspay/config.json
 # The directory is 751, so ajspay-api can traverse to the file it owns without
