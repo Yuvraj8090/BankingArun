@@ -62,6 +62,24 @@ else
   exit 1
 fi
 
+# The release carries the Python service's code but cannot install its
+# dependencies: the venv is root-owned and provisioning is a deliberate root
+# action. A release that adds one would restart the service into a failure the
+# swap below swallows as a warning, while the proxy map is applied regardless --
+# taking every already-ported route down with it. The smoke check would not
+# notice, because everything it tests is served by PHP. So check here, before
+# anything is swapped, and leave the site on the release it is already serving.
+if systemctl list-unit-files ajspay-pyapi.service >/dev/null 2>&1 &&
+   systemctl is-enabled --quiet ajspay-pyapi 2>/dev/null; then
+  if ! (cd /srv/ajspay/pyapi && /srv/ajspay/pyapi-venv/bin/python -c 'import app.main') 2>/dev/null; then
+    echo 'ERROR: the Python service cannot load this release with the venv it has.' >&2
+    echo '       Its dependencies have changed. As root on the VPS, run:' >&2
+    echo '         /srv/ajspay/pyapi-venv/bin/pip install -r /srv/ajspay/pyapi/requirements.txt' >&2
+    echo '       then deploy again. Nothing has been changed.' >&2
+    exit 1
+  fi
+fi
+
 previous=$(readlink current || true)
 ln -s "$release" current.next
 mv -Tf current.next current
@@ -83,8 +101,13 @@ if systemctl list-unit-files ajspay-pyapi.service >/dev/null 2>&1 &&
     echo 'WARNING: could not apply the proxy map; routes are unchanged' >&2
 fi
 # A failed smoke check restores the prior release without touching the database.
+# Everything below is a different backend from the one above it: version.txt is
+# a static file, /api/auth/me is PHP, and /api/public/features is proxied to the
+# Python service. Checking only the first two would call a deploy successful
+# while every ported route answered 502.
 if ! curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt | grep -qx "$revision" ||
-   [[ "$(curl -sS -o /dev/null -w '%{http_code}' https://ajspay.co.in/api/auth/me)" != 401 ]]; then
+   [[ "$(curl -sS -o /dev/null -w '%{http_code}' https://ajspay.co.in/api/auth/me)" != 401 ]] ||
+   [[ "$(curl -sS -o /dev/null -w '%{http_code}' https://ajspay.co.in/api/public/features)" != 200 ]]; then
   if [[ -n "$previous" ]]; then
     ln -s "$previous" current.rollback
     mv -Tf current.rollback current
