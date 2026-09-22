@@ -57,7 +57,7 @@ ledger and need none of this. They already work and are unaffected.
    own account, never a member's.
 
 4. **Record the authorisation.** Once signed, the agreement reference goes into
-   the capability register (step 5 below). The register refuses to enable
+   the capability register (3.6 below). The register refuses to enable
    outward transfers without one, on purpose.
 
 > Nidhi Rules note: a Nidhi may deal only with its **members**, may not open
@@ -134,7 +134,27 @@ Run it **often** — every 5 minutes is reasonable, daily is not:
 It is safe to run concurrently: a MySQL lock keeps overlapping runs apart, and
 every step is idempotent.
 
-### 3.5 Switch the capability on
+### 3.5 If you changed the Python service's dependencies
+
+The director's rail screen is served by the Python backend, and it needs two
+packages the older releases did not: `httpx` and `PyNaCl`. A deploy ships code
+but **cannot install dependencies** — the virtualenv is root-owned and
+provisioning is a deliberate root action — so after any change to
+`pyapi/requirements.txt`, run this once as root on the VPS:
+
+```bash
+/srv/ajspay/pyapi-venv/bin/pip install -r /srv/ajspay/pyapi/requirements.txt
+```
+
+The deploy refuses to swap in a release its virtualenv cannot import, so
+forgetting this stops the deploy rather than breaking the site. It is worth
+knowing why that guard exists: without it the service would fail to start while
+the proxy map was applied anyway, and every already-ported route — the public
+product pages, the rate card, the branch locator — would answer 502 while the
+deploy reported success, because everything the smoke check looked at was served
+by PHP.
+
+### 3.6 Switch the capability on
 
 Outward transfers stay refused until the bank owner enables them and **records
 the authorisation reference**:
@@ -148,7 +168,7 @@ PUT /api/compliance/capability
 Same for `upi` if you are offering UPI collections. This is deliberate: it
 forces the question to be answered once, in writing, and it is audited.
 
-### 3.6 Go live
+### 3.7 Go live
 
 ```
 PUT /api/rails/config   {"driver": "partner"}
@@ -254,7 +274,7 @@ reached the partner), and `paid_out_today` approaching the cap.
 ## 7. Troubleshooting
 
 **Transfers refused with "not available"** — the `payment_systems` capability is
-off. See 3.5.
+off. See 3.6.
 
 **"The payment partner is not configured"** — one of base URL, key id, key
 secret or webhook secret is blank. The rail refuses rather than silently
