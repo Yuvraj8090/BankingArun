@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from . import routes_public, routes_rails
 from .impersonation import block_impersonated_writes
+from .ratelimit import guard_request
 
 log = logging.getLogger("ajspay")
 
@@ -27,6 +28,12 @@ app = FastAPI(title="AJSPay API", docs_url=None, redoc_url=None, openapi_url=Non
 # dependency, for the reason the PHP checks it in its dispatcher: a route that
 # forgets the dependency would silently accept the write. See impersonation.py.
 app.middleware("http")(block_impersonated_writes)
+
+# Rate limiting, added after the guard above and therefore wrapping it: the last
+# middleware registered is the outermost, and the PHP counts the request before
+# it decides anything else about it -- including before rejecting an unknown
+# path, so probing costs what using it costs.
+app.middleware("http")(guard_request)
 
 app.include_router(routes_public.router, prefix="/api")
 # The owner's payment-rail screen. Settlement stays in the PHP; see rails.py.

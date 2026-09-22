@@ -79,5 +79,24 @@ def staff_user(request: Request, roles: list[str]) -> dict:
 
 
 def client_ip(request: Request) -> str:
-    """The address the PHP records, taken the same way."""
+    """The caller's address, which is not the one the socket reports.
+
+    This service listens on loopback and only Apache reaches it, so
+    request.client.host is 127.0.0.1 for every request ever made. Recording
+    that as the member's address would make the audit trail and the session log
+    say the same useless thing about everyone, and would put every caller in one
+    rate-limit bucket.
+
+    mod_proxy appends the address it accepted the connection from to
+    X-Forwarded-For, so the LAST entry is the one Apache vouched for. Entries
+    before it were supplied by the caller and can say anything, which is why
+    this reads from the right and not, as the PHP does, from the left: the PHP
+    sits where REMOTE_ADDR is already correct and only consults the header when
+    it is explicitly told a proxy is in front.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        nearest = forwarded.split(",")[-1].strip()
+        if nearest:
+            return nearest
     return (request.client.host if request.client else "") or ""
