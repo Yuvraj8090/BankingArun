@@ -205,6 +205,7 @@ export const api = {
   // Opening an account is a counter action: staff only, after the applicant's
   // documents have been seen.
   openAccount: async (payload) => (await axios.post(`${API}/register/account`, payload, getAuthHeaders())).data,
+  memberRanks: async () => (await axios.get(`${API}/member-ranks`, getAuthHeaders())).data,
   revokeSession: async (id) => (await axios.delete(`${API}/auth/sessions/${id}`, getAuthHeaders())).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,

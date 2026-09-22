@@ -69,6 +69,20 @@ function delivery_config(): array
     return $cfg;
 }
 
+// Whether a channel can actually deliver, rather than whether someone remembered
+// to flip a switch. A live_otp left on with no credentials behind it fails
+// silently at send time, which looks to a member like an OTP that never arrived.
+function sms_configured(array $cfg): bool
+{
+    return $cfg['twilio_account_sid'] !== '' && $cfg['twilio_auth_token'] !== ''
+        && $cfg['twilio_from_number'] !== '';
+}
+
+function email_configured(array $cfg): bool
+{
+    return $cfg['sendgrid_api_key'] !== '' || $cfg['smtp_host'] !== '';
+}
+
 // --- OTP ------------------------------------------------------------------------------
 function otp_hash(string $otp): string
 {
@@ -238,12 +252,23 @@ function route_otp_send(array $d): void
     $delivery = ['sms' => 'MOCKED', 'email' => 'MOCKED'];
     if ($cfg['live_otp']) {
         $delivery = ['sms' => null, 'email' => null];
+        // Each channel goes out only if it is both asked for and actually set
+        // up. Reported as SKIPPED rather than left null, so a member support
+        // call can tell "nothing was configured" from "we tried and it failed".
         if ($channel !== 'email') {
-            $delivery['sms'] = send_sms($cfg, $user['phone'], "AJSPay OTP: $otp. Valid 5 min. Never share.");
+            $delivery['sms'] = sms_configured($cfg)
+                ? send_sms($cfg, $user['phone'], "AJSPay OTP: $otp. Valid 5 min. Never share.")
+                : 'SKIPPED_NOT_CONFIGURED';
         }
         if ($channel !== 'sms') {
-            $delivery['email'] = send_email($cfg, $user['email'], "AJSPay OTP — $purpose",
-                "<p>Your OTP is <b style='font-size:22px'>$otp</b>. Valid 5 min.</p><p>Never share this with anyone.</p>");
+            // A member may have no email at all: that is allowed at the counter,
+            // and it must not turn into a failed send against an empty address.
+            $delivery['email'] = empty($user['email'])
+                ? 'SKIPPED_NO_ADDRESS'
+                : (email_configured($cfg)
+                    ? send_email($cfg, $user['email'], "AJSPay OTP — $purpose",
+                        "<p>Your OTP is <b style='font-size:22px'>$otp</b>. Valid 5 min.</p><p>Never share this with anyone.</p>")
+                    : 'SKIPPED_NOT_CONFIGURED');
         }
     }
     audit($user, 'OTP_SENT', "purpose=$purpose channel=$channel");

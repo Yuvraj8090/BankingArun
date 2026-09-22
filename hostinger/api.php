@@ -1086,6 +1086,7 @@ $routes = [
     'POST /agents' => 'route_agent_create',
     'GET /branches' => 'route_branches_list',
     'POST /branches' => 'route_branch_create',
+    'GET /member-ranks' => 'route_member_ranks',
     'GET /products' => 'route_products_list',
     'POST /products' => 'route_product_create',
     'POST /collections' => 'route_collection_create',

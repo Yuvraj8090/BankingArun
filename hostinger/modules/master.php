@@ -781,3 +781,109 @@ function route_product_delete(array $d, string $id = ''): void
     audit($user, 'PRODUCT_DELETED', "{$product['group_key']}/{$product['slug']}");
     respond(['status' => 'SUCCESS', 'message' => "Page /{$product['group_key']}/{$product['slug']} removed."]);
 }
+
+// --- Member ranks ----------------------------------------------------------------------
+// A standing earned from how many members someone has introduced, and what standing those
+// members have reached in turn. It is recognition only: nothing here pays anybody. The
+// Nidhi Rules, 2014 prohibit brokerage or incentives for mobilising deposits, so there is
+// no commission attached to a rank and none is calculated anywhere in this file.
+const MEMBER_RANKS = [
+    1 => 'Silver',
+    2 => 'Gold',
+    3 => 'Platinum',
+    4 => 'Diamond',
+    5 => 'Ruby',
+    6 => 'Blue Diamond',
+    7 => 'Emerald',
+    8 => 'Ambassador',
+    9 => 'Brand Ambassador',
+];
+// Each rank needs two members directly introduced who hold the rank below it. Silver is
+// the entry: two introductions of any standing.
+const RANK_WIDTH = 2;
+
+function member_rank_map(): array
+{
+    // referrer -> the members they introduced. Only referrals that actually
+    // completed count; a lead that never became a member is not an introduction.
+    $children = [];
+    foreach (rows("SELECT referrer_id, referee_id FROM referrals WHERE status = 'paid'") as $r) {
+        $children[$r['referrer_id']][] = $r['referee_id'];
+    }
+
+    $rank = [];
+    // Settle by repetition rather than recursion: a rank can only rise when one
+    // below it rises, so nine passes is the most the ladder can need.
+    for ($pass = 0; $pass < count(MEMBER_RANKS); $pass++) {
+        $changed = false;
+        foreach ($children as $parent => $kids) {
+            $best = 0;
+            for ($level = count(MEMBER_RANKS); $level >= 1; $level--) {
+                $needed = $level - 1;   // Silver needs two of rank 0, i.e. any member
+                $qualifying = 0;
+                foreach ($kids as $kid) {
+                    if (($rank[$kid] ?? 0) >= $needed) {
+                        $qualifying++;
+                    }
+                }
+                if ($qualifying >= RANK_WIDTH) {
+                    $best = $level;
+                    break;
+                }
+            }
+            if ($best !== ($rank[$parent] ?? 0)) {
+                $rank[$parent] = $best;
+                $changed = true;
+            }
+        }
+        if (!$changed) {
+            break;
+        }
+    }
+    return array_filter($rank, fn($level) => $level > 0);
+}
+
+function route_member_ranks(array $d): void
+{
+    staff_user(SCHEME_READ_ROLES);
+    $ranks = member_rank_map();
+
+    $counts = [];
+    foreach (rows("SELECT referrer_id, COUNT(*) AS n FROM referrals WHERE status = 'paid' GROUP BY referrer_id") as $r) {
+        $counts[$r['referrer_id']] = (int)$r['n'];
+    }
+
+    $members = [];
+    foreach (rows('SELECT id, name, email, phone, branch FROM users WHERE role = ?', ['retail']) as $u) {
+        $level = $ranks[$u['id']] ?? 0;
+        $members[] = [
+            'id' => $u['id'],
+            'name' => $u['name'],
+            'email' => $u['email'],
+            'phone' => $u['phone'],
+            'branch' => $u['branch'],
+            'rank_level' => $level,
+            'rank' => $level === 0 ? null : MEMBER_RANKS[$level],
+            'introduced' => $counts[$u['id']] ?? 0,
+            // What the next step would take, so a member can be told plainly.
+            'next_rank' => $level >= count(MEMBER_RANKS) ? null : MEMBER_RANKS[$level + 1],
+        ];
+    }
+    // Highest standing first, then by how many they have introduced.
+    usort($members, fn($a, $b) => [$b['rank_level'], $b['introduced']] <=> [$a['rank_level'], $a['introduced']]);
+
+    $byRank = [];
+    foreach (MEMBER_RANKS as $level => $name) {
+        $byRank[$name] = count(array_filter($members, fn($m) => $m['rank_level'] === $level));
+    }
+
+    respond([
+        'members' => $members,
+        'by_rank' => $byRank,
+        'unranked' => count(array_filter($members, fn($m) => $m['rank_level'] === 0)),
+        'ladder' => array_values(MEMBER_RANKS),
+        'width' => RANK_WIDTH,
+        'note' => 'Standing only. No commission, brokerage or incentive is paid on it — '
+            . 'the Nidhi Rules, 2014 prohibit paying for the mobilising of deposits.',
+    ]);
+}
