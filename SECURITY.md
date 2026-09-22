@@ -140,7 +140,7 @@ feature: a member is told a regulated step completed when nothing was sent.
 
 | Screen | What it claims | What happens |
 |---|---|---|
-| KYC documents | "Sent to Branch Compliance Officer" | ✅ **Fixed** — documents are now validated, stored and queued for review |
+| KYC documents | "Sent to Branch Compliance Officer" | ✅ **Fixed** — documents are validated, stored, queued, and now actually reviewable (`route_kyc_document_review`) |
 | Nominee registration | "Nominee updated successfully!" | ✅ **Fixed** — saved, transaction password required, old → new in the audit trail |
 | Joint co-signatory | "Joint holder authorized on account!" | ✅ **Fixed** — saved, propagates to the member's accounts, removal supported |
 
@@ -148,6 +148,14 @@ feature: a member is told a regulated step completed when nothing was sent.
 documents, nomination and joint holding — now reach the server, and the two
 statutory ones are gated on the transaction password with lockout after five
 wrong attempts.
+
+"Queued for review" was itself half a claim for a while: the queue could be
+read but never cleared, because no route ever wrote a decision back, so every
+document sat at `pending_review` for ever. A reviewer can now verify or reject
+one, a rejection has to say what is wrong with the document, and the decision
+is audited against the person who made it. The same documents can be collected
+against an enquiry before any account exists, which is what lets the
+verification gate the account opening instead of trailing behind it.
 
 ## Real gaps worth fixing, in order
 
