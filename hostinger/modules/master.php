@@ -83,12 +83,57 @@ function effective_rate(array $scheme): ?float
     return round(((1 + ($low + $high) / 2) ** 12 - 1) * 100, 2);
 }
 
+// The maturity figure this plan would have to print to sit exactly on the cap.
+// effective_rate() answers "what does this cost"; this answers "what would it
+// have to say instead", which is the only form of the question anyone can act
+// on. Same discounting, solved the other way round.
+function cap_compliant_maturity(array $scheme): ?array
+{
+    $months = (int)$scheme['tenure_months'];
+    $deposit = (float)$scheme['total_deposit'];
+    if ($months < 1 || $deposit <= 0) {
+        return null;
+    }
+    $r = (1 + NIDHI_MAX_DEPOSIT_RATE / 100) ** (1 / 12) - 1;
+    $byInstalment = in_array($scheme['scheme_type'], ['daily', 'recurring'], true);
+    $payIn = (int)($scheme['contribution_months'] ?? 0) ?: $months;
+    $payIn = max(1, min($payIn, $months));
+
+    // What the member's money is worth on the day they join.
+    $paidIn = $deposit;
+    if ($byInstalment) {
+        $each = $deposit / $payIn;
+        $paidIn = 0.0;
+        for ($i = 1; $i <= $payIn; $i++) {
+            $paidIn += $each / (1 + $r) ** ($i - 1);
+        }
+    }
+
+    if (($scheme['payout_type'] ?? 'maturity') === 'monthly') {
+        // Paid out in equal monthly instalments, so the same total is worth more
+        // and the compliant figure is correspondingly lower.
+        $factor = 0.0;
+        for ($i = 1; $i <= $months; $i++) {
+            $factor += 1 / (1 + $r) ** $i;
+        }
+        if ($factor <= 0) {
+            return null;
+        }
+        $maturity = $paidIn * $months / $factor;
+        return ['maturity_amount' => round($maturity, 2),
+            'monthly_payout' => round($maturity / $months, 2)];
+    }
+    return ['maturity_amount' => round($paidIn * (1 + $r) ** $months, 2), 'monthly_payout' => null];
+}
+
 function scheme_public(array $scheme): array
 {
     $scheme = out($scheme);
     $rate = effective_rate($scheme);
     $scheme['effective_rate_pa'] = $rate;
     $scheme['exceeds_cap'] = $rate !== null && $rate > NIDHI_MAX_DEPOSIT_RATE;
+    // Only worked out where it is needed: a plan inside the cap has nothing to fix.
+    $scheme['cap_compliant'] = $scheme['exceeds_cap'] ? cap_compliant_maturity($scheme) : null;
     // Rate every denomination, not just the representative one. A slab whose own
     // figures imply a different return is either priced differently on purpose or
     // is a misprint, and either way somebody should be able to see it.

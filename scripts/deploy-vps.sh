@@ -14,9 +14,13 @@ scp hostinger/migrate.sql "$VPS_USER@$VPS_HOST:/srv/ajspay/migrate.sql"
 # The scheduler's unit files travel with the release so provision-cron.sh has
 # something to install. Shipping them does not schedule anything -- enabling the
 # timer stays a deliberate root action, like the migration above.
-ssh "$VPS_USER@$VPS_HOST" 'install -d -m 755 /srv/ajspay/schedule'
+#
+# They land beside migrate.sql rather than in a directory of their own: the
+# deploy account can write files into /srv/ajspay but cannot create directories
+# there, and the mkdir that seemed harmless killed the deploy before the release
+# was even unpacked.
 scp scripts/ajspay-cron.service scripts/ajspay-cron.timer scripts/provision-cron.sh \
-  "$VPS_USER@$VPS_HOST:/srv/ajspay/schedule/"
+  "$VPS_USER@$VPS_HOST:/srv/ajspay/"
 # The Python backend ships outside the document root: it is proxied to, never
 # served as files. Its deploy assets travel with it so provisioning reads one
 # copy rather than a second that can drift.

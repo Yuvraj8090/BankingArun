@@ -31,6 +31,7 @@ export default function SchemesPage() {
   const [data, setData] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const overCap = (data?.schemes || []).filter((x) => x.exceeds_cap);
 
   const load = async () => {
     try { setData(await api.schemesList()); }
@@ -80,11 +81,33 @@ export default function SchemesPage() {
 
       <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-900">
         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-        <p>
-          The Nidhi Rules, 2014 cap deposit interest at <strong>{data.max_rate_pa}% a year</strong>. The effective
-          return below is computed from each plan's own deposit and maturity figures. A plan above the cap can be kept
-          as a draft for reference, but cannot be set to active.
-        </p>
+        <div className="space-y-1.5">
+          <p>
+            The Nidhi Rules, 2014 cap deposit interest at <strong>{data.max_rate_pa}% a year</strong>. The effective
+            return below is computed from each plan's own deposit and maturity figures.
+          </p>
+          {/* This notice used to end "a plan above the cap cannot be set to active",
+              which was not true of the plans sitting on this very page. The editor
+              does refuse it; plans activated directly in the database were never
+              asked. Saying it plainly beats a member finding the contradiction. */}
+          {overCap.length > 0 ? (
+            <p data-testid="scheme-cap-truth">
+              <strong>{overCap.length} active plan{overCap.length === 1 ? '' : 's'} price
+              above the cap.</strong> This editor refuses to activate one — they were published
+              straight to the database from the printed brochure, which does not go through that
+              check. Each is marked below with the maturity figure that would bring it to
+              exactly {data.max_rate_pa}%.
+            </p>
+          ) : (
+            <p>No active plan prices above the cap. The editor refuses to activate one.</p>
+          )}
+          <p className="text-amber-800">
+            Three ways out of an over-cap plan, in the order they cost least: reprint it at the
+            compliant figure shown, leave it active and disclose the rate wherever it is quoted
+            (which is what happens today), or set it to draft so it stops being sold. Reducing a
+            figure a member has already been sold on is a decision for the board, not this screen.
+          </p>
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto">
@@ -131,7 +154,23 @@ export default function SchemesPage() {
                 </td>
                 <td className={`p-3 text-right font-semibold ${s.exceeds_cap ? 'text-[#c8102e]' : 'text-emerald-700'}`}>
                   {s.effective_rate_pa === null ? '—' : `${s.effective_rate_pa}%`}
-                  {s.exceeds_cap && <span className="block text-[9px] font-normal">above cap</span>}
+                  {/* The warning and the remedy in the same cell: a flag with no
+                      number beside it leaves whoever has to fix it doing the
+                      arithmetic by hand, which is how it stays unfixed. */}
+                  {s.exceeds_cap && (
+                    <span className="block text-[9px] font-normal" data-testid={`scheme-fix-${s.code}`}>
+                      above cap
+                      {s.cap_compliant && (
+                        <span className="block text-slate-500">
+                          {s.max_rate_pa || 12.5}% would be ₹
+                          {Number(s.cap_compliant.maturity_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          {s.cap_compliant.monthly_payout
+                            ? ` (₹${Number(s.cap_compliant.monthly_payout).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/mo)`
+                            : ''}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </td>
                 <td className="p-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${

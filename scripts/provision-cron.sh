@@ -8,6 +8,7 @@
 # all implemented, tested, and never once executed in production.
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Run as root" >&2; exit 1; }
+# Deployed beside migrate.sql; also works when run from a git checkout.
 here=$(cd "$(dirname "$0")" && pwd)
 
 install -m 644 "$here/ajspay-cron.service" /etc/systemd/system/ajspay-cron.service
