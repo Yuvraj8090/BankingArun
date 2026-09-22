@@ -351,11 +351,11 @@ function route_public_enquiry(array $d): void
         fail(422, 'Please choose what you are interested in.');
     }
 
-    $parts = array_filter([
-        clip($d['notes'] ?? '', 400),
-        empty($d['referral_code']) ? '' : 'Referral code: ' . clip($d['referral_code'], 40),
-    ], fn($part) => $part !== '');
-    $notes = implode(' | ', $parts);
+    $notes = clip($d['notes'] ?? '', 400);
+    // Kept as a column, not appended to the notes. A code in free text cannot be
+    // read back when the account is finally opened, which is where the bonus is
+    // paid — so a shared link used to go nowhere.
+    $referral = strtoupper(clip($d['referral_code'] ?? '', 40));
 
     // Someone enquiring twice should not become two pipelines, and the reply must
     // not reveal whether a number is already on file — that would turn this form
@@ -363,10 +363,12 @@ function route_public_enquiry(array $d): void
     $existing = row('SELECT id FROM crm_leads WHERE phone = ? AND stage NOT IN (?, ?)',
         [$phone, 'lost', 'enrolled']);
     if (!$existing) {
-        $pdo->prepare('INSERT INTO crm_leads (id, name, phone, email, source, interest, stage, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        $pdo->prepare('INSERT INTO crm_leads (id, name, phone, email, source, interest, stage, notes,
+                referral_code, referral_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([uuid4(), $name, $phone, $email ?: null, 'website',
-                $interest ?: null, 'new', $notes ?: null]);
+                $interest ?: null, 'new', $notes ?: null,
+                $referral ?: null, $referral === '' ? null : 'pending']);
     }
     respond(['status' => 'SUCCESS',
         'message' => 'Thank you. Our team will call you within one working day to arrange your document verification.']);

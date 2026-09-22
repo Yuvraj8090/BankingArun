@@ -435,6 +435,7 @@ function LeadsTab() {
                     <th className="p-3 font-semibold">Contact</th>
                     <th className="p-3 font-semibold">Source</th>
                     <th className="p-3 font-semibold">Interest</th>
+                    <th className="p-3 font-semibold">Referral</th>
                     <th className="p-3 font-semibold">Stage</th>
                     <th className="p-3 font-semibold text-right">Move to</th>
                   </tr>
@@ -445,6 +446,22 @@ function LeadsTab() {
                       <td className="p-3 font-semibold text-slate-900">{l.name}</td>
                       <td className="p-3 text-slate-600">{l.phone}<br /><span className="text-slate-500">{l.email || '—'}</span></td>
                       <td className="p-3 text-slate-600">{l.source}{l.agent_name ? ` · ${l.agent_name}` : ''}</td>
+                      <td className="p-3">
+                        {/* Where a shared link ends up. Before this column the code
+                            went into the notes and nothing could act on it. */}
+                        {l.referral_code ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-mono text-[11px] text-slate-900">{l.referral_code}</span>
+                            <span className={`text-[10px] font-semibold ${
+                              l.referral_status === 'paid' ? 'text-emerald-700'
+                                : l.referral_status === 'not_paid' ? 'text-[#c8102e]' : 'text-amber-700'}`}>
+                              {l.referral_status === 'paid' ? 'bonus paid'
+                                : l.referral_status === 'not_paid' ? 'code did not match'
+                                : 'pays on enrolment'}
+                            </span>
+                          </div>
+                        ) : <span className="text-slate-400">—</span>}
+                      </td>
                       <td className="p-3 text-slate-600">{l.interest || '—'}</td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_STYLE[l.stage]}`}>{l.stage}</span>

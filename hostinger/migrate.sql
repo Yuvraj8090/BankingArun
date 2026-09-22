@@ -559,3 +559,10 @@ UPDATE schemes SET status = 'active',
     slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]',
     notes = 'Brochure p9. Monthly payout for sixty months; the maturity column is the total received.'
     WHERE code = 'AJS-MIS-5Y';
+
+-- The referral code an enquiry arrived with, kept as its own column rather than
+-- buried in the notes. It was free text before, which meant nothing could read
+-- it back and the chain from a shared link to a paid bonus was broken.
+ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS referral_code VARCHAR(40) NULL;
+ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS referral_status VARCHAR(20) NULL;
+CREATE INDEX IF NOT EXISTS idx_lead_referral ON crm_leads (referral_code);

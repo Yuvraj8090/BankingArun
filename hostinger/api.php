@@ -546,10 +546,32 @@ function route_register(array $d): void
         'mode' => 'ACCOUNT_OPENING', 'amount' => $initial, 'balance_after' => $initial,
         'counterparty_name' => 'Account Opening Initial Fund', 'counterparty_acc' => 'BRANCH-CASH-DESK',
         'ref_number' => 'AOF-' . random_int(1000000, 9999999), 'description' => 'Initial account deposit']);
-    $code = strtoupper(clip($d['referral_code'] ?? '', 12));
+    // Opening against a lead carries its referral code through, which is the
+    // join the chain was missing: the code arrived with the enquiry, and the
+    // bonus is paid here, but nothing connected the two and a shared link paid
+    // nobody unless a teller happened to retype the code.
+    $lead = null;
+    if (!empty($d['lead_id'])) {
+        $lead = row('SELECT * FROM crm_leads WHERE id = ?', [clip($d['lead_id'], 36)]);
+        if (!$lead) {
+            fail(404, 'That enquiry no longer exists.');
+        }
+    }
+    $code = strtoupper(clip($d['referral_code'] ?? ($lead['referral_code'] ?? ''), 12));
     $bonus = $code === '' ? null : apply_referral_bonus($userId, $name, $email, $accountNumber, $initial, $code);
+    // The enquiry is closed out here rather than left for someone to tidy later,
+    // so the pipeline shows what actually happened to it.
+    if ($lead !== null) {
+        $pdo->prepare('UPDATE crm_leads SET stage = ?, converted_user_id = ?, referral_status = ? WHERE id = ?')
+            ->execute(['enrolled', $userId,
+                $lead['referral_code'] === null ? null : ($bonus === null ? 'not_paid' : 'paid'),
+                $lead['id']]);
+    }
+
     $user = row('SELECT * FROM users WHERE id = ?', [$userId]);
-    audit($opener, 'ACCOUNT_OPENED', "$accountNumber for {$user['email']}");
+    audit($opener, 'ACCOUNT_OPENED', "$accountNumber for {$user['email']}"
+        . ($lead === null ? '' : " from enquiry {$lead['id']}")
+        . ($bonus === null ? '' : " · referral $code paid " . rupees($bonus)));
     $pdo->commit();
 
     // No session is started. The teller who opened the account must stay
