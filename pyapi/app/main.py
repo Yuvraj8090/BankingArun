@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import routes_public, routes_rails
+from .impersonation import block_impersonated_writes
 
 log = logging.getLogger("ajspay")
 
@@ -21,6 +22,11 @@ app = FastAPI(title="AJSPay API", docs_url=None, redoc_url=None, openapi_url=Non
 
 # The API is same-origin behind Apache, so no CORS middleware is added: the
 # PHP's allowed_origins list exists for the same reason and stays authoritative.
+
+# A support session may read but never write. Registered as middleware, not as a
+# dependency, for the reason the PHP checks it in its dispatcher: a route that
+# forgets the dependency would silently accept the write. See impersonation.py.
+app.middleware("http")(block_impersonated_writes)
 
 app.include_router(routes_public.router, prefix="/api")
 # The owner's payment-rail screen. Settlement stays in the PHP; see rails.py.
