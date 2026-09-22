@@ -584,22 +584,34 @@ function route_register(array $d): void
 
 function route_login(array $d): void
 {
-    $email = strtolower(clip($d['email'] ?? '', 150));
+    // The field has always said "Email / User ID" but only ever accepted an
+    // email, so a member given an account number by their branch could not sign
+    // in with it. Any of the three identifiers a member is actually given now
+    // works: their email, their account number, or their folio on the member
+    // register.
+    $login = clip($d['email'] ?? $d['user_id'] ?? '', 150);
     $password = $d['password'] ?? null;
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !is_string($password) || $password === '') {
-        fail(422, 'A valid email and password are required.');
+    if ($login === '' || !is_string($password) || $password === '') {
+        fail(422, 'Your email or user ID and your password are both required.');
     }
-    $identifier = client_ip() . ':' . $email;
+    // Keyed on what was typed, so attempts against one identifier cannot be used
+    // to lock a member out under another.
+    $identifier = client_ip() . ':' . strtolower($login);
     $fails = recent_fails($identifier);
     if ($fails >= MAX_FAILS) {
         fail(429, 'Account temporarily locked due to 5 consecutive failed login attempts. Please try again in 15 minutes.');
     }
-    $user = row('SELECT * FROM users WHERE email = ?', [$email]);
+    $email = strtolower($login);
+    $user = row('SELECT u.* FROM users u
+        LEFT JOIN accounts a ON a.user_id = u.id
+        LEFT JOIN member_register m ON m.user_id = u.id
+        WHERE u.email = ? OR a.account_number = ? OR m.folio_no = ?
+        LIMIT 1', [$email, $login, strtoupper($login)]);
     $valid = password_verify($password, $user['password_hash'] ?? DUMMY_HASH);
     if (!$user || !$valid) {
         record_fail($identifier, $email);
         $left = MAX_FAILS - 1 - $fails;
-        fail(401, "Invalid email or password. $left attempt(s) remaining before security lockout.");
+        fail(401, "Invalid login or password. $left attempt(s) remaining before security lockout.");
     }
     clear_fails($identifier);
     // With an authenticator enrolled, the password alone does not produce a

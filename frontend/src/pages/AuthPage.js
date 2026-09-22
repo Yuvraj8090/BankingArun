@@ -182,10 +182,11 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
 
           {!isRegister ? (
             <form onSubmit={doLogin} className="space-y-4">
-              <Field icon={Mail} label="Email / User ID">
-                <input data-testid="login-email-input" type="email" required
+              <Field icon={Mail} label="Email or user ID">
+                <input data-testid="login-email-input" type="text" required
                   value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder="you@example.com or AJSP0…"
+                  autoComplete="username"
                   className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]" />
               </Field>
               <Field icon={Lock} label="Password">
