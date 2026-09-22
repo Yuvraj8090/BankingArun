@@ -706,7 +706,7 @@ function route_collection_anomalies(array $d): void
     }
 
     // An agent's daily totals compared against their own usual day.
-    foreach (rows('SELECT a.id, a.code, a.name FROM agents a') as $agent) {
+    foreach (rows('SELECT a.id, a.code, a.name FROM agents a WHERE a.deleted_at IS NULL') as $agent) {
         $daily = array_map('floatval', array_column(rows('SELECT SUM(amount) AS total FROM agent_collections
             WHERE agent_id = ? GROUP BY collected_on ORDER BY collected_on DESC LIMIT 90', [$agent['id']]), 'total'));
         if (count($daily) < 5) {
@@ -730,7 +730,7 @@ function route_collection_anomalies(array $d): void
             array_count_values(array_column($findings, 'severity'))),
         'checked' => [
             'collections' => (int)scalar('SELECT COUNT(*) FROM agent_collections'),
-            'agents' => (int)scalar('SELECT COUNT(*) FROM agents'),
+            'agents' => (int)scalar('SELECT COUNT(*) FROM agents WHERE deleted_at IS NULL'),
         ],
     ]);
 }

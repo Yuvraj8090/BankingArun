@@ -20,7 +20,7 @@ function route_panel_bank_owner(array $d): void
 {
     staff_user(['bank_owner']);
     $loans = out_all(rows('SELECT * FROM loan_applications ORDER BY created_at DESC LIMIT 50'));
-    $branches = out_all(rows('SELECT * FROM branches ORDER BY id'));
+    $branches = out_all(rows('SELECT * FROM branches WHERE deleted_at IS NULL ORDER BY id'));
     respond([
         // Only figures this system can actually derive. No credit rating or
         // capital-adequacy claims: those are bank measures and were invented.

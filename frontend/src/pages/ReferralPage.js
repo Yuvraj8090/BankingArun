@@ -120,6 +120,16 @@ function BrochureStructure() {
           </table>
         </div>
 
+        {ill?.family_unknown && (
+          <p className="text-[11px] text-[#c8102e]" data-testid="referral-family-unknown">
+            The book sets the first-level rate per BN plan family, and no priced page says which
+            family this plan is in — so all four are shown. Ask head office before quoting one.
+          </p>
+        )}
+        {data.mis_note && (
+          <p className="text-[11px] text-slate-500" data-testid="referral-mis-note">{data.mis_note}</p>
+        )}
+
         <p className="text-[11px] text-slate-500">
           {ill
             ? ill.basis === 'instalment'

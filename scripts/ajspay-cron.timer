@@ -1,0 +1,15 @@
+[Unit]
+Description=Run AJSPay scheduled money movement daily
+Documentation=file:/srv/ajspay/current/cron.php
+
+[Timer]
+# 01:30 IST. Every job inside is idempotent -- a deposit pays at most once per
+# calendar month and matures exactly once -- so a catch-up run after the box has
+# been down cannot double-pay anybody.
+OnCalendar=*-*-* 01:30:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=300
+Unit=ajspay-cron.service
+
+[Install]
+WantedBy=timers.target

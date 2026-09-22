@@ -78,7 +78,20 @@ No XML is parsed anywhere|simplexml_load_string
 CLAIMS
 [[ -z "$stale" ]] && ok "SECURITY.md not stale" || bad "SECURITY.md not stale" "claims something missing that is built:$stale"
 
-# 9. The disclosure contact must not silently expire.
+# 9. Scheduled money movement must have something that actually runs it.
+# cron.php spent its whole life pointing at a cron panel the VPS does not have,
+# so monthly interest and maturities were implemented and never executed. If the
+# timer or its installer goes missing again, that must fail a deploy rather than
+# be discovered by a member asking where their payout is.
+missing_schedule=""
+for f in scripts/ajspay-cron.service scripts/ajspay-cron.timer scripts/provision-cron.sh; do
+  [[ -f "$f" ]] || missing_schedule="$missing_schedule $f"
+done
+grep -q 'ajspay-cron' scripts/deploy-vps.sh || missing_schedule="$missing_schedule deploy-vps.sh-does-not-ship-it"
+[[ -z "$missing_schedule" ]] && ok "cron has a scheduler" \
+  || bad "cron has a scheduler" "cron.php would never run:$missing_schedule"
+
+# 10. The disclosure contact must not silently expire.
 if [[ -f frontend/public/.well-known/security.txt ]]; then
   exp=$(grep -i '^Expires:' frontend/public/.well-known/security.txt | head -1 | cut -d' ' -f2)
   if python3 -c "

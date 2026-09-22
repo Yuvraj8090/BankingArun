@@ -548,7 +548,8 @@ function route_register(array $d): void
     $terms = null;
     $planCode = strtoupper(clip($d['scheme_code'] ?? '', 20));
     if ($planCode !== '') {
-        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active'", [$planCode]);
+        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active' AND deleted_at IS NULL",
+            [$planCode]);
         if (!$scheme) {
             fail(422, 'That plan is not one of our current schemes.');
         }
@@ -677,7 +678,7 @@ function route_register(array $d): void
         // so a member who is still deciding on an amount is not recorded as
         // having come in for nothing.
         if ($scheme === null && $lead['scheme_code'] !== null) {
-            $scheme = row("SELECT * FROM schemes WHERE code = ?", [$lead['scheme_code']]);
+            $scheme = row("SELECT * FROM schemes WHERE code = ? AND deleted_at IS NULL", [$lead['scheme_code']]);
         } elseif ($scheme !== null && $lead['scheme_code'] !== $scheme['code']) {
             $pdo->prepare('UPDATE crm_leads SET scheme_code = ? WHERE id = ?')
                 ->execute([$scheme['code'], $lead['id']]);
@@ -1227,6 +1228,8 @@ $routes = [
     'GET /referrals/my-code' => 'route_referral_code',
     'GET /referrals/history' => 'route_referral_history',
     'GET /referrals/structure' => 'route_referral_structure',
+    'GET /admin/recycle-bin' => 'route_recycle_bin',
+    'POST /admin/recycle-bin/restore' => 'route_recycle_restore',
     'GET /standing-instructions' => 'route_si_list',
     'POST /standing-instructions' => 'route_si_create',
     // Statements (modules/statements.php)

@@ -637,3 +637,50 @@ CREATE TABLE IF NOT EXISTS rail_events (
 -- member was sold from, and nothing can answer "how many people are on MIS".
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS scheme_code VARCHAR(20) NULL;
 CREATE INDEX IF NOT EXISTS idx_deposit_scheme ON deposits (scheme_code, status);
+
+-- Brochure p13: "12th Month Deposite Plan 6 Year Return BN-1018". Twelve monthly
+-- instalments, then the fund is held to year six and paid back at double. It was
+-- the one plan on a priced page that had never been entered, so the book offered
+-- it and the portal had never heard of it.
+--
+-- 13.31% a year on its own printed figures, which is above the 12.5% a Nidhi may
+-- pay. It goes in as printed and the rate card marks it, the same as every other
+-- over-cap slab -- the alternative is a plan the counter sells and the system
+-- cannot quote.
+INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
+    contribution_amount, total_deposit, maturity_amount, payout_type, status, notes, slabs)
+VALUES (UUID(), 'AJS-12M-6Y', 'Dwigun Yojana (12 instalments, doubles by year 6)', 'recurring',
+    72, 12, 6000.00, 72000.00, 144000.00, 'maturity', 'active',
+    'Brochure p13, BN-1018. Twelve monthly instalments, then held to year six and paid at double.',
+    '[{"unit":500,"deposit":6000,"maturity":12000},{"unit":1000,"deposit":12000,"maturity":24000},{"unit":1500,"deposit":18000,"maturity":36000},{"unit":2000,"deposit":24000,"maturity":48000},{"unit":2500,"deposit":30000,"maturity":60000},{"unit":3000,"deposit":36000,"maturity":72000},{"unit":3500,"deposit":42000,"maturity":84000},{"unit":4000,"deposit":48000,"maturity":96000},{"unit":5000,"deposit":60000,"maturity":120000},{"unit":6000,"deposit":72000,"maturity":144000}]');
+
+UPDATE schemes SET status = 'active', scheme_type = 'recurring',
+    tenure_months = 72, contribution_months = 12,
+    contribution_amount = 6000.00, total_deposit = 72000.00, maturity_amount = 144000.00,
+    payout_type = 'maturity',
+    slabs = '[{"unit":500,"deposit":6000,"maturity":12000},{"unit":1000,"deposit":12000,"maturity":24000},{"unit":1500,"deposit":18000,"maturity":36000},{"unit":2000,"deposit":24000,"maturity":48000},{"unit":2500,"deposit":30000,"maturity":60000},{"unit":3000,"deposit":36000,"maturity":72000},{"unit":3500,"deposit":42000,"maturity":84000},{"unit":4000,"deposit":48000,"maturity":96000},{"unit":5000,"deposit":60000,"maturity":120000},{"unit":6000,"deposit":72000,"maturity":144000}]',
+    notes = 'Brochure p13, BN-1018. Twelve monthly instalments, then held to year six and paid at double.'
+    WHERE code = 'AJS-12M-6Y';
+
+-- Master data was deleted outright: a scheme, agent, branch or public page
+-- removed by mistake was gone, and the audit line saying who removed it was the
+-- only trace left. These four now mark the row instead, so a wrong click is a
+-- restore rather than a retyping job. Every read filters on deleted_at.
+--
+-- A deleted code is NOT freed for reuse: schemes.code carries a UNIQUE index, so
+-- the marked row goes on holding it, and dropping that index to free the string
+-- would be a worse trade than the inconvenience. Creating over a deleted code is
+-- refused, and the refusal says where the code has gone so nobody is left
+-- guessing why a code they cannot see is taken.
+ALTER TABLE schemes       ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL;
+ALTER TABLE schemes       ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(36) NULL;
+ALTER TABLE agents        ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL;
+ALTER TABLE agents        ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(36) NULL;
+ALTER TABLE branches      ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL;
+ALTER TABLE branches      ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(36) NULL;
+ALTER TABLE site_products ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL;
+ALTER TABLE site_products ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(36) NULL;
+CREATE INDEX IF NOT EXISTS idx_schemes_live       ON schemes (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_agents_live        ON agents (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_branches_live      ON branches (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_site_products_live ON site_products (deleted_at);

@@ -372,7 +372,8 @@ function route_public_market_rates(array $d): void
 function route_public_schemes(array $d): void
 {
     $schemes = array_map('scheme_public', rows(
-        'SELECT * FROM schemes WHERE status = ? ORDER BY scheme_type, tenure_months, code', ['active']));
+        'SELECT * FROM schemes WHERE status = ? AND deleted_at IS NULL
+            ORDER BY scheme_type, tenure_months, code', ['active']));
     respond([
         'company' => COMPANY_IDENTITY,
         'schemes' => $schemes,
@@ -385,7 +386,8 @@ function route_schemes_list(array $d): void
 {
     staff_user(SCHEME_READ_ROLES);
     respond([
-        'schemes' => array_map('scheme_public', rows('SELECT * FROM schemes ORDER BY scheme_type, tenure_months, code')),
+        'schemes' => array_map('scheme_public', rows('SELECT * FROM schemes WHERE deleted_at IS NULL
+            ORDER BY scheme_type, tenure_months, code')),
         'max_rate_pa' => NIDHI_MAX_DEPOSIT_RATE,
         'types' => SCHEME_TYPES,
         'statuses' => SCHEME_STATUSES,
@@ -397,8 +399,13 @@ function route_scheme_create(array $d): void
     global $pdo;
     $owner = staff_user(SCHEME_WRITE_ROLES);
     $scheme = scheme_payload($d);
-    if (row('SELECT id FROM schemes WHERE code = ?', [$scheme['code']])) {
-        fail(400, 'A scheme with this code already exists.');
+    if ($held = row('SELECT deleted_at FROM schemes WHERE code = ?', [$scheme['code']])) {
+        // Deleted schemes keep their code, so an admin can be told a code is
+        // taken by something no listing shows. Say which it is.
+        fail(400, $held['deleted_at'] === null
+            ? 'A scheme with this code already exists.'
+            : 'This code belongs to a deleted scheme. Restore it from the recycle bin, '
+                . 'or choose another code.');
     }
     $scheme = ['id' => uuid4()] + $scheme;
     $columns = implode(', ', array_keys($scheme));
@@ -413,7 +420,7 @@ function route_scheme_update(array $d, string $id = ''): void
 {
     global $pdo;
     $owner = staff_user(SCHEME_WRITE_ROLES);
-    $existing = row('SELECT * FROM schemes WHERE id = ?', [$id]);
+    $existing = row('SELECT * FROM schemes WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$existing) {
         fail(404, 'Scheme not found.');
     }
@@ -432,14 +439,15 @@ function route_scheme_delete(array $d, string $id = ''): void
 {
     global $pdo;
     $owner = staff_user(SCHEME_WRITE_ROLES);
-    $scheme = row('SELECT * FROM schemes WHERE id = ?', [$id]);
+    $scheme = row('SELECT * FROM schemes WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$scheme) {
         fail(404, 'Scheme not found.');
     }
     if (row('SELECT id FROM agent_collections WHERE scheme_id = ? LIMIT 1', [$id])) {
         fail(400, 'This scheme already has collections recorded against it. Set it to inactive instead of deleting.');
     }
-    $pdo->prepare('DELETE FROM schemes WHERE id = ?')->execute([$id]);
+    $pdo->prepare('UPDATE schemes SET deleted_at = NOW(), deleted_by = ? WHERE id = ?')
+        ->execute([$owner['id'], $id]);
     audit($owner, 'SCHEME_DELETED', $scheme['code']);
     respond(['status' => 'SUCCESS', 'message' => "Scheme {$scheme['code']} deleted."]);
 }
@@ -470,6 +478,7 @@ function route_agents_list(array $d): void
     staff_user(AGENT_READ_ROLES);
     $agents = out_all(rows('SELECT a.*, COUNT(c.id) AS collection_count, COALESCE(SUM(c.amount), 0) AS collected_total
         FROM agents a LEFT JOIN agent_collections c ON c.agent_id = a.id
+        WHERE a.deleted_at IS NULL
         GROUP BY a.id ORDER BY a.name'));
     respond(['agents' => array_map(function ($a) {
         $a['collection_count'] = (int)$a['collection_count'];
@@ -483,7 +492,13 @@ function route_agent_create(array $d): void
     global $pdo;
     $user = staff_user(AGENT_WRITE_ROLES);
     $agent = agent_payload($d);
-    if (row('SELECT id FROM agents WHERE code = ?', [$agent['code']])) {
+    if ($held = row('SELECT deleted_at FROM agents WHERE code = ?', [$agent['code']])) {
+        // A deleted row keeps its code, so a code can be taken by something
+        // no listing shows. Say which, rather than leaving an admin to guess.
+        if ($held['deleted_at'] !== null) {
+            fail(400, 'This code belongs to a deleted agent. Restore it from the recycle bin, '
+                . 'or choose another code.');
+        }
         fail(400, 'An agent with this code already exists.');
     }
     $agent = ['id' => uuid4()] + $agent;
@@ -497,7 +512,7 @@ function route_agent_update(array $d, string $id = ''): void
 {
     global $pdo;
     $user = staff_user(AGENT_WRITE_ROLES);
-    $existing = row('SELECT * FROM agents WHERE id = ?', [$id]);
+    $existing = row('SELECT * FROM agents WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$existing) {
         fail(404, 'Agent not found.');
     }
@@ -515,14 +530,15 @@ function route_agent_delete(array $d, string $id = ''): void
 {
     global $pdo;
     $user = staff_user(AGENT_WRITE_ROLES);
-    $agent = row('SELECT * FROM agents WHERE id = ?', [$id]);
+    $agent = row('SELECT * FROM agents WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$agent) {
         fail(404, 'Agent not found.');
     }
     if (row('SELECT id FROM agent_collections WHERE agent_id = ? LIMIT 1', [$id])) {
         fail(400, 'This agent has collections recorded. Set them to inactive instead of deleting.');
     }
-    $pdo->prepare('DELETE FROM agents WHERE id = ?')->execute([$id]);
+    $pdo->prepare('UPDATE agents SET deleted_at = NOW(), deleted_by = ? WHERE id = ?')
+        ->execute([$user['id'], $id]);
     audit($user, 'AGENT_DELETED', $agent['code']);
     respond(['status' => 'SUCCESS', 'message' => "Agent {$agent['code']} removed."]);
 }
@@ -533,7 +549,7 @@ function route_agent_delete(array $d, string $id = ''): void
 function route_collections_list(array $d, string $id = ''): void
 {
     staff_user(AGENT_READ_ROLES);
-    $agent = row('SELECT * FROM agents WHERE id = ?', [$id]);
+    $agent = row('SELECT * FROM agents WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$agent) {
         fail(404, 'Agent not found.');
     }
@@ -551,7 +567,7 @@ function route_collection_create(array $d): void
     global $pdo;
     $user = staff_user(AGENT_READ_ROLES);
     need($d, 'agent_id', 'account_number', 'amount', 'collected_on');
-    $agent = row('SELECT * FROM agents WHERE id = ?', [clip($d['agent_id'], 36)]);
+    $agent = row('SELECT * FROM agents WHERE id = ? AND deleted_at IS NULL', [clip($d['agent_id'], 36)]);
     if (!$agent) {
         fail(404, 'Agent not found.');
     }
@@ -634,7 +650,7 @@ function branch_payload(array $d, array $existing = []): array
 function route_branches_list(array $d): void
 {
     staff_user(BRANCH_READ_ROLES);
-    respond(['branches' => out_all(rows('SELECT * FROM branches ORDER BY name'))]);
+    respond(['branches' => out_all(rows('SELECT * FROM branches WHERE deleted_at IS NULL ORDER BY name'))]);
 }
 
 function route_branch_create(array $d): void
@@ -642,7 +658,13 @@ function route_branch_create(array $d): void
     global $pdo;
     $user = staff_user(BRANCH_WRITE_ROLES);
     $branch = branch_payload($d);
-    if (row('SELECT id FROM branches WHERE code = ?', [$branch['code']])) {
+    if ($held = row('SELECT deleted_at FROM branches WHERE code = ?', [$branch['code']])) {
+        // A deleted row keeps its code, so a code can be taken by something
+        // no listing shows. Say which, rather than leaving an admin to guess.
+        if ($held['deleted_at'] !== null) {
+            fail(400, 'This code belongs to a deleted branch. Restore it from the recycle bin, '
+                . 'or choose another code.');
+        }
         fail(400, 'A branch with this code already exists.');
     }
     $branch = ['id' => uuid4()] + $branch;
@@ -658,7 +680,7 @@ function route_branch_update(array $d, string $id = ''): void
 {
     global $pdo;
     $user = staff_user(BRANCH_WRITE_ROLES);
-    $existing = row('SELECT * FROM branches WHERE id = ?', [$id]);
+    $existing = row('SELECT * FROM branches WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$existing) {
         fail(404, 'Branch not found.');
     }
@@ -677,7 +699,7 @@ function route_branch_delete(array $d, string $id = ''): void
 {
     global $pdo;
     $user = staff_user(BRANCH_WRITE_ROLES);
-    $branch = row('SELECT * FROM branches WHERE id = ?', [$id]);
+    $branch = row('SELECT * FROM branches WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$branch) {
         fail(404, 'Branch not found.');
     }
@@ -687,7 +709,8 @@ function route_branch_delete(array $d, string $id = ''): void
     if ($attached && (int)$attached['n'] > 0) {
         fail(400, "{$branch['name']} still has {$attached['n']} member(s) or staff attached to it. Move them first.");
     }
-    $pdo->prepare('DELETE FROM branches WHERE id = ?')->execute([$id]);
+    $pdo->prepare('UPDATE branches SET deleted_at = NOW(), deleted_by = ? WHERE id = ?')
+        ->execute([$user['id'], $id]);
     audit($user, 'BRANCH_DELETED', "{$branch['code']} {$branch['name']}");
     respond(['status' => 'SUCCESS', 'message' => "Branch {$branch['code']} removed."]);
 }
@@ -727,7 +750,8 @@ function product_public(array $row): array
 
 function route_public_products(array $d): void
 {
-    $rows = rows("SELECT * FROM site_products WHERE status = 'active' ORDER BY sort_order, title");
+    $rows = rows("SELECT * FROM site_products WHERE status = 'active' AND deleted_at IS NULL
+        ORDER BY sort_order, title");
     respond(['products' => array_map('product_public', $rows)]);
 }
 
@@ -735,7 +759,8 @@ function route_products_list(array $d): void
 {
     staff_user(PRODUCT_READ_ROLES);
     respond([
-        'products' => array_map('product_public', rows('SELECT * FROM site_products ORDER BY sort_order, title')),
+        'products' => array_map('product_public', rows('SELECT * FROM site_products WHERE deleted_at IS NULL
+            ORDER BY sort_order, title')),
         'groups' => PRODUCT_GROUPS,
     ]);
 }
@@ -821,7 +846,7 @@ function route_product_update(array $d, string $id = ''): void
 {
     global $pdo;
     $user = staff_user(PRODUCT_WRITE_ROLES);
-    $existing = row('SELECT * FROM site_products WHERE id = ?', [$id]);
+    $existing = row('SELECT * FROM site_products WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$existing) {
         fail(404, 'Page not found.');
     }
@@ -841,13 +866,74 @@ function route_product_delete(array $d, string $id = ''): void
 {
     global $pdo;
     $user = staff_user(PRODUCT_WRITE_ROLES);
-    $product = row('SELECT * FROM site_products WHERE id = ?', [$id]);
+    $product = row('SELECT * FROM site_products WHERE id = ? AND deleted_at IS NULL', [$id]);
     if (!$product) {
         fail(404, 'Page not found.');
     }
-    $pdo->prepare('DELETE FROM site_products WHERE id = ?')->execute([$id]);
+    $pdo->prepare('UPDATE site_products SET deleted_at = NOW(), deleted_by = ? WHERE id = ?')
+        ->execute([$user['id'], $id]);
     audit($user, 'PRODUCT_DELETED', "{$product['group_key']}/{$product['slug']}");
     respond(['status' => 'SUCCESS', 'message' => "Page /{$product['group_key']}/{$product['slug']} removed."]);
+}
+
+// --- Recycle bin ------------------------------------------------------------------------
+// The four tables above mark rows deleted rather than removing them, which is
+// only half a feature: without somewhere to see and undo it, a soft delete is
+// just a delete that leaves litter. This is the other half.
+const RECYCLABLE = [
+    'scheme'  => ['table' => 'schemes',       'label' => 'code', 'name' => 'name'],
+    'agent'   => ['table' => 'agents',        'label' => 'code', 'name' => 'name'],
+    'branch'  => ['table' => 'branches',      'label' => 'code', 'name' => 'name'],
+    'product' => ['table' => 'site_products', 'label' => 'slug', 'name' => 'title'],
+];
+
+function route_recycle_bin(array $d): void
+{
+    staff_user(SCHEME_WRITE_ROLES);
+    $items = [];
+    foreach (RECYCLABLE as $kind => $meta) {
+        // The table name comes from the constant above, never from the request.
+        $rows = rows("SELECT r.id, r.{$meta['label']} AS label, r.{$meta['name']} AS name,
+                r.deleted_at, u.name AS deleted_by_name
+            FROM {$meta['table']} r LEFT JOIN users u ON u.id = r.deleted_by
+            WHERE r.deleted_at IS NOT NULL ORDER BY r.deleted_at DESC LIMIT 100");
+        foreach ($rows as $row) {
+            $items[] = ['kind' => $kind] + out($row);
+        }
+    }
+    usort($items, fn($a, $b) => strcmp($b['deleted_at'], $a['deleted_at']));
+    respond(['items' => $items, 'kinds' => array_keys(RECYCLABLE)]);
+}
+
+function route_recycle_restore(array $d): void
+{
+    global $pdo;
+    $owner = staff_user(SCHEME_WRITE_ROLES);
+    $kind = clip($d['kind'] ?? '', 20);
+    if (!isset(RECYCLABLE[$kind])) {
+        fail(422, 'kind must be one of: ' . implode(', ', array_keys(RECYCLABLE)));
+    }
+    $meta = RECYCLABLE[$kind];
+    $id = clip($d['id'] ?? '', 36);
+    $row = row("SELECT * FROM {$meta['table']} WHERE id = ? AND deleted_at IS NOT NULL", [$id]);
+    if (!$row) {
+        fail(404, 'That item is not in the recycle bin.');
+    }
+    // A backstop, not a routine path: the create routes refuse a code a deleted
+    // row is holding, so nothing should normally be sitting on it. It stays
+    // because the cost of being wrong is two live rows on one code and lookups
+    // returning whichever the database felt like that query.
+    $clash = row("SELECT id FROM {$meta['table']} WHERE {$meta['label']} = ? AND deleted_at IS NULL",
+        [$row[$meta['label']]]);
+    if ($clash) {
+        fail(409, "Another live {$kind} already uses {$row[$meta['label']]}. "
+            . 'Rename or remove that one first, then restore this.');
+    }
+    $pdo->prepare("UPDATE {$meta['table']} SET deleted_at = NULL, deleted_by = NULL WHERE id = ?")
+        ->execute([$id]);
+    audit($owner, strtoupper($kind) . '_RESTORED', (string)$row[$meta['label']]);
+    respond(['status' => 'SUCCESS',
+        'message' => ucfirst($kind) . " {$row[$meta['label']]} restored."]);
 }
 
 // --- Member ranks ----------------------------------------------------------------------

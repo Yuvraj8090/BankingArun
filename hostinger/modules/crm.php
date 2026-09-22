@@ -196,7 +196,7 @@ function lead_scheme_code(array $d, ?string $fallback = null): ?string
     if ($code === '') {
         return null;
     }
-    if (!row("SELECT id FROM schemes WHERE code = ? AND status = 'active'", [$code])) {
+    if (!row("SELECT id FROM schemes WHERE code = ? AND status = 'active' AND deleted_at IS NULL", [$code])) {
         fail(422, 'That plan is not one of our current schemes.');
     }
     return $code;

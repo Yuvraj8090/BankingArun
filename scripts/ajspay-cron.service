@@ -1,0 +1,31 @@
+[Unit]
+Description=AJSPay scheduled money movement (deposit interest, maturities, standing instructions)
+Documentation=file:/srv/ajspay/current/cron.php
+After=network.target mariadb.service
+Requires=mariadb.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+# The live release, by the symlink the deploy swaps, so a run always uses the
+# code that is currently serving rather than whichever release was current when
+# the unit was installed.
+ExecStart=/usr/bin/php /srv/ajspay/current/cron.php --verbose
+
+# It moves members' money. Give it nothing it does not need.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+ReadOnlyPaths=/srv/ajspay /etc/ajspay

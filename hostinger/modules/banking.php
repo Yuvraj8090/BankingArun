@@ -300,7 +300,7 @@ function route_my_tickets(array $d): void
 
 function route_branches(array $d): void
 {
-    respond(['branches' => out_all(rows('SELECT * FROM branches ORDER BY id'))]);
+    respond(['branches' => out_all(rows('SELECT * FROM branches WHERE deleted_at IS NULL ORDER BY id'))]);
 }
 
 // route_chat now lives in modules/ai.php, where it can answer from the
@@ -509,6 +509,14 @@ function referral_illustration(array $scheme, float $unit): array
         'columns' => array_column(REFERRAL_ONE_TIME_FAMILIES, 'label'),
         'paid_in_per_column' => null, 'levels' => $rows,
         'scheme' => ['code' => $scheme['code'], 'name' => $scheme['name']],
+        // The commission page keys its one-time rates to BN families, and not one
+        // priced page in the book says which family it belongs to -- the only
+        // plan carrying a code at all is the twelve-instalment one, and its
+        // BN-1018 is not among the BN-1 to BN-11 the table lists. So four
+        // different first-level rates could apply and the document does not
+        // choose between them. Saying so is the only honest answer; picking the
+        // friendliest column would be inventing a promise.
+        'family_unknown' => true,
         'unit' => $unit, 'total_paid_in' => $deposit];
 }
 
@@ -518,7 +526,7 @@ function route_referral_structure(array $d): void
     $illustration = null;
     $code = strtoupper(clip($_GET['scheme_code'] ?? '', 20));
     if ($code !== '') {
-        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active'", [$code]);
+        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active' AND deleted_at IS NULL", [$code]);
         if (!$scheme) {
             fail(422, 'That plan is not one of our current schemes.');
         }
@@ -545,6 +553,12 @@ function route_referral_structure(array $d): void
         'instalment' => ['columns' => REFERRAL_STAGES, 'levels' => $instalment],
         'one_time' => ['columns' => array_column(REFERRAL_ONE_TIME_FAMILIES, 'label'), 'levels' => $oneTime],
         'chain' => referral_chain($user['id']),
+        // Asked often enough about the monthly-income plan specifically to be
+        // worth stating rather than left to be inferred from a missing row.
+        'mis_note' => 'The monthly-income plan has no referral row of its own in the book. '
+            . 'It is paid for in one sum, so the one-time table would apply -- but that table '
+            . 'sets its first-level rate per BN plan family, and no priced page says which '
+            . 'family any plan belongs to. Ask head office before quoting a figure.',
         'illustration' => $illustration,
     ]);
 }
