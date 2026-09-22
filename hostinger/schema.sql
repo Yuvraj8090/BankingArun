@@ -82,6 +82,48 @@ CREATE TABLE IF NOT EXISTS transactions (
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Every instruction this institution gave its payment partner, and what came
+-- back. A Nidhi is not an NPCI member, so money only moves through a regulated
+-- partner; this table is the bridge between our ledger and theirs. A payout is
+-- PENDING here until the partner confirms it, which is what stops the ledger
+-- claiming money left when it did not.
+CREATE TABLE IF NOT EXISTS rail_transactions (
+    id VARCHAR(36) PRIMARY KEY,
+    direction VARCHAR(10) NOT NULL,          -- payout | collect
+    rail VARCHAR(10) NOT NULL,               -- IMPS | NEFT | RTGS | UPI
+    driver VARCHAR(20) NOT NULL,             -- simulator | partner
+    user_id VARCHAR(36),
+    account_number VARCHAR(30),
+    amount DECIMAL(15,2) NOT NULL,
+    counterparty_name VARCHAR(150),
+    counterparty_acc VARCHAR(50),
+    counterparty_ifsc VARCHAR(11),
+    counterparty_vpa VARCHAR(100),
+    ref_number VARCHAR(100) NOT NULL,        -- ours; matches transactions.ref_number
+    idempotency_key VARCHAR(64) NOT NULL,    -- retrying the same key must never pay twice
+    partner_ref VARCHAR(100),                -- theirs
+    utr VARCHAR(50),                         -- the real UTR, once there is one
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    failure_reason VARCHAR(255),
+    request_payload TEXT,
+    last_event TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_rail_idempotency (idempotency_key),
+    INDEX idx_rail_status (status, created_at),
+    INDEX idx_rail_partner (partner_ref),
+    INDEX idx_rail_ref (ref_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Webhook de-duplication. Partners retry a callback until they get a 2xx, so the
+-- same event arrives many times; the event id being the primary key is what makes
+-- processing it twice impossible.
+CREATE TABLE IF NOT EXISTS rail_events (
+    id VARCHAR(100) PRIMARY KEY,
+    payload TEXT NOT NULL,
+    received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS cards (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
@@ -571,6 +613,7 @@ CREATE TABLE IF NOT EXISTS crm_leads (
     email VARCHAR(150),
     source VARCHAR(30),                     -- walk_in | referral | agent | campaign | phone
     interest VARCHAR(30),                   -- savings | deposit | loan | other
+    scheme_code VARCHAR(20),                -- the published plan they asked about, where they named one
     stage VARCHAR(20) NOT NULL DEFAULT 'new',  -- new | contacted | documents | enrolled | lost
     assigned_to VARCHAR(36),
     agent_id VARCHAR(36),                   -- introducing agent, where there is one
@@ -903,7 +946,10 @@ CREATE TABLE IF NOT EXISTS captcha_challenges (
 -- and the bytes are only ever handed to an authorised reviewer.
 CREATE TABLE IF NOT EXISTS kyc_documents (
     id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
+    -- Exactly one of these is set. A document belongs to an enquiry while the
+    -- account is still being opened, and is re-pointed at the member once it is.
+    user_id VARCHAR(36),
+    lead_id VARCHAR(36),
     kind VARCHAR(20) NOT NULL,              -- pan | aadhaar | address
     file_name VARCHAR(200),
     mime VARCHAR(40) NOT NULL,
@@ -915,6 +961,7 @@ CREATE TABLE IF NOT EXISTS kyc_documents (
     uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reviewed_at DATETIME NULL,
     INDEX idx_kyc_doc_user (user_id, kind),
+    INDEX idx_kyc_doc_lead (lead_id, kind),
     INDEX idx_kyc_doc_status (status, uploaded_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

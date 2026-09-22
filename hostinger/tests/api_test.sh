@@ -11,6 +11,7 @@ API=${AJSPAY_API:-http://127.0.0.1:8002/api}
 DB=${AJSPAY_DB:-ajspay_php}
 J='Content-Type: application/json'
 Q() { mysql -u root -N -B "$DB" -e "$1"; }
+CFG_BACKUP=$(Q "SELECT TO_BASE64(data) FROM system_config WHERE id='global'")
 pass=0; fail=0
 ck()    { if [[ "$2" == "$3" ]]; then print "  ok   $1"; pass=$((pass+1)); else print "  FAIL $1: expected '$2' got '$3'"; fail=$((fail+1)); fi }
 has()   { if print -r -- "$2" | grep -qF -- "$3"; then print "  ok   $1"; pass=$((pass+1)); else print "  FAIL $1: missing '$3'"; fail=$((fail+1)); fi }
@@ -25,6 +26,7 @@ jq_() { python3 -c "import sys,json;d=json.load(sys.stdin);$1"; }
 
 RETAIL_ACC=AJSP00984521098
 CORP_ACC=AJSP00129845612
+DOC_PDF=$(python3 -c 'import base64; print("data:application/pdf;base64," + base64.b64encode(b"%PDF-1.4\n" + b"0"*600).decode())')
 reset_balances() { Q "UPDATE accounts SET balance=137800.00 WHERE account_number='$RETAIL_ACC';
                      UPDATE accounts SET balance=1285000.00 WHERE account_number='$CORP_ACC';" >/dev/null; }
 
@@ -103,6 +105,12 @@ hasnt "public card hides the drafted over-cap scheme" "$BODY" "ZZ-CAP-1"
 Q "DELETE FROM schemes WHERE code LIKE 'ZZ-%';" >/dev/null
 
 print "\n-- regulated capability gating --"
+Q "INSERT INTO system_config (id,data,updated_by) VALUES ('global','{}','api_test')
+   ON DUPLICATE KEY UPDATE data = JSON_SET(data,
+     '$.capabilities.debit_cards.enabled', false,
+     '$.capabilities.upi.enabled', false,
+     '$.capabilities.mutual_funds.enabled', false,
+     '$.capabilities.payment_systems.enabled', false), updated_by='api_test';" >/dev/null
 call GET /cards "$RETAIL";               ck "debit cards gated" 403 "$CODE"
 call GET /upi/status "$RETAIL";          ck "UPI gated" 403 "$CODE"
 call GET /investments/catalog "$RETAIL"; ck "mutual funds gated" 403 "$CODE"
@@ -261,6 +269,34 @@ ck "lead created" 200 "$CODE"
 LID=$(print -r -- "$BODY" | jq_ 'print(d["id"])')
 call POST /crm/leads "$STAFF" '{"name":"APITEST Duplicate","phone":"+91 90111 22333"}'
 ck "duplicate lead phone refused" 400 "$CODE"
+PLAN=$(Q "SELECT code FROM schemes WHERE status='active' ORDER BY code LIMIT 1")
+call POST /crm/leads "$STAFF" "{\"name\":\"APITEST AOF Verma\",\"phone\":\"+91 90222 33444\",\"source\":\"walk_in\",\"scheme_code\":\"$PLAN\"}"
+ck "account-opening lead records the plan" 200 "$CODE"
+AOF_LID=$(print -r -- "$BODY" | jq_ 'print(d["id"])')
+call POST /register/account "$STAFF" "{\"lead_id\":\"$AOF_LID\",\"name\":\"APITEST AOF Verma\",\"phone\":\"+91 90222 33444\",\"password\":\"AOF#2026!Qr7mZp\",\"transaction_password\":\"4321\",\"initial_deposit\":1000}"
+ck "account opening waits for verified documents" 409 "$CODE"
+call POST "/crm/leads/$AOF_LID/documents" "$STAFF" "{\"kind\":\"pan\",\"file_name\":\"pan.pdf\",\"content\":\"$DOC_PDF\"}"
+ck "identity document uploaded against the enquiry" 200 "$CODE"
+PANDOC=$(print -r -- "$BODY" | jq_ 'print(next(x["id"] for x in d["documents"] if x["kind"]=="pan"))')
+call POST "/crm/leads/$AOF_LID/documents" "$STAFF" "{\"kind\":\"address\",\"file_name\":\"address.pdf\",\"content\":\"$DOC_PDF\"}"
+ck "address document uploaded against the enquiry" 200 "$CODE"
+ADDRDOC=$(print -r -- "$BODY" | jq_ 'print(next(x["id"] for x in d["documents"] if x["kind"]=="address"))')
+call POST "/kyc/documents/$PANDOC/review" "$OWNER" '{"decision":"verified"}'
+ck "identity document can be verified" 200 "$CODE"
+call POST "/kyc/documents/$ADDRDOC/review" "$OWNER" '{"decision":"verified"}'
+ck "address document can be verified" 200 "$CODE"
+call GET "/crm/leads/$AOF_LID/documents" "$STAFF"
+ck "verified applicant file is ready to open" "True" "$(print -r -- "$BODY" | jq_ 'print(d["ready_to_open"])')"
+call POST /register/account "$STAFF" "{\"lead_id\":\"$AOF_LID\",\"name\":\"APITEST AOF Verma\",\"phone\":\"+91 90222 33444\",\"password\":\"AOF#2026!Qr7mZp\",\"transaction_password\":\"4321\",\"initial_deposit\":1000}"
+ck "verified applicant account opens" 200 "$CODE"
+ck "opened applicant is KYC verified" "verified" "$(print -r -- "$BODY" | jq_ 'print(d["kyc_status"])')"
+has "opened response repeats the selected plan" "$BODY" "$PLAN"
+AOF_UID=$(print -r -- "$BODY" | jq_ 'print(d["user"]["id"])')
+Q "DELETE FROM kyc_documents WHERE user_id='$AOF_UID';
+   DELETE FROM cards WHERE user_id='$AOF_UID';
+   DELETE FROM transactions WHERE user_id='$AOF_UID';
+   DELETE FROM accounts WHERE user_id='$AOF_UID';
+   DELETE FROM users WHERE id='$AOF_UID';" >/dev/null
 call PATCH "/crm/leads/$LID" "$STAFF" '{"stage":"lost"}'
 ck "cannot mark a lead lost without a reason" 422 "$CODE"
 call PATCH "/crm/leads/$LID" "$STAFF" '{"stage":"enrolled"}'
@@ -401,6 +437,12 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
    DELETE FROM audit_logs WHERE action LIKE 'MFA%' OR action LIKE 'FRAUD%' OR action='FUND_TRANSFER'
      OR action LIKE 'IMPERSONATION%' OR action='ACCOUNT_VIEWED_BY_SUPPORT' OR action LIKE 'TICKET%'
      OR action='SUPPORT_TICKET' OR action LIKE 'CRM%' OR action='REPORT_EXPORTED';
+   DELETE FROM kyc_documents WHERE lead_id IN (SELECT id FROM crm_leads WHERE phone='+91 90222 33444')
+      OR user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
+   DELETE FROM cards WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
+   DELETE FROM transactions WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
+   DELETE FROM accounts WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
+   DELETE FROM users WHERE phone='+91 90222 33444';
    DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;
    DELETE FROM audit_logs WHERE action LIKE 'TUTORIAL%';
    UPDATE users SET tutorial_status='completed', tutorial_step=0;
@@ -410,5 +452,8 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
    DELETE FROM audit_logs WHERE action LIKE 'MEMBER_%' OR action LIKE 'SHARES_%'
      OR action LIKE 'SCREENING_%' OR action LIKE 'WATCHLIST_%' OR action='DEPOSIT_BOOKED';" >/dev/null
 reset_balances
+if [[ -n "$CFG_BACKUP" ]]; then
+  Q "UPDATE system_config SET data=FROM_BASE64('$CFG_BACKUP') WHERE id='global'" >/dev/null
+fi
 print "\n== $pass passed, $fail failed =="
 [[ $fail -eq 0 ]] || exit 1

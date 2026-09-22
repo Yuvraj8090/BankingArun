@@ -156,7 +156,14 @@ function route_crm_log_interaction(array $d): void
 function route_crm_leads(array $d): void
 {
     staff_user(CRM_ROLES);
-    $sql = 'SELECT l.*, a.name AS agent_name FROM crm_leads l LEFT JOIN agents a ON a.id = l.agent_id WHERE 1 = 1';
+    $sql = "SELECT l.*, a.name AS agent_name, s.name AS scheme_name,
+            (SELECT COUNT(*) FROM kyc_documents k WHERE k.lead_id = l.id) AS documents_uploaded,
+            (SELECT COUNT(*) FROM kyc_documents k WHERE k.lead_id = l.id AND k.status = 'verified')
+                AS documents_verified
+        FROM crm_leads l
+        LEFT JOIN agents a ON a.id = l.agent_id
+        LEFT JOIN schemes s ON s.code = l.scheme_code
+        WHERE 1 = 1";
     $params = [];
     if (!empty($_GET['stage']) && in_array($_GET['stage'], LEAD_STAGES, true)) {
         $sql .= ' AND l.stage = ?';
@@ -177,6 +184,24 @@ function route_crm_leads(array $d): void
         'stages' => LEAD_STAGES, 'sources' => LEAD_SOURCES]);
 }
 
+// The plan has to be one we actually publish. A code typed into the enquiry
+// that matches nothing would be quoted back to the member at the counter as
+// though it were a real plan.
+function lead_scheme_code(array $d, ?string $fallback = null): ?string
+{
+    if (!array_key_exists('scheme_code', $d)) {
+        return $fallback;
+    }
+    $code = strtoupper(clip($d['scheme_code'] ?? '', 20));
+    if ($code === '') {
+        return null;
+    }
+    if (!row("SELECT id FROM schemes WHERE code = ? AND status = 'active'", [$code])) {
+        fail(422, 'That plan is not one of our current schemes.');
+    }
+    return $code;
+}
+
 function route_crm_lead_create(array $d): void
 {
     global $pdo;
@@ -189,12 +214,12 @@ function route_crm_lead_create(array $d): void
     }
     $source = clip($d['source'] ?? 'walk_in', 30);
     $id = uuid4();
-    $pdo->prepare('INSERT INTO crm_leads (id, name, phone, email, source, interest, stage, assigned_to, agent_id,
-            notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    $pdo->prepare('INSERT INTO crm_leads (id, name, phone, email, source, interest, scheme_code, stage, assigned_to,
+            agent_id, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$id, clip($d['name'], 150), $phone, clip($d['email'] ?? '', 150) ?: null,
             in_array($source, LEAD_SOURCES, true) ? $source : 'walk_in', clip($d['interest'] ?? '', 30) ?: null,
-            'new', clip($d['assigned_to'] ?? '', 36) ?: $staff['id'], clip($d['agent_id'] ?? '', 36) ?: null,
-            clip($d['notes'] ?? '', 500) ?: null, $staff['id']]);
+            lead_scheme_code($d), 'new', clip($d['assigned_to'] ?? '', 36) ?: $staff['id'],
+            clip($d['agent_id'] ?? '', 36) ?: null, clip($d['notes'] ?? '', 500) ?: null, $staff['id']]);
     audit($staff, 'CRM_LEAD_CREATED', clip($d['name'], 100) . " ($phone)");
     respond(['status' => 'SUCCESS', 'id' => $id, 'message' => 'Lead added to the pipeline.']);
 }
@@ -221,14 +246,106 @@ function route_crm_lead_update(array $d, string $id = ''): void
     if ($converted !== null && !row('SELECT id FROM users WHERE id = ?', [$converted])) {
         fail(404, 'That member account does not exist.');
     }
-    $pdo->prepare('UPDATE crm_leads SET stage = ?, assigned_to = ?, interest = ?, notes = ?, lost_reason = ?,
-            converted_user_id = ? WHERE id = ?')
+    $pdo->prepare('UPDATE crm_leads SET stage = ?, assigned_to = ?, interest = ?, scheme_code = ?, notes = ?,
+            lost_reason = ?, converted_user_id = ? WHERE id = ?')
         ->execute([$stage, clip($d['assigned_to'] ?? $lead['assigned_to'] ?? '', 36) ?: null,
             clip($d['interest'] ?? $lead['interest'] ?? '', 30) ?: null,
+            lead_scheme_code($d, $lead['scheme_code']),
             clip($d['notes'] ?? $lead['notes'] ?? '', 500) ?: null,
             clip($d['lost_reason'] ?? $lead['lost_reason'] ?? '', 255) ?: null, $converted, $id]);
     audit($staff, 'CRM_LEAD_UPDATED', "{$lead['name']} -> $stage");
     respond(['status' => 'SUCCESS', 'message' => "{$lead['name']} moved to $stage."]);
+}
+
+// --- The account-opening file ------------------------------------------------------------
+// Everything a person has to hand over before an account can be opened, kept
+// against the enquiry rather than against a member who does not exist yet.
+
+// One officially valid document for identity and one for address, both cleared
+// by a reviewer. Aadhaar counts for identity here; the address proof is asked
+// for separately because an Aadhaar with the number masked, which is how we are
+// required to hold it, often no longer shows a legible address.
+const LEAD_FILE_IDENTITY = ['pan', 'aadhaar'];
+const LEAD_FILE_ADDRESS = 'address';
+const DOC_KIND_LABEL = ['pan' => 'PAN card', 'aadhaar' => 'Aadhaar', 'address' => 'Proof of address'];
+
+function lead_file_status(string $leadId): array
+{
+    $docs = rows('SELECT * FROM kyc_documents WHERE lead_id = ? ORDER BY uploaded_at', [$leadId]);
+    $verified = [];
+    foreach ($docs as $doc) {
+        if ($doc['status'] === 'verified') {
+            $verified[$doc['kind']] = true;
+        }
+    }
+    $identity = (bool)array_intersect(LEAD_FILE_IDENTITY, array_keys($verified));
+    $address = isset($verified[LEAD_FILE_ADDRESS]);
+    $missing = [];
+    if (!$identity) {
+        $missing[] = 'a verified PAN card or Aadhaar';
+    }
+    if (!$address) {
+        $missing[] = 'a verified proof of address';
+    }
+    return [
+        'documents' => array_map(fn($r) => kyc_document_public($r), $docs),
+        'identity_verified' => $identity,
+        'address_verified' => $address,
+        'ready_to_open' => $identity && $address,
+        'missing' => $missing,
+    ];
+}
+
+function lead_or_404(string $id): array
+{
+    $lead = row('SELECT * FROM crm_leads WHERE id = ?', [$id]);
+    if (!$lead) {
+        fail(404, 'That enquiry no longer exists.');
+    }
+    return $lead;
+}
+
+function route_crm_lead_documents(array $d, string $id = ''): void
+{
+    staff_user(CRM_ROLES);
+    $lead = lead_or_404($id);
+    // Metadata only. The scans themselves are shown in the review queue, which
+    // is the one place the bytes are served and the only role that needs them.
+    respond(['lead' => ['id' => $lead['id'], 'name' => $lead['name'], 'stage' => $lead['stage']]]
+        + lead_file_status($lead['id']));
+}
+
+function route_crm_lead_document_upload(array $d, string $id = ''): void
+{
+    global $pdo;
+    $staff = staff_user(CRM_ROLES);
+    $lead = lead_or_404($id);
+    if ($lead['converted_user_id'] !== null) {
+        fail(400, 'This enquiry already became an account. Upload further documents against the member instead.');
+    }
+    rate_limit('leaddoc:' . $staff['id'], 60, 3600, 'Too many uploads. Please try again later.');
+    $doc = kyc_document_payload($d);
+
+    // A re-upload replaces whatever is not already cleared, so a reviewer is
+    // never left choosing between two copies of the same document. A verified
+    // one is left alone: re-uploading must not quietly undo a decision.
+    $pdo->prepare('DELETE FROM kyc_documents WHERE lead_id = ? AND kind = ? AND status <> ?')
+        ->execute([$lead['id'], $doc['kind'], 'verified']);
+    $docId = uuid4();
+    $pdo->prepare('INSERT INTO kyc_documents (id, lead_id, kind, file_name, mime, byte_size, content_b64)
+        VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$docId, $lead['id'], $doc['kind'], $doc['file_name'], $doc['mime'],
+            $doc['byte_size'], $doc['content_b64']]);
+    // Collecting documents is what the "documents" stage means, so the pipeline
+    // moves itself rather than waiting for someone to remember to move it.
+    if (in_array($lead['stage'], ['new', 'contacted'], true)) {
+        $pdo->prepare('UPDATE crm_leads SET stage = ? WHERE id = ?')->execute(['documents', $lead['id']]);
+    }
+    audit($staff, 'LEAD_DOCUMENT_UPLOADED', "{$doc['kind']} for {$lead['name']} ({$lead['phone']})");
+    respond(['status' => 'SUCCESS',
+        'message' => (DOC_KIND_LABEL[$doc['kind']] ?? $doc['kind'])
+            . ' uploaded. It has to be verified before the account can be opened.']
+        + lead_file_status($lead['id']));
 }
 
 // --- Tasks -------------------------------------------------------------------------------
@@ -350,6 +467,10 @@ function route_public_enquiry(array $d): void
     if ($interest !== '' && !in_array($interest, ENQUIRY_INTERESTS, true)) {
         fail(422, 'Please choose what you are interested in.');
     }
+    // Naming the plan on the form is what lets the desk call back about the
+    // plan the person was reading about, rather than opening with a question
+    // they have already answered.
+    $scheme = lead_scheme_code($d);
 
     $notes = clip($d['notes'] ?? '', 400);
     // Kept as a column, not appended to the notes. A code in free text cannot be
@@ -363,11 +484,11 @@ function route_public_enquiry(array $d): void
     $existing = row('SELECT id FROM crm_leads WHERE phone = ? AND stage NOT IN (?, ?)',
         [$phone, 'lost', 'enrolled']);
     if (!$existing) {
-        $pdo->prepare('INSERT INTO crm_leads (id, name, phone, email, source, interest, stage, notes,
+        $pdo->prepare('INSERT INTO crm_leads (id, name, phone, email, source, interest, scheme_code, stage, notes,
                 referral_code, referral_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             ->execute([uuid4(), $name, $phone, $email ?: null, 'website',
-                $interest ?: null, 'new', $notes ?: null,
+                $interest ?: null, $scheme, 'new', $notes ?: null,
                 $referral ?: null, $referral === '' ? null : 'pending']);
     }
     respond(['status' => 'SUCCESS',

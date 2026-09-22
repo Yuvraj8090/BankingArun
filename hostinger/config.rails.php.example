@@ -1,0 +1,76 @@
+<?php
+// AJSPay: payment rail settings. Copy this file to config.rails.php, fill it in,
+// and never commit or upload the filled-in copy — it holds live payment keys.
+//
+//   cp config.rails.php.example config.rails.php
+//
+// Everything here can also be set from the bank owner's Rails screen
+// (PUT /api/rails/config), which stores the secrets encrypted in the database
+// and wins over this file. Use this file for the first setup and for the values
+// that never change; use the screen for rotating keys.
+//
+// This institution is a Nidhi company, not a bank, so it cannot be an NPCI or
+// RBI member and cannot put a message on the IMPS switch itself. Real money
+// moves only through an RBI-authorised payment aggregator or a sponsor bank,
+// and that is what these settings point at.
+declare(strict_types=1);
+
+return ['rails' => [
+
+    // --- Which driver -------------------------------------------------------
+    // 'simulator' — nothing is called and no money moves. Every response says
+    //               so. This is the right setting on a laptop and the right
+    //               setting in production until the partner is live.
+    // 'partner'   — real money. Needs every credential below, and the
+    //               payment_systems capability switched on in the capability
+    //               register with the authorisation recorded.
+    'driver' => 'simulator',
+
+    // --- Your partner -------------------------------------------------------
+    'partner_name' => '',                 // shown in the owner screens, e.g. 'Acme Payments'
+    'base_url'     => '',                 // https:// only. e.g. 'https://api.partner.com/v1'
+    'auth'         => 'basic',            // 'basic' (key id + secret) or 'bearer' (secret only)
+    'key_id'       => '',
+    'key_secret'   => '',
+
+    // --- Their callback to us -----------------------------------------------
+    // Give the partner this URL:  https://yourdomain.com/api/rails/webhook
+    // The secret is the one they show you when you create the webhook. Every
+    // callback is rejected unless HMAC-SHA256(raw body, this secret) matches the
+    // header below, so an unsigned callback can never credit an account.
+    'webhook_secret' => '',
+    'webhook_header' => 'X-Webhook-Signature',   // whatever header they sign with
+
+    // Your own current account at the partner bank — the pooled account the
+    // money is paid out of and settles into. Not a member's account.
+    'settlement_account' => '',
+
+    // --- Their API shape ----------------------------------------------------
+    // No two partners agree on paths or field names, so both are configurable.
+    // {ref} in status_path is replaced with the partner's own reference.
+    'payout_path'  => '/payouts',
+    'collect_path' => '/payment_links',
+    'status_path'  => '/payouts/{ref}',
+
+    // Where to read the answer out of their JSON. Dot paths, so 'payout.status'
+    // works for a partner that nests it.
+    'ref_field'     => 'id',
+    'status_field'  => 'status',
+    'utr_field'     => 'utr',
+    'failure_field' => 'failure_reason',
+
+    // Their vocabulary mapped onto ours. Anything not listed is treated as
+    // still pending, which is the safe reading: we never assume money moved.
+    'status_map' => [
+        'processed' => 'SUCCESS', 'success' => 'SUCCESS', 'completed' => 'SUCCESS', 'paid' => 'SUCCESS',
+        'queued' => 'PENDING', 'pending' => 'PENDING', 'processing' => 'PENDING', 'initiated' => 'PENDING',
+        'failed' => 'FAILED', 'reversed' => 'FAILED', 'cancelled' => 'FAILED', 'rejected' => 'FAILED',
+    ],
+
+    // --- Limits -------------------------------------------------------------
+    // Start low. These are the last line of defence if something goes wrong in
+    // a loop, and raising them later takes seconds.
+    'max_payout'       => 200000.0,   // per transaction
+    'daily_payout_cap' => 1000000.0,  // across the whole institution, per IST day
+    'timeout'          => 20,         // seconds to wait for the partner
+]];

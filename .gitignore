@@ -1,5 +1,6 @@
 __pycache__/
 hostinger/config.local.php
+hostinger/config.rails.php
 .deploy/
 
 # Local secrets: JWT, admin and third-party API keys. Never commit.

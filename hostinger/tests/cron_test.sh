@@ -11,21 +11,35 @@ CRON() { php "$ROOT/cron.php" "$@"; }
 RETAIL_ACC=AJSP00984521098
 CORP_ACC=AJSP00129845612
 TODAY=$(date +%F)
+CFG_BACKUP=$(Q "SELECT TO_BASE64(data) FROM system_config WHERE id='global'")
 pass=0; fail=0
 ck() { if [[ "$2" == "$3" ]]; then print "  ok   $1"; pass=$((pass+1)); else print "  FAIL $1: expected '$2' got '$3'"; fail=$((fail+1)); fi }
 
 cleanup() {
-  Q "DELETE FROM transactions WHERE description LIKE '%CRONTEST%' OR ref_number LIKE 'MAT-CRONTEST%' OR ref_number LIKE 'INT-CRONTEST%';
+  Q "DELETE FROM transactions WHERE description LIKE '%CRONTEST%' OR counterparty_name LIKE 'CRONTEST%' OR ref_number LIKE 'MAT-CRONTEST%' OR ref_number LIKE 'INT-CRONTEST%';
+     DELETE FROM rail_transactions WHERE counterparty_name LIKE 'CRONTEST%' OR ref_number IN (SELECT ref_number FROM scheduled_payments WHERE id LIKE 'crontest-%' AND ref_number IS NOT NULL);
      DELETE FROM standing_instructions WHERE id LIKE 'crontest-%';
      DELETE FROM scheduled_payments WHERE id LIKE 'crontest-%';
      DELETE FROM deposits WHERE deposit_number LIKE 'CRONTEST%';
      DELETE FROM audit_logs WHERE action IN ('SI_EXECUTED','SI_FAILED','SI_PAUSED','DEPOSIT_MATURED','SCHEDULED_TRANSFER_EXECUTED','SCHEDULED_TRANSFER_FAILED');
      UPDATE accounts SET balance=137800.00 WHERE account_number='$RETAIL_ACC';
      UPDATE accounts SET balance=1285000.00 WHERE account_number='$CORP_ACC';" >/dev/null
+  if [[ -n "$CFG_BACKUP" ]]; then
+    Q "UPDATE system_config SET data=FROM_BASE64('$CFG_BACKUP') WHERE id='global'" >/dev/null
+  fi
 }
 
 print "AJSPay cron regression suite"
 cleanup
+Q "INSERT INTO system_config (id,data,updated_by) VALUES ('global','{}','cron_test')
+   ON DUPLICATE KEY UPDATE data = JSON_SET(data,
+     '$.capabilities.payment_systems.enabled', true,
+     '$.capabilities.payment_systems.reference', 'CRONTEST',
+     '$.capabilities.payment_systems.authorised_on', NOW(),
+     '$.capabilities.payment_systems.by', 'cron_test',
+     '$.rails.driver', 'simulator',
+     '$.rails.max_payout', 200000,
+     '$.rails.daily_payout_cap', 1000000), updated_by='cron_test';" >/dev/null
 DBX <<SQL
 INSERT INTO standing_instructions (id,user_id,from_account_number,beneficiary_name,beneficiary_account,amount,frequency,category,start_date,end_date,remarks,status,executions,next_run) VALUES
 ('crontest-daily','retail-001','$RETAIL_ACC','Tata Digital','$CORP_ACC',100.00,'daily','generic','$TODAY',NULL,'CRONTEST daily','active',0,'$TODAY'),
@@ -35,6 +49,7 @@ INSERT INTO standing_instructions (id,user_id,from_account_number,beneficiary_na
 ('crontest-paused','retail-001','$RETAIL_ACC','Tata Digital','$CORP_ACC',600.00,'monthly','generic','$TODAY',NULL,'CRONTEST paused','paused',0,'$TODAY');
 INSERT INTO scheduled_payments (id,user_id,from_account_number,to_account_number,beneficiary_name,transfer_type,amount,schedule_date,status,remarks) VALUES
 ('crontest-pay-ok','retail-001','$RETAIL_ACC','$CORP_ACC','Tata Digital','IMPS',250.00,'$TODAY','SCHEDULED','CRONTEST scheduled ok'),
+('crontest-pay-external','retail-001','$RETAIL_ACC','HDFC0009998887','CRONTEST Outside','NEFT',400.00,'$TODAY','SCHEDULED','CRONTEST scheduled external'),
 ('crontest-pay-future','retail-001','$RETAIL_ACC','$CORP_ACC','Tata Digital','NEFT',700.00,'2027-12-01','SCHEDULED','CRONTEST scheduled future');
 INSERT INTO deposits (id,user_id,deposit_number,deposit_type,source_account,principal_amount,interest_rate,tenure_months,interest_payout,maturity_amount,maturity_date,status,created_at) VALUES
 ('crontest-dep-mat','retail-001','CRONTEST-MAT','fixed','$RETAIL_ACC',10000.00,7.25,12,'on_maturity',10725.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'active',DATE_SUB(NOW(),INTERVAL 13 MONTH)),
@@ -64,6 +79,9 @@ ck "paused instruction untouched" "0|paused" \
 
 print "\n-- scheduled transfers --"
 ck "due payment executed" "EXECUTED" "$(Q "SELECT status FROM scheduled_payments WHERE id='crontest-pay-ok'")"
+ck "external due payment executed" "EXECUTED" "$(Q "SELECT status FROM scheduled_payments WHERE id='crontest-pay-external'")"
+ck "external scheduled payout settled through rail" "SUCCESS|SUCCESS" \
+  "$(Q "SELECT CONCAT_WS('|',rt.status,t.status) FROM scheduled_payments sp JOIN rail_transactions rt ON rt.ref_number=sp.ref_number JOIN transactions t ON t.ref_number=sp.ref_number WHERE sp.id='crontest-pay-external'")"
 ck "future payment still scheduled" "SCHEDULED" "$(Q "SELECT status FROM scheduled_payments WHERE id='crontest-pay-future'")"
 
 print "\n-- deposit interest and maturity --"
@@ -74,12 +92,12 @@ ck "monthly deposit stays active" "active" "$(Q "SELECT status FROM deposits WHE
 ck "undue deposit untouched" "active|0.00" "$(Q "SELECT CONCAT_WS('|',status,interest_paid) FROM deposits WHERE deposit_number='CRONTEST-FUT'")"
 
 print "\n-- balance reconciles --"
-# out: 100 daily + 300 clamp + 250 scheduled = 650;  in: 10725 maturity + 600 interest = 11325
-ck "balance = 137800 - 650 + 11325" "148475.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+# out: 100 daily + 300 clamp + 250 scheduled + 400 external scheduled = 1050;  in: 10725 maturity + 600 interest = 11325
+ck "balance = 137800 - 1050 + 11325" "148075.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 
 print "\n-- a second run the same day is a no-op --"
 CRON >/dev/null 2>&1
-ck "nothing paid twice" "148475.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "nothing paid twice" "148075.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 ck "maturity credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number='MAT-CRONTEST-MAT'")"
 ck "interest credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='DEPOSIT_INTEREST' AND ref_number LIKE 'INT-CRONTEST-MON%'")"
 

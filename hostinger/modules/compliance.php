@@ -125,6 +125,8 @@ const ROUTE_CAPABILITIES = [
     'GET /upi/status' => 'upi',
     'POST /upi/link-card' => 'upi',
     'GET /upi/qr' => 'upi',
+    // Pulling money in over UPI is a payment-system transaction like any other.
+    'POST /rails/collect' => 'upi',
     'POST /services/cheque-book' => 'cheque_book',
     'POST /services/stop-cheque' => 'cheque_book',
     'POST /services/demand-draft' => 'demand_draft',

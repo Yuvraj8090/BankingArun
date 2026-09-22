@@ -6,6 +6,7 @@ import {
 import { api } from '../services/api';
 import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
+import DocumentUpload from '../components/DocumentUpload';
 import { toast } from 'sonner';
 
 const TABS = [['members', 'Members'], ['leads', 'Leads'], ['tasks', 'My Tasks']];
@@ -342,6 +343,114 @@ function LogInteraction({ memberId, onClose, onSaved }) {
   );
 }
 
+
+// The documents a person has to hand over before an account exists for them.
+// Before this they could only be uploaded by someone who already had an account,
+// which put the verification behind the thing it is meant to gate.
+const FILE_KINDS = [
+  { kind: 'pan', label: 'PAN card', hint: 'JPEG, PNG or PDF, up to 3 MB' },
+  { kind: 'aadhaar', label: 'Aadhaar', hint: 'Mask all but the last four digits' },
+  { kind: 'address', label: 'Proof of address', hint: 'A utility bill, passport or voter ID' },
+];
+
+const DOC_STYLE = {
+  verified: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+  rejected: 'bg-red-50 border-red-200 text-[#c8102e]',
+  pending_review: 'bg-amber-50 border-amber-200 text-amber-800',
+};
+
+function ApplicationFile({ leadId, onChange }) {
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const r = await api.leadDocuments(leadId);
+      setFile(r);
+      onChange?.(r);
+    } catch (e) { toast.error(e.response?.data?.detail || 'Could not load the documents'); }
+  }, [leadId, onChange]);
+  useEffect(() => { load(); }, [load]);
+
+  const review = async (doc, decision) => {
+    let reason = '';
+    if (decision === 'rejected') {
+      // Refused server-side without one, because a rejection the applicant
+      // cannot act on just sends them back to the counter to ask why.
+      reason = window.prompt('What is wrong with this document?') || '';
+      if (!reason) return;
+    }
+    setBusy(doc.id);
+    try {
+      toast.success((await api.kycDocumentReview(doc.id, { decision, reason })).message);
+      await load();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Could not record that decision'); }
+    finally { setBusy(''); }
+  };
+
+  const byKind = {};
+  (file?.documents || []).forEach((d) => { byKind[d.kind] = d; });
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-3 space-y-3" data-testid="open-account-file">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-slate-900">Documents for this account</p>
+          <p className="text-[11px] text-slate-500">
+            A PAN card or Aadhaar, and a proof of address. Both have to be checked here before the
+            account can be opened — the button below stays disabled until they are.
+          </p>
+        </div>
+        {file && (
+          <span data-testid="open-account-file-state"
+            className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-semibold border ${
+              file.ready_to_open ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+            {file.ready_to_open ? 'Verified — ready to open' : 'Not yet verified'}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {FILE_KINDS.map(({ kind, label, hint }) => {
+          const doc = byKind[kind];
+          return (
+            <div key={kind} className="space-y-1.5">
+              <DocumentUpload
+                kind={kind} label={label} hint={hint}
+                upload={(payload) => api.leadDocumentUpload(leadId, payload)}
+                onUploaded={load}
+              />
+              {doc && (
+                <div className={`p-1.5 rounded-md border text-[10px] ${DOC_STYLE[doc.status] || DOC_STYLE.pending_review}`}>
+                  <div className="font-semibold">
+                    {doc.status === 'pending_review' ? 'Waiting to be checked' : doc.status}
+                  </div>
+                  {doc.review_reason && <div className="mt-0.5">{doc.review_reason}</div>}
+                  {doc.status === 'pending_review' && (
+                    <div className="flex gap-2 mt-1">
+                      <button disabled={busy === doc.id} data-testid={`open-verify-${kind}`}
+                        onClick={() => review(doc, 'verified')}
+                        className="font-semibold text-emerald-700 hover:underline disabled:opacity-50">verify</button>
+                      <button disabled={busy === doc.id} data-testid={`open-reject-${kind}`}
+                        onClick={() => review(doc, 'rejected')}
+                        className="font-semibold text-[#c8102e] hover:underline disabled:opacity-50">reject</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {file && !file.ready_to_open && (
+        <p className="text-[11px] text-amber-800">Still needed: {file.missing.join(' and ')}.</p>
+      )}
+    </div>
+  );
+}
+
 // --- Leads -------------------------------------------------------------------
 function LeadsTab() {
   const [data, setData] = useState(null);
@@ -351,7 +460,16 @@ function LeadsTab() {
   const [opening, setOpening] = useState(null);
   const [account, setAccount] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', source: 'walk_in', interest: 'deposit', notes: '' });
+  const [file, setFile] = useState(null);
+  const [opened, setOpened] = useState(null);
+  const [schemes, setSchemes] = useState([]);
+  const [form, setForm] = useState({ name: '', phone: '', email: '', source: 'walk_in', interest: 'deposit', scheme_code: '', notes: '' });
+
+  // Only the plans we actually publish, so the desk cannot record somebody as
+  // having signed up for one that was never launched.
+  useEffect(() => {
+    api.publicSchemes().then((r) => setSchemes(r.schemes || [])).catch(() => setSchemes([]));
+  }, []);
 
   const load = useCallback(async () => {
     try { setData(await api.crmLeads({ stage, page, per_page: 25 })); }
@@ -363,7 +481,7 @@ function LeadsTab() {
     try {
       toast.success((await api.crmLeadCreate(form)).message);
       setAdding(false);
-      setForm({ name: '', phone: '', email: '', source: 'walk_in', interest: 'deposit', notes: '' });
+      setForm({ name: '', phone: '', email: '', source: 'walk_in', interest: 'deposit', scheme_code: '', notes: '' });
       load();
     } catch (e) { toast.error(e.response?.data?.detail || 'Could not add this lead'); }
   };
@@ -372,22 +490,32 @@ function LeadsTab() {
   // through to the bonus without anyone retyping it.
   useEffect(() => {
     if (!opening) return;
+    setFile(null);
     setAccount({
       name: opening.name || '', email: opening.email || '', phone: opening.phone || '',
       password: '', transaction_password: '', pan_number: '', initial_deposit: 1000,
+      scheme_code: opening.scheme_code || '',
     });
   }, [opening]);
 
   const openAccount = async () => {
     setSaving(true);
     try {
+      // The plan is saved to the enquiry first, because that is the row the
+      // opening reads it back from — and the row that keeps the record of what
+      // the member was told they were signing up for.
+      if ((account.scheme_code || '') !== (opening.scheme_code || '')) {
+        await api.crmLeadUpdate(opening.id, { scheme_code: account.scheme_code || '' });
+      }
       const r = await api.openAccount({ ...account, lead_id: opening.id });
-      toast.success(r.message);
       if (r.referral_bonus) {
         toast.success(`Referral bonus of ₹${r.referral_bonus} paid to both sides.`);
       }
       setOpening(null);
       setAccount(null);
+      // Shown rather than announced in a toast that disappears: this is the one
+      // moment the user ID exists on screen for the teller to write down.
+      setOpened(r);
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Could not open the account');
@@ -440,7 +568,8 @@ function LeadsTab() {
               className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
             <button data-testid="crm-confirm-open-account" onClick={openAccount}
               disabled={saving || !account.name || !account.phone
-                || !account.password || !account.transaction_password}
+                || !account.password || !account.transaction_password
+                || !file?.ready_to_open}
               className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
               {saving ? 'Opening…' : 'Open account'}
             </button>
@@ -458,6 +587,22 @@ function LeadsTab() {
               otherwise with the account number this creates. Give both to them in person and ask them
               to change the password from Security &amp; Passkeys.
             </div>
+            <ApplicationFile leadId={opening.id} onChange={setFile} />
+            <div>
+              <label className="block text-[11px] text-slate-600 mb-1">Plan they are taking</label>
+              <select data-testid="open-scheme" value={account.scheme_code}
+                onChange={(e) => setAccount({ ...account, scheme_code: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 bg-white">
+                <option value="">Not decided yet</option>
+                {schemes.map((sc) => (
+                  <option key={sc.code} value={sc.code}>{sc.name} ({sc.code})</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Read back to the member when the account is opened, and kept against the enquiry.
+                The deposit itself is created afterwards under Deposits.
+              </p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Full name" value={account.name} onChange={(v) => setAccount({ ...account, name: v })} testId="open-name" />
               <Field label="Phone" value={account.phone} onChange={(v) => setAccount({ ...account, phone: v })} testId="open-phone" />
@@ -467,6 +612,43 @@ function LeadsTab() {
               <Field label="Transaction password" value={account.transaction_password} onChange={(v) => setAccount({ ...account, transaction_password: v })} testId="open-txnpwd" />
               <Field label="Opening deposit" value={String(account.initial_deposit)} onChange={(v) => setAccount({ ...account, initial_deposit: Number(v.replace(/\D/g, '')) || 0 })} />
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {opened && (
+        <Modal
+          testId="crm-account-opened-modal"
+          title="Account opened"
+          subtitle="Write these down and give them to the member in person."
+          onClose={() => setOpened(null)}
+          footer={<button onClick={() => setOpened(null)} data-testid="crm-opened-done"
+            className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold">Done</button>}
+        >
+          <div className="space-y-3">
+            <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200">
+              <p className="text-[11px] text-emerald-900">User ID for signing in</p>
+              <p className="text-xl font-mono font-bold text-emerald-900 tracking-wide"
+                data-testid="crm-opened-user-id">{opened.user_id}</p>
+              <p className="text-[11px] text-emerald-800 mt-1">
+                This is the account number. It is what the member types into the sign-in box, with the
+                password you set. Ask them to change that password from Security &amp; Passkeys.
+              </p>
+            </div>
+            <dl className="grid grid-cols-2 gap-2 text-[11px]">
+              <div><dt className="text-slate-500">Member</dt><dd className="font-semibold text-slate-900">{opened.user?.name}</dd></div>
+              <div><dt className="text-slate-500">KYC</dt><dd className="font-semibold text-slate-900">{opened.kyc_status}</dd></div>
+              <div className="col-span-2">
+                <dt className="text-slate-500">Plan</dt>
+                <dd className="font-semibold text-slate-900" data-testid="crm-opened-plan">
+                  {opened.plan ? `${opened.plan.name} (${opened.plan.code})` : 'Not decided yet'}
+                </dd>
+              </div>
+            </dl>
+            <p className="text-[11px] text-slate-500">
+              The documents you verified now sit on the member's own KYC record, so they will not be
+              asked for them again.
+            </p>
           </div>
         </Modal>
       )}
@@ -492,6 +674,15 @@ function LeadsTab() {
               options={['walk_in', 'referral', 'agent', 'campaign', 'phone']} />
             <Select label="Interested in" value={form.interest} onChange={(v) => setForm({ ...form, interest: v })}
               options={['savings', 'deposit', 'loan', 'other']} />
+            <div className="md:col-span-2">
+              <label className="block text-[11px] text-slate-600 mb-1">Plan they asked about (optional)</label>
+              <select data-testid="crm-lead-scheme" value={form.scheme_code}
+                onChange={(e) => setForm({ ...form, scheme_code: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 bg-white">
+                <option value="">Not named</option>
+                {schemes.map((sc) => <option key={sc.code} value={sc.code}>{sc.name} ({sc.code})</option>)}
+              </select>
+            </div>
           </div>
         </Modal>
       )}
@@ -506,7 +697,8 @@ function LeadsTab() {
                     <th className="p-3 font-semibold">Name</th>
                     <th className="p-3 font-semibold">Contact</th>
                     <th className="p-3 font-semibold">Source</th>
-                    <th className="p-3 font-semibold">Interest</th>
+                    <th className="p-3 font-semibold">Plan</th>
+                    <th className="p-3 font-semibold">Documents</th>
                     <th className="p-3 font-semibold">Referral</th>
                     <th className="p-3 font-semibold">Stage</th>
                     <th className="p-3 font-semibold text-right">Move to</th>
@@ -534,7 +726,22 @@ function LeadsTab() {
                           </div>
                         ) : <span className="text-slate-400">—</span>}
                       </td>
-                      <td className="p-3 text-slate-600">{l.interest || '—'}</td>
+                      <td className="p-3 text-slate-600">
+                        {l.scheme_name
+                          ? <span title={l.scheme_code}>{l.scheme_name}</span>
+                          : <span className="text-slate-400">{l.interest || '—'}</span>}
+                      </td>
+                      <td className="p-3">
+                        {/* What is actually holding the opening up, without
+                            having to open the dialog to find out. */}
+                        {Number(l.documents_uploaded) === 0 ? (
+                          <span className="text-slate-400">none yet</span>
+                        ) : (
+                          <span className={Number(l.documents_verified) > 0 ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
+                            {l.documents_verified} of {l.documents_uploaded} verified
+                          </span>
+                        )}
+                      </td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_STYLE[l.stage]}`}>{l.stage}</span>
                         {l.lost_reason && <div className="text-[10px] text-slate-500 mt-0.5">{l.lost_reason}</div>}
@@ -555,7 +762,7 @@ function LeadsTab() {
                       </td>
                     </tr>
                   ))}
-                  {!data.leads.length && <tr><td colSpan={6} className="p-10 text-center text-slate-500">No leads yet.</td></tr>}
+                  {!data.leads.length && <tr><td colSpan={8} className="p-10 text-center text-slate-500">No leads yet.</td></tr>}
                 </tbody>
               </table>
             </div>

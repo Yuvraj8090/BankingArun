@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ajspay-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "cwd": "frontend",
+      "port": 3000
+    },
+    {
+      "name": "ajspay-frontend-php",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["REACT_APP_BACKEND_URL=http://127.0.0.1:8002", "BROWSER=none", "npm", "start"],
+      "cwd": "frontend",
+      "port": 3000
+    }
+  ]
+}

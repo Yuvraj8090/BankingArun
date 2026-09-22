@@ -22,6 +22,7 @@ require __DIR__ . '/modules/tutorial.php';
 require __DIR__ . '/modules/crm.php';
 require __DIR__ . '/modules/reports.php';
 require __DIR__ . '/modules/ai.php';
+require __DIR__ . '/modules/rails.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
 const TRANSFER_MODES = ['IMPS', 'NEFT', 'RTGS', 'UPI'];
@@ -249,15 +250,18 @@ function audit(array $user, string $action, string $details): void
         ->execute([uuid4(), $user['id'], $user['email'], $action, mb_substr($details, 0, 255), client_ip()]);
 }
 
+// A transfer the payment partner has not confirmed yet is written as PENDING and
+// settled later, so the statement never claims money left before it did.
 function insert_txn(array $t): void
 {
     global $pdo;
     $pdo->prepare('INSERT INTO transactions (id, user_id, account_number, type, mode, amount, balance_after,
-            counterparty_name, counterparty_acc, ref_number, batch_ref, description, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            counterparty_name, counterparty_acc, ref_number, batch_ref, status, description, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([uuid4(), $t['user_id'], $t['account_number'], $t['type'], $t['mode'], $t['amount'],
             $t['balance_after'], $t['counterparty_name'], $t['counterparty_acc'], $t['ref_number'],
-            $t['batch_ref'] ?? null, mb_substr($t['description'], 0, 255), $t['timestamp'] ?? now_utc()]);
+            $t['batch_ref'] ?? null, $t['status'] ?? 'SUCCESS', mb_substr($t['description'], 0, 255),
+            $t['timestamp'] ?? now_utc()]);
 }
 
 // New cards get a random PIN nobody knows: the cardholder sets their own via "Set PIN".
@@ -535,6 +539,24 @@ function route_register(array $d): void
     $userId = uuid4();
     $accountNumber = 'AJSP0' . digits(9);
 
+    // Opening against an enquiry means opening against its document file, and
+    // the file has to have been checked first. This is the whole point of
+    // collecting documents at the enquiry: the verification gates the account
+    // instead of trailing along behind one that is already live.
+    $lead = null;
+    $file = null;
+    if (!empty($d['lead_id'])) {
+        $lead = row('SELECT * FROM crm_leads WHERE id = ?', [clip($d['lead_id'], 36)]);
+        if (!$lead) {
+            fail(404, 'That enquiry no longer exists.');
+        }
+        $file = lead_file_status($lead['id']);
+        if (!$file['ready_to_open']) {
+            fail(409, 'This account cannot be opened yet. Still needed: '
+                . implode(' and ', $file['missing']) . '.');
+        }
+    }
+
     $pdo->beginTransaction();
     $pdo->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash,
             branch, pan_number, aadhaar_number, kyc_status, is_joint, joint_holder_name, nominee_name, nominee_relation)
@@ -543,7 +565,10 @@ function route_register(array $d): void
             $userId, $name, $email === '' ? null : $email, clip($d['phone'], 30), 'retail',
             password_hash($d['password'], PASSWORD_BCRYPT), password_hash($d['transaction_password'], PASSWORD_BCRYPT),
             $branch, $pan === '' ? null : $pan, strlen($aadhaar) >= 4 ? 'XXXX-XXXX-' . substr($aadhaar, -4) : null,
-            'pending_approval', (int)$isJoint, $isJoint ? clip($d['joint_holder_name'] ?? '', 150) : null,
+            // A member whose documents were checked before the account existed
+            // is not waiting on KYC. Marking them pending would send them round
+            // the same review a second time for the same papers.
+            $file === null ? 'pending_approval' : 'verified', (int)$isJoint, $isJoint ? clip($d['joint_holder_name'] ?? '', 150) : null,
             $nominee === '' ? null : $nominee, $nominee === '' ? null : clip($d['nominee_relation'] ?? '', 50),
         ]);
     $pdo->prepare('INSERT INTO accounts (id, user_id, account_number, account_type, account_name, balance, upi_id,
@@ -563,22 +588,25 @@ function route_register(array $d): void
     // join the chain was missing: the code arrived with the enquiry, and the
     // bonus is paid here, but nothing connected the two and a shared link paid
     // nobody unless a teller happened to retype the code.
-    $lead = null;
-    if (!empty($d['lead_id'])) {
-        $lead = row('SELECT * FROM crm_leads WHERE id = ?', [clip($d['lead_id'], 36)]);
-        if (!$lead) {
-            fail(404, 'That enquiry no longer exists.');
-        }
-    }
     $code = strtoupper(clip($d['referral_code'] ?? ($lead['referral_code'] ?? ''), 12));
     $bonus = $code === '' ? null : apply_referral_bonus($userId, $name, $email, $accountNumber, $initial, $code);
     // The enquiry is closed out here rather than left for someone to tidy later,
     // so the pipeline shows what actually happened to it.
+    $plan = null;
     if ($lead !== null) {
         $pdo->prepare('UPDATE crm_leads SET stage = ?, converted_user_id = ?, referral_status = ? WHERE id = ?')
             ->execute(['enrolled', $userId,
                 $lead['referral_code'] === null ? null : ($bonus === null ? 'not_paid' : 'paid'),
                 $lead['id']]);
+        // The scans follow the person. Left on the enquiry they would be
+        // stranded behind a closed pipeline row, and the member would be asked
+        // for the same documents again the first time anything needed them.
+        $pdo->prepare('UPDATE kyc_documents SET lead_id = NULL, user_id = ? WHERE lead_id = ?')
+            ->execute([$userId, $lead['id']]);
+        if ($lead['scheme_code'] !== null) {
+            $plan = row("SELECT code, name, scheme_type, tenure_months, payout_type
+                FROM schemes WHERE code = ?", [$lead['scheme_code']]);
+        }
     }
 
     $user = row('SELECT * FROM users WHERE id = ?', [$userId]);
@@ -590,9 +618,15 @@ function route_register(array $d): void
     // No session is started. The teller who opened the account must stay
     // themselves; handing them the new member's token would let a counter
     // action turn into acting as that member.
+    // The account number is the member's user ID -- it is what route_login
+    // accepts and what the counter reads out -- so it is named as such here
+    // rather than left for the teller to explain.
     respond(['status' => 'SUCCESS', 'user' => public_user($user),
-        'account_number' => $accountNumber, 'referral_bonus' => $bonus,
-        'message' => "Account $accountNumber opened for {$user['name']}."]);
+        'account_number' => $accountNumber, 'user_id' => $accountNumber,
+        'referral_bonus' => $bonus, 'plan' => $plan === null ? null : out($plan),
+        'kyc_status' => $user['kyc_status'],
+        'message' => "Account $accountNumber opened for {$user['name']}."
+            . ($plan === null ? '' : " Plan: {$plan['name']}.")]);
 }
 
 function route_login(array $d): void
@@ -793,11 +827,29 @@ function route_transfer(array $d): void
     $now = now_utc();
     $ref = "UTR-$mode-" . gmdate('YmdHis') . '-' . random_int(100, 999);
     $newBalance = round((float)$sender['balance'] - $amount, 2);
+    // A payee inside this institution is a book entry and settles now. A payee
+    // outside it travels on a rail we do not own, and the partner — not us —
+    // decides whether the money arrives, so that debit is held as PENDING until
+    // they confirm. See modules/rails.php.
+    $external = $receiver === null;
+    $vpa = clip($d['beneficiary_vpa'] ?? '', 100);
+    if ($external && ($limit = rail_limit_error($amount)) !== null) {
+        $pdo->rollBack();
+        fail(422, $limit);
+    }
     $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$amount, $sender['id']]);
     insert_txn(['user_id' => $user['id'], 'account_number' => $from, 'type' => 'debit', 'mode' => $mode,
         'amount' => $amount, 'balance_after' => $newBalance, 'counterparty_name' => $beneficiary,
-        'counterparty_acc' => $to, 'ref_number' => $ref, 'description' => $remarks ?: "$mode to $beneficiary",
-        'timestamp' => $now]);
+        'counterparty_acc' => $to, 'ref_number' => $ref, 'status' => $external ? 'PENDING' : 'SUCCESS',
+        'description' => $remarks ?: "$mode to $beneficiary", 'timestamp' => $now]);
+    $railId = $external ? rail_record([
+        'direction' => 'payout', 'rail' => $mode, 'driver' => rail_config()['driver'], 'user_id' => $user['id'],
+        'account_number' => $from, 'amount' => $amount, 'counterparty_name' => $beneficiary,
+        'counterparty_acc' => $to, 'counterparty_ifsc' => clip($d['beneficiary_ifsc'] ?? '', 11) ?: null,
+        'counterparty_vpa' => $vpa ?: null, 'ref_number' => $ref,
+        'idempotency_key' => hash('sha256', "payout:$ref"),
+        'request' => ['amount' => $amount, 'mode' => $mode],
+    ]) : null;
     if ($receiver) {
         $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?')->execute([$amount, $receiver['id']]);
         insert_txn(['user_id' => $receiver['user_id'], 'account_number' => $to, 'type' => 'credit', 'mode' => $mode,
@@ -813,8 +865,46 @@ function route_transfer(array $d): void
     // prohibits. The alert goes to the staff review queue only.
     score_transfer_safely($user, ['account_number' => $from, 'amount' => $amount, 'ref_number' => $ref,
         'counterparty_acc' => $to, 'counterparty_name' => $beneficiary, 'balance_after' => $newBalance]);
-    respond(['status' => 'SUCCESS', 'message' => 'Successfully transferred ' . rupees($amount) . " via $mode",
-        'ref_number' => $ref, 'new_balance' => $newBalance, 'timestamp' => iso($now)]);
+
+    if (!$external) {
+        respond(['status' => 'SUCCESS', 'message' => 'Successfully transferred ' . rupees($amount) . " via $mode",
+            'ref_number' => $ref, 'new_balance' => $newBalance, 'timestamp' => iso($now)]);
+    }
+
+    // Deliberately after the commit: a call to the payment partner can take
+    // seconds, and holding a lock on the member's account for that long would
+    // stall every other transfer they attempt.
+    $result = rail_payout(['amount' => $amount, 'rail' => $mode, 'ref_number' => $ref,
+        'idempotency_key' => hash('sha256', "payout:$ref"), 'remarks' => $remarks,
+        'counterparty_name' => $beneficiary, 'counterparty_acc' => $to, 'counterparty_vpa' => $vpa ?: null,
+        'counterparty_ifsc' => clip($d['beneficiary_ifsc'] ?? '', 11) ?: null]);
+    rail_update($railId, 'PENDING', ['partner_ref' => $result['partner_ref'] ?? null,
+        'utr' => $result['utr'] ?? null, 'failure_reason' => $result['status'] === 'FAILED'
+            ? $result['message'] : null], $result['raw'] ?? []);
+    $railTxn = row('SELECT * FROM rail_transactions WHERE id = ?', [$railId]);
+    if ($result['status'] !== 'PENDING') {
+        rail_settle($railTxn, $result['status'], ['failure_reason' => $result['message'] ?? null],
+            $result['raw'] ?? []);
+    }
+    if ($result['status'] === 'FAILED') {
+        // rail_settle has already put the money back and recorded the reversal.
+        audit($user, 'FUND_TRANSFER_FAILED', "$ref — " . $result['message']);
+        // The partner's wording is theirs and may or may not end in a full stop;
+        // ours has to read as one sentence either way.
+        $reason = rtrim($result['message'], ' .') . '.';
+        fail(502, "The transfer could not be sent: $reason "
+            . rupees($amount) . ' has been returned to your account.');
+    }
+    respond([
+        'status' => $result['status'],
+        'message' => $result['status'] === 'SUCCESS'
+            ? 'Successfully transferred ' . rupees($amount) . " via $mode"
+                . (!empty($result['simulated']) ? ' (simulated — no money left this institution)' : '')
+            : rupees($amount) . " sent via $mode. It is with the payment partner and your statement will "
+                . 'show it as confirmed once they settle it.',
+        'ref_number' => $ref, 'utr' => $result['utr'] ?? null, 'new_balance' => $newBalance,
+        'timestamp' => iso($now), 'simulated' => $result['simulated'] ?? false,
+    ]);
 }
 
 function route_bulk_transfer(array $d): void
@@ -1028,6 +1118,17 @@ $routes = [
     'GET /upi/status' => 'route_upi_status',
     'POST /upi/link-card' => 'route_upi_link_card',
     'GET /upi/qr' => 'route_upi_qr',
+    // Payment rails (modules/rails.php). The webhook is the partner's callback
+    // and authenticates by signature, not by session, so it is deliberately not
+    // behind the member login.
+    'POST /rails/webhook' => 'route_rail_webhook',
+    'POST /rails/collect' => 'route_rail_collect',
+    'GET /rails/my-payments' => 'route_rail_my_pending',
+    'GET /rails/config' => 'route_rail_config_get',
+    'PUT /rails/config' => 'route_rail_config_set',
+    'POST /rails/test' => 'route_rail_test',
+    'GET /rails/transactions' => 'route_rail_transactions',
+    'POST /rails/reconcile' => 'route_rail_reconcile_one',
     // Banking services (modules/banking.php)
     'POST /services/cheque-book' => 'route_cheque_book',
     'POST /services/stop-cheque' => 'route_stop_cheque',
@@ -1182,6 +1283,9 @@ $paramRoutes = [
     ['POST', '#^/register/cease/([\w-]{1,64})$#', 'route_register_cease'],
     ['GET', '#^/crm/member/([\w@.-]{1,80})$#', 'route_crm_member'],
     ['PATCH', '#^/crm/leads/([\w-]{1,64})$#', 'route_crm_lead_update'],
+    ['GET', '#^/crm/leads/([\w-]{1,64})/documents$#', 'route_crm_lead_documents'],
+    ['POST', '#^/crm/leads/([\w-]{1,64})/documents$#', 'route_crm_lead_document_upload'],
+    ['POST', '#^/kyc/documents/([\w-]{1,64})/review$#', 'route_kyc_document_review'],
     ['POST', '#^/tickets/([\w-]{1,64})/escalate$#', 'route_grievance_escalate'],
     ['POST', '#^/grievance/([\w-]{1,64})/resolve$#', 'route_grievance_resolve'],
     ['PATCH', '#^/crm/tasks/([\w-]{1,64})$#', 'route_crm_task_update'],

@@ -26,6 +26,8 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [interest, setInterest] = useState('savings');
+  const [schemeCode, setSchemeCode] = useState('');
+  const [schemes, setSchemes] = useState([]);
   const [notes, setNotes] = useState('');
   const [enquirySent, setEnquirySent] = useState(false);
   const [captcha, setCaptcha] = useState(null);
@@ -68,6 +70,13 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
 
   useEffect(() => { if (isRegister) newCaptcha(); }, [isRegister, newCaptcha]);
 
+  // The published plans, so somebody who came from the rate card can say which
+  // one they were reading about instead of the desk having to ask.
+  useEffect(() => {
+    if (!isRegister) return;
+    api.publicSchemes().then((r) => setSchemes(r.schemes || [])).catch(() => setSchemes([]));
+  }, [isRegister]);
+
   const doEnquiry = async (e) => {
     e?.preventDefault();
     if (!name.trim() || !phone.trim()) return toast.error('Please give us your name and phone number');
@@ -78,6 +87,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
         phone: phone.trim(),
         email: email.trim() || undefined,
         interest,
+        scheme_code: schemeCode || undefined,
         notes: notes.trim() || undefined,
         referral_code: referralCode.trim() || undefined,
         captcha_id: captcha?.captcha_id,
@@ -272,6 +282,19 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                   <option value="other">Something else</option>
                 </select>
               </Field>
+
+              {schemes.length > 0 && (
+                <label className="block">
+                  <span className="block text-[11px] text-slate-600 mb-1 font-medium">
+                    Which plan? (optional)
+                  </span>
+                  <select data-testid="enquiry-scheme-input" value={schemeCode} onChange={e => setSchemeCode(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#0b3b8c]">
+                    <option value="">I would like advice on this</option>
+                    {schemes.map((sc) => <option key={sc.code} value={sc.code}>{sc.name}</option>)}
+                  </select>
+                </label>
+              )}
 
               <label className="block">
                 <span className="block text-[11px] text-slate-600 mb-1 font-medium">Anything else? (optional)</span>

@@ -190,6 +190,12 @@ export const api = {
   kycDocuments: async () => (await axios.get(`${API}/kyc/documents`, getAuthHeaders())).data,
   kycDocumentUpload: async (payload) => (await axios.post(`${API}/kyc/documents`, payload, getAuthHeaders())).data,
   kycDocumentsQueue: async () => (await axios.get(`${API}/kyc/documents/queue`, getAuthHeaders())).data,
+  kycDocumentReview: async (id, payload) =>
+    (await axios.post(`${API}/kyc/documents/${id}/review`, payload, getAuthHeaders())).data,
+  // The applicant's file, built against the enquiry before any account exists.
+  leadDocuments: async (id) => (await axios.get(`${API}/crm/leads/${id}/documents`, getAuthHeaders())).data,
+  leadDocumentUpload: async (id, payload) =>
+    (await axios.post(`${API}/crm/leads/${id}/documents`, payload, getAuthHeaders())).data,
 
   // Nomination and joint holding are statutory records, so both take the
   // transaction password the same way a transfer does.

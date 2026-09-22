@@ -31,6 +31,11 @@ const RATE_ROUTES = [
     'POST /accounts/bulk-transfer' => [10, 300],
     'POST /passkey/login/complete' => [30, 900],
     'POST /support/chat' => [60, 300],
+    // The payment partner's callback. Generous, because throttling a genuine
+    // webhook leaves a member's money in limbo; unsigned ones cost an attacker
+    // the global budget and are rejected before they touch anything.
+    'POST /rails/webhook' => [600, 300],
+    'POST /rails/collect' => [30, 300],
 ];
 
 // Events worth keeping. Anything not listed is still accepted, but these are the

@@ -613,13 +613,59 @@ function route_kyc_document_upload(array $d): void
 function route_kyc_documents_queue(array $d): void
 {
     staff_user(ADMIN_ROLES);
-    $rows = rows("SELECT d.*, u.name AS user_name, u.email AS user_email
-        FROM kyc_documents d JOIN users u ON u.id = d.user_id
+    // A document waiting against an enquiry has no member row yet, so the join
+    // to users cannot be the thing that decides whether it is listed -- an inner
+    // join here is what would hide an applicant's file from the very queue that
+    // is supposed to clear it before the account opens.
+    $rows = rows("SELECT d.*, u.name AS user_name, u.email AS user_email,
+            l.name AS lead_name, l.phone AS lead_phone
+        FROM kyc_documents d
+        LEFT JOIN users u ON u.id = d.user_id
+        LEFT JOIN crm_leads l ON l.id = d.lead_id
         WHERE d.status = 'pending_review' ORDER BY d.uploaded_at");
     respond(['documents' => array_map(function ($r) {
         $out = kyc_document_public($r, true);
-        $out['user_name'] = $r['user_name'];
+        $out['user_name'] = $r['user_name'] ?? $r['lead_name'];
         $out['user_email'] = $r['user_email'];
+        // Says which of the two queues this belongs to, so a reviewer knows
+        // whether clearing it lets an account be opened or updates an existing
+        // member's file.
+        $out['for'] = $r['lead_id'] === null ? 'member' : 'applicant';
+        $out['lead_id'] = $r['lead_id'];
+        $out['lead_phone'] = $r['lead_phone'];
         return $out;
     }, $rows)]);
+}
+
+// The queue could be read but never cleared: documents were uploaded, shown to a
+// reviewer, and left at pending_review for ever, because no route ever wrote a
+// decision back. This is that route.
+function route_kyc_document_review(array $d, string $id = ''): void
+{
+    global $pdo;
+    $staff = staff_user(ADMIN_ROLES);
+    $doc = row('SELECT * FROM kyc_documents WHERE id = ?', [$id]);
+    if (!$doc) {
+        fail(404, 'That document no longer exists.');
+    }
+    $decision = clip($d['decision'] ?? '', 10);
+    if (!in_array($decision, ['verified', 'rejected'], true)) {
+        fail(422, 'decision must be verified or rejected.');
+    }
+    $reason = clip($d['reason'] ?? '', 255);
+    // A rejection the applicant cannot act on just sends them back to the
+    // counter to ask what was wrong with it.
+    if ($decision === 'rejected' && $reason === '') {
+        fail(422, 'Say what is wrong with the document, so it can be replaced with a good copy.');
+    }
+    $pdo->prepare('UPDATE kyc_documents SET status = ?, reviewed_by = ?, review_reason = ?, reviewed_at = NOW()
+        WHERE id = ?')->execute([$decision, $staff['id'], $reason ?: null, $id]);
+    $whose = $doc['lead_id'] !== null ? "enquiry {$doc['lead_id']}" : "member {$doc['user_id']}";
+    audit($staff, 'KYC_DOCUMENT_REVIEWED', "{$doc['kind']} for $whose -> $decision"
+        . ($reason === '' ? '' : " ($reason)"));
+    respond(['status' => 'SUCCESS',
+        'document' => kyc_document_public(row('SELECT * FROM kyc_documents WHERE id = ?', [$id])),
+        'message' => (DOC_KIND_LABEL[$doc['kind']] ?? $doc['kind'])
+            . ($decision === 'verified' ? ' verified.'
+                : ' rejected. A replacement can now be uploaded.')]);
 }

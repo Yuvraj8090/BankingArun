@@ -102,7 +102,7 @@ export default function KycAccountPage() {
                   value={user?.pan_number || 'ABCPS8492K'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <div className="w-56 shrink-0"><DocumentUpload kind="pan" label="PAN card" hint="JPEG, PNG or PDF, up to 3 MB" existing={docs.pan} onUploaded={(d) => setDocs((v) => ({ ...v, pan: d }))} /></div>
+                <div className="w-56 shrink-0"><DocumentUpload kind="pan" label="PAN card" hint="JPEG, PNG or PDF, up to 3 MB" existing={docs.pan} onUploaded={(r) => setDocs((v) => ({ ...v, pan: r.document }))} /></div>
               </div>
             </div>
 
@@ -115,7 +115,7 @@ export default function KycAccountPage() {
                   value={user?.aadhaar_number || 'XXXX-XXXX-4892'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <div className="w-56 shrink-0"><DocumentUpload kind="aadhaar" label="Aadhaar / UIDAI document" hint="Mask all but the last four digits if you prefer" existing={docs.aadhaar} onUploaded={(d) => setDocs((v) => ({ ...v, aadhaar: d }))} /></div>
+                <div className="w-56 shrink-0"><DocumentUpload kind="aadhaar" label="Aadhaar / UIDAI document" hint="Mask all but the last four digits if you prefer" existing={docs.aadhaar} onUploaded={(r) => setDocs((v) => ({ ...v, aadhaar: r.document }))} /></div>
               </div>
             </div>
 
@@ -128,7 +128,7 @@ export default function KycAccountPage() {
                   value="Electricity Bill - Arya Nagar, Chhutmalpur"
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-600"
                 />
-                <div className="w-56 shrink-0"><DocumentUpload kind="address" label="Proof of address" hint="A utility bill or passport, up to 3 MB" existing={docs.address} onUploaded={(d) => setDocs((v) => ({ ...v, address: d }))} /></div>
+                <div className="w-56 shrink-0"><DocumentUpload kind="address" label="Proof of address" hint="A utility bill or passport, up to 3 MB" existing={docs.address} onUploaded={(r) => setDocs((v) => ({ ...v, address: r.document }))} /></div>
               </div>
             </div>
 

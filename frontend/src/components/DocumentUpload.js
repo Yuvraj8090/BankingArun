@@ -15,7 +15,10 @@ const readAsDataUri = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
-export default function DocumentUpload({ kind, label, hint, existing, onUploaded }) {
+// `upload` is how the same control serves two places: a member uploading their
+// own file, and a teller building an applicant's file against an enquiry that
+// has no member account behind it yet.
+export default function DocumentUpload({ kind, label, hint, existing, onUploaded, upload: send = api.kycDocumentUpload }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -44,11 +47,11 @@ export default function DocumentUpload({ kind, label, hint, existing, onUploaded
     if (!file || !preview) return;
     setBusy(true);
     try {
-      const r = await api.kycDocumentUpload({ kind, file_name: file.name, content: preview });
+      const r = await send({ kind, file_name: file.name, content: preview });
       toast.success(r.message);
       setFile(null);
       setPreview(null);
-      onUploaded?.(r.document);
+      onUploaded?.(r);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Upload failed. Please try again.');
     } finally { setBusy(false); }

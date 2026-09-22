@@ -69,7 +69,7 @@ function next_due(string $current, string $frequency, string $anchor): string
 // Returns [true, ref] on success or [false, reason] if it could not be paid;
 // unlike the API handlers this never calls fail(), which would kill the run.
 function pay(array $payer, string $from, string $to, float $amount, string $mode,
-    string $beneficiary, string $description): array
+    string $beneficiary, string $description, ?string $beneficiaryIfsc = null): array
 {
     global $pdo;
     // Lock both rows in account-number order so concurrent transfers can't deadlock.
@@ -88,9 +88,16 @@ function pay(array $payer, string $from, string $to, float $amount, string $mode
     if ((float)$sender['balance'] < $amount) {
         return [false, 'Insufficient balance. Available: ' . rupees((float)$sender['balance'])];
     }
-    $receiver = $locked[$to] ?? null;  // absent for a payee outside AJSPay: debit only
+    $receiver = $locked[$to] ?? null;
     if ($receiver && $receiver['status'] !== 'active') {
         return [false, 'The beneficiary account cannot receive funds right now.'];
+    }
+    $external = $receiver === null;
+    if ($external && !capability_enabled('payment_systems')) {
+        return [false, 'Payment systems capability is disabled.'];
+    }
+    if ($external && ($limit = rail_limit_error($amount)) !== null) {
+        return [false, $limit];
     }
     $now = now_utc();
     $ref = "UTR-$mode-" . gmdate('YmdHis') . '-' . random_int(100, 999);
@@ -98,7 +105,17 @@ function pay(array $payer, string $from, string $to, float $amount, string $mode
     insert_txn(['user_id' => $payer['id'], 'account_number' => $from, 'type' => 'debit', 'mode' => $mode,
         'amount' => $amount, 'balance_after' => round((float)$sender['balance'] - $amount, 2),
         'counterparty_name' => $beneficiary, 'counterparty_acc' => $to, 'ref_number' => $ref,
-        'description' => $description, 'timestamp' => $now]);
+        'status' => $external ? 'PENDING' : 'SUCCESS', 'description' => $description, 'timestamp' => $now]);
+    if ($external) {
+        rail_record([
+            'direction' => 'payout', 'rail' => $mode, 'driver' => rail_config()['driver'],
+            'user_id' => $payer['id'], 'account_number' => $from, 'amount' => $amount,
+            'counterparty_name' => $beneficiary, 'counterparty_acc' => $to,
+            'counterparty_ifsc' => $beneficiaryIfsc === null ? null : clip($beneficiaryIfsc, 11),
+            'ref_number' => $ref, 'idempotency_key' => hash('sha256', "payout:$ref"),
+            'request' => ['amount' => $amount, 'mode' => $mode],
+        ]);
+    }
     if ($receiver) {
         $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?')->execute([$amount, $receiver['id']]);
         insert_txn(['user_id' => $receiver['user_id'], 'account_number' => $to, 'type' => 'credit', 'mode' => $mode,
@@ -273,7 +290,8 @@ function run_standing_instructions(string $today, bool $dryRun, bool $verbose): 
             continue;
         }
         [$ok, $result] = pay($owner, $locked['from_account_number'], $locked['beneficiary_account'], $amount,
-            'NEFT', $locked['beneficiary_name'], $locked['remarks'] ?: "Standing instruction to {$locked['beneficiary_name']}");
+            'NEFT', $locked['beneficiary_name'], $locked['remarks'] ?: "Standing instruction to {$locked['beneficiary_name']}",
+            $locked['beneficiary_ifsc']);
 
         if ($ok) {
             // One occurrence per run: if cron was down for a week, the arrears are
@@ -339,7 +357,8 @@ function run_scheduled_payments(string $today, bool $dryRun, bool $verbose): arr
         }
         $mode = in_array($locked['transfer_type'], TRANSFER_MODES, true) ? $locked['transfer_type'] : 'NEFT';
         [$ok, $result] = pay($owner, $locked['from_account_number'], $locked['to_account_number'], $amount,
-            $mode, $locked['beneficiary_name'], $locked['remarks'] ?: "Scheduled transfer to {$locked['beneficiary_name']}");
+            $mode, $locked['beneficiary_name'], $locked['remarks'] ?: "Scheduled transfer to {$locked['beneficiary_name']}",
+            $locked['beneficiary_ifsc']);
 
         if ($ok) {
             $pdo->prepare("UPDATE scheduled_payments SET status = 'EXECUTED', processed_at = ?, ref_number = ?,
@@ -366,6 +385,22 @@ function run_scheduled_payments(string $today, bool $dryRun, bool $verbose): arr
     return [$done, $failed];
 }
 
+// --- Payment rail reconciliation ---------------------------------------------------
+// Webhooks get lost. Every payout or collection still marked pending is asked
+// about directly, so no member's money sits in limbo because one HTTP callback
+// never arrived. Worth running far more often than daily.
+function run_rail_reconciliation(bool $dryRun, bool $verbose): array
+{
+    [$dispatched, $dispatchFailed, $dispatchNotes] = rail_dispatch_pending($dryRun);
+    [$settled, $stuck, $notes] = rail_reconcile($dryRun);
+    if ($verbose) {
+        foreach (array_merge($dispatchNotes, $notes) as $note) {
+            say("  rail: $note");
+        }
+    }
+    return [$dispatched, $dispatchFailed, $settled, $stuck];
+}
+
 // --- Run ------------------------------------------------------------------------------
 $today = today_ist();
 say('AJSPay cron starting for ' . $today . ' IST' . ($dryRun ? ' (dry run — nothing will be written)' : ''));
@@ -382,6 +417,7 @@ try {
     [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
     [$intDone, $intFailed] = run_deposit_interest($today, $dryRun, $verbose);
     [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
+    [$railSent, $railFailed, $railDone, $railStuck] = run_rail_reconciliation($dryRun, $verbose);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
@@ -396,7 +432,10 @@ scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
 say("Standing instructions: $siDone run, $siFailed failed. "
     . "Scheduled transfers: $payDone run, $payFailed failed. "
     . "Deposit interest: $intDone paid, $intFailed failed. "
-    . "Maturities: $matDone paid, $matFailed failed.");
+    . "Maturities: $matDone paid, $matFailed failed. "
+    . "Payment rail: $railSent dispatched, $railFailed failed, $railDone settled, $railStuck still pending.");
 $finished = true;
-$problems = $siFailed + $payFailed + $intFailed + $matFailed;
+// A rail transaction that is still pending is not a failure — the partner has
+// simply not answered yet — so it does not make the run report a problem.
+$problems = $siFailed + $payFailed + $intFailed + $matFailed + $railFailed;
 exit($problems > 0 ? 2 : 0);  // 2 = ran, but something needs a look

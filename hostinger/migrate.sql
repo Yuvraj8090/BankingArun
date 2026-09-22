@@ -572,3 +572,62 @@ CREATE INDEX IF NOT EXISTS idx_lead_referral ON crm_leads (referral_code);
 -- number of NULLs, so those members simply have none. They sign in with their
 -- account number instead.
 ALTER TABLE users MODIFY COLUMN email VARCHAR(150) NULL;
+
+-- An enquiry now carries the plan the person actually asked about, not just the
+-- broad category. "Deposit" told the desk nothing: the caller who wants the
+-- 5-year monthly-income plan and the one saving ten rupees a day are the same
+-- row otherwise, and the plan is the first thing the member asks to be told
+-- back when the account is opened.
+ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS scheme_code VARCHAR(20) NULL;
+
+-- Documents could only be uploaded by someone who already had an account, which
+-- put the verification after the thing it is supposed to gate. Hanging them on
+-- the enquiry lets the file be assembled and checked first, and the rows are
+-- re-pointed at the member when the account is finally opened, so nothing is
+-- uploaded twice and the review history follows the person.
+ALTER TABLE kyc_documents ADD COLUMN IF NOT EXISTS lead_id VARCHAR(36) NULL;
+ALTER TABLE kyc_documents MODIFY COLUMN user_id VARCHAR(36) NULL;
+CREATE INDEX IF NOT EXISTS idx_kyc_doc_lead ON kyc_documents (lead_id, kind);
+
+-- --- Payment rails -------------------------------------------------------
+-- Every instruction this institution gave its payment partner, and what came
+-- back. A Nidhi is not an NPCI member, so money only moves through a regulated
+-- partner; this table is the bridge between our ledger and theirs. A payout is
+-- PENDING here until the partner confirms it, which is what stops the ledger
+-- claiming money left when it did not.
+CREATE TABLE IF NOT EXISTS rail_transactions (
+    id VARCHAR(36) PRIMARY KEY,
+    direction VARCHAR(10) NOT NULL,          -- payout | collect
+    rail VARCHAR(10) NOT NULL,               -- IMPS | NEFT | RTGS | UPI
+    driver VARCHAR(20) NOT NULL,             -- simulator | partner
+    user_id VARCHAR(36),
+    account_number VARCHAR(30),
+    amount DECIMAL(15,2) NOT NULL,
+    counterparty_name VARCHAR(150),
+    counterparty_acc VARCHAR(50),
+    counterparty_ifsc VARCHAR(11),
+    counterparty_vpa VARCHAR(100),
+    ref_number VARCHAR(100) NOT NULL,        -- ours; matches transactions.ref_number
+    idempotency_key VARCHAR(64) NOT NULL,    -- retrying the same key must never pay twice
+    partner_ref VARCHAR(100),                -- theirs
+    utr VARCHAR(50),                         -- the real UTR, once there is one
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    failure_reason VARCHAR(255),
+    request_payload TEXT,
+    last_event TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_rail_idempotency (idempotency_key),
+    INDEX idx_rail_status (status, created_at),
+    INDEX idx_rail_partner (partner_ref),
+    INDEX idx_rail_ref (ref_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Webhook de-duplication. Partners retry a callback until they get a 2xx, so the
+-- same event arrives many times; the event id being the primary key is what makes
+-- processing it twice impossible.
+CREATE TABLE IF NOT EXISTS rail_events (
+    id VARCHAR(100) PRIMARY KEY,
+    payload TEXT NOT NULL,
+    received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

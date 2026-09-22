@@ -53,6 +53,12 @@ $config = [
 if (is_file(__DIR__ . '/config.local.php')) {
     $config = array_merge($config, require __DIR__ . '/config.local.php');
 }
+// Payment rail settings live in their own file, because they are the one set of
+// credentials that can move real money and are worth keeping separable — see
+// config.rails.php.example.
+if (is_file(__DIR__ . '/config.rails.php')) {
+    $config = array_merge($config, require __DIR__ . '/config.rails.php');
+}
 
 // --- CORS and response headers ------------------------------------------------
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
