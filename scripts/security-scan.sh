@@ -9,8 +9,16 @@ bad() { note "$1" "FAIL — $2"; fail=1; }
 ok() { note "$1" "ok"; }
 
 # 1. Every PHP file parses. A syntax error here is a 500 on every request.
-errors=$(find hostinger -name '*.php' ! -name config.local.php -print0 | xargs -0 -n1 php -l 2>&1 | grep -v '^No syntax errors' || true)
-[[ -z "$errors" ]] && ok "php syntax" || bad "php syntax" "$errors"
+# Only a real parse failure counts: this used to treat any output at all as an
+# error, so a deprecation notice from whichever PHP the runner happens to carry
+# would fail the build for something that is not a fault in the code.
+if ! command -v php >/dev/null 2>&1; then
+  bad "php syntax" "php is not on PATH, so nothing was linted"
+else
+  errors=$(find hostinger -name '*.php' ! -name config.local.php -print0 \
+    | xargs -0 -n1 php -l 2>&1 | grep -E '^(Parse|Fatal) error' || true)
+  [[ -z "$errors" ]] && ok "php syntax" || bad "php syntax" "$errors"
+fi
 
 # 2. No secret may be committed. backend/.env was tracked for months, carrying a
 # live Twilio token. The test is the content, not the filename: frontend/.env
