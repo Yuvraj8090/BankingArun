@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Percent, Info, ChevronRight, RefreshCw, ShieldCheck, Building2 } from 'lucide-react';
+import { Percent, Info, ChevronRight, RefreshCw, ShieldCheck, Building2, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
+import ReturnsCalculator from '../components/ReturnsCalculator';
 
 const TYPE_LABEL = {
   daily: 'Daily deposit',
@@ -80,9 +81,12 @@ export default function PublicRatesPage() {
           <ShieldCheck className="w-4 h-4 text-[#0b3b8c] shrink-0 mt-0.5" />
           <p className="text-[11px] text-slate-600 leading-relaxed">
             {disclosure} The Nidhi Rules, 2014 cap what we may pay on a deposit at <strong>{cap}% a year</strong>.
-            Please confirm the applicable rate and terms with your branch before depositing.
+            Where a plan&apos;s printed figures work out above that, the row is marked — please confirm the
+            rate and terms with your branch before depositing against it.
           </p>
         </div>
+
+        <ReturnsCalculator schemes={schemes} cap={cap} />
 
         {Object.entries(byType).map(([type, list]) => (
           <div key={type} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
@@ -136,14 +140,23 @@ export default function PublicRatesPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {s.slabs.map((slab, i) => (
-                                <tr key={i} className="hover:bg-slate-50">
+                                // A row pricing above the statutory cap is tinted as well as
+                                // labelled: colour alone is not a disclosure for a reader who
+                                // cannot distinguish it.
+                                <tr key={i} className={slab.exceeds_cap ? 'bg-rose-50' : 'hover:bg-slate-50'}>
                                   <td className="p-2.5 font-semibold text-slate-900 tabular-nums whitespace-nowrap">₹{inr(slab.unit)}</td>
                                   <td className="p-2.5 text-right text-slate-700 tabular-nums whitespace-nowrap">₹{inr(slab.deposit)}</td>
                                   <td className="p-2.5 text-right font-semibold text-slate-900 tabular-nums whitespace-nowrap">₹{inr(slab.maturity)}</td>
                                   <td className="p-2.5 text-right tabular-nums whitespace-nowrap">
-                                    <span className="text-slate-600">
+                                    <span className={slab.exceeds_cap ? 'font-semibold text-[#c8102e]' : 'text-slate-600'}>
                                       {slab.effective_rate_pa === null ? '-' : `${slab.effective_rate_pa}%`}
                                     </span>
+                                    {slab.exceeds_cap && (
+                                      <span className="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded
+                                        bg-[#c8102e] text-white text-[9px] font-bold uppercase tracking-wide">
+                                        <AlertTriangle className="w-2.5 h-2.5" /> above cap
+                                      </span>
+                                    )}
                                     {slab.off_headline && !slab.exceeds_cap && (
                                       <span className="block text-[10px] text-amber-700">differs from the plan rate</span>
                                     )}
