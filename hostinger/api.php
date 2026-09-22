@@ -488,13 +488,18 @@ function route_register(array $d): void
 {
     $opener = staff_user(ACCOUNT_OPEN_ROLES);
     global $pdo;
-    need($d, 'name', 'email', 'phone', 'password', 'transaction_password');
-    $email = strtolower(clip($d['email'], 150));
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        fail(422, 'A valid email address is required.');
+    // Email is optional. Plenty of members do not have one, and requiring it
+    // meant either turning them away or a teller inventing an address — which
+    // then becomes the account's identity and cannot be used to reach anybody.
+    // They sign in with the account number instead; see route_login.
+    need($d, 'name', 'phone', 'password', 'transaction_password');
+    $email = strtolower(clip($d['email'] ?? '', 150));
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        fail(422, 'That email address does not look right. Leave it blank if the member has none.');
     }
     // bcrypt silently ignores everything past 72 bytes, so cap it rather than pretend.
-    assert_password_acceptable($d['password'] ?? null, [$d['name'] ?? '', strstr((string)($d['email'] ?? ''), '@', true)]);
+    assert_password_acceptable($d['password'] ?? null,
+        [$d['name'] ?? '', $email === '' ? '' : strstr($email, '@', true)]);
     if (!is_string($d['password']) || strlen($d['password']) < 8 || strlen($d['password']) > 72) {
         fail(422, 'Password must be 8 to 72 characters.');
     }
@@ -502,8 +507,13 @@ function route_register(array $d): void
         || strlen($d['transaction_password']) > 72) {
         fail(422, 'Transaction password must be 4 to 72 characters.');
     }
-    if (row('SELECT id FROM users WHERE email = ?', [$email])) {
+    if ($email !== '' && row('SELECT id FROM users WHERE email = ?', [$email])) {
         fail(400, 'Account with this email already exists.');
+    }
+    // A phone number is how a member is reached and how staff find them, so it
+    // has to be unique even though an email need not be present.
+    if (row('SELECT id FROM users WHERE phone = ?', [clip($d['phone'], 30)])) {
+        fail(400, 'An account already exists for this phone number.');
     }
     $pan = strtoupper(clip($d['pan_number'] ?? '', 10));
     if ($pan !== '' && !preg_match('/\A[A-Z]{5}[0-9]{4}[A-Z]\z/', $pan)) {
@@ -530,7 +540,7 @@ function route_register(array $d): void
             branch, pan_number, aadhaar_number, kyc_status, is_joint, joint_holder_name, nominee_name, nominee_relation)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([
-            $userId, $name, $email, clip($d['phone'], 30), 'retail',
+            $userId, $name, $email === '' ? null : $email, clip($d['phone'], 30), 'retail',
             password_hash($d['password'], PASSWORD_BCRYPT), password_hash($d['transaction_password'], PASSWORD_BCRYPT),
             $branch, $pan === '' ? null : $pan, strlen($aadhaar) >= 4 ? 'XXXX-XXXX-' . substr($aadhaar, -4) : null,
             'pending_approval', (int)$isJoint, $isJoint ? clip($d['joint_holder_name'] ?? '', 150) : null,
@@ -540,7 +550,10 @@ function route_register(array $d): void
             branch, is_joint)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([uuid4(), $userId, $accountNumber, $accountType, ucfirst($accountType) . ' Account', $initial,
-            strstr($email, '@', true) . '@ajspay', $branch, (int)$isJoint]);
+            // The UPI handle is built from the account number when there is no
+            // email to build it from, so it stays unique either way.
+            ($email === '' ? strtolower($accountNumber) : strstr($email, '@', true)) . '@ajspay',
+            $branch, (int)$isJoint]);
     insert_card($userId, $accountNumber, $name, VIRTUAL_DEBIT_CARD);
     insert_txn(['user_id' => $userId, 'account_number' => $accountNumber, 'type' => 'credit',
         'mode' => 'ACCOUNT_OPENING', 'amount' => $initial, 'balance_after' => $initial,

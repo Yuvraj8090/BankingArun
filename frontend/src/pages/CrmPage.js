@@ -439,7 +439,7 @@ function LeadsTab() {
             <button onClick={() => { setOpening(null); setAccount(null); }}
               className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
             <button data-testid="crm-confirm-open-account" onClick={openAccount}
-              disabled={saving || !account.name || !account.email || !account.phone
+              disabled={saving || !account.name || !account.phone
                 || !account.password || !account.transaction_password}
               className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
               {saving ? 'Opening…' : 'Open account'}
@@ -454,13 +454,14 @@ function LeadsTab() {
               </div>
             )}
             <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
-              The member signs in with the password you set here. Give it to them in person and ask
-              them to change it from Security &amp; Passkeys.
+              The member signs in with the password you set here — with their email if they gave one,
+              otherwise with the account number this creates. Give both to them in person and ask them
+              to change the password from Security &amp; Passkeys.
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Full name" value={account.name} onChange={(v) => setAccount({ ...account, name: v })} testId="open-name" />
               <Field label="Phone" value={account.phone} onChange={(v) => setAccount({ ...account, phone: v })} testId="open-phone" />
-              <Field label="Email" value={account.email} onChange={(v) => setAccount({ ...account, email: v })} testId="open-email" />
+              <Field label="Email (optional)" value={account.email} onChange={(v) => setAccount({ ...account, email: v })} testId="open-email" />
               <Field label="PAN (optional)" value={account.pan_number} onChange={(v) => setAccount({ ...account, pan_number: v.toUpperCase() })} />
               <Field label="Login password" value={account.password} onChange={(v) => setAccount({ ...account, password: v })} testId="open-password" />
               <Field label="Transaction password" value={account.transaction_password} onChange={(v) => setAccount({ ...account, transaction_password: v })} testId="open-txnpwd" />

@@ -986,3 +986,9 @@ UPDATE schemes SET status = 'active',
 ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS referral_code VARCHAR(40) NULL;
 ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS referral_status VARCHAR(20) NULL;
 CREATE INDEX IF NOT EXISTS idx_lead_referral ON crm_leads (referral_code);
+
+-- A member without an email is a member, not an error. The column stays unique
+-- so two accounts cannot share an address, and a unique index accepts any
+-- number of NULLs, so those members simply have none. They sign in with their
+-- account number instead.
+ALTER TABLE users MODIFY COLUMN email VARCHAR(150) NULL;
