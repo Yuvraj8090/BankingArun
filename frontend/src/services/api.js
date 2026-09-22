@@ -149,6 +149,10 @@ export const api = {
   // Referrals
   referralCode: async () => (await axios.get(`${API}/referrals/my-code`, getAuthHeaders())).data,
   referralHistory: async () => (await axios.get(`${API}/referrals/history`, getAuthHeaders())).data,
+  // The brochure's twelve-level table, shown but never paid — see
+  // route_referral_structure for why.
+  referralStructure: async (params = {}) =>
+    (await axios.get(`${API}/referrals/structure?${new URLSearchParams(params)}`, getAuthHeaders())).data,
 
   // Standing Instructions
   siList: async () => (await axios.get(`${API}/standing-instructions`, getAuthHeaders())).data,
@@ -159,6 +163,15 @@ export const api = {
   siDelete: async (id) => (await axios.delete(`${API}/standing-instructions/${id}`, getAuthHeaders())).data,
 
   // Super-admin runtime config
+  // Payment rails. Config, the connectivity check and the in-flight list are
+  // served by the Python backend; settlement stays in the PHP. Both sit behind
+  // the same /api prefix, so which one answers is not this layer's business.
+  railsConfigGet: async () => (await axios.get(`${API}/rails/config`, getAuthHeaders())).data,
+  railsConfigSet: async (payload) => (await axios.put(`${API}/rails/config`, payload, getAuthHeaders())).data,
+  railsTest: async () => (await axios.post(`${API}/rails/test`, {}, getAuthHeaders())).data,
+  railsTransactions: async (params) => (await axios.get(`${API}/rails/transactions`, { ...getAuthHeaders(), params })).data,
+  railsReconcile: async (payload) => (await axios.post(`${API}/rails/reconcile`, payload, getAuthHeaders())).data,
+
   adminConfigGet: async () => (await axios.get(`${API}/admin/config`, getAuthHeaders())).data,
   adminConfigSet: async (payload) => (await axios.put(`${API}/admin/config`, payload, getAuthHeaders())).data,
 

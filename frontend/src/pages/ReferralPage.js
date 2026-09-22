@@ -1,7 +1,140 @@
 import React, { useEffect, useState } from 'react';
-import { Gift, Share2, Copy, Users, Wallet, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Gift, Share2, Copy, Users, Wallet, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+
+const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+
+// The twelve-level table printed in the plan book, and what it would come to on
+// one plan at one amount. It is shown because members are asked about it and the
+// desk had no way to answer; it is not paid, and the banner says so before any
+// number appears. See route_referral_structure.
+function BrochureStructure() {
+  const [data, setData] = useState(null);
+  const [schemes, setSchemes] = useState([]);
+  const [code, setCode] = useState('');
+  const [amount, setAmount] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.referralStructure().then(setData).catch(() => setData(null));
+    api.publicSchemes().then((r) => setSchemes(r.schemes || [])).catch(() => setSchemes([]));
+  }, []);
+
+  const scheme = schemes.find((s) => s.code === code);
+  const slabs = scheme?.slabs || [];
+
+  const illustrate = async (nextCode, nextAmount) => {
+    setCode(nextCode);
+    setAmount(nextAmount);
+    if (!nextCode || !nextAmount) {
+      return setData((d) => (d ? { ...d, illustration: null } : d));
+    }
+    setBusy(true);
+    try {
+      setData(await api.referralStructure({ scheme_code: nextCode, amount: nextAmount }));
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Could not work that out');
+    } finally { setBusy(false); }
+  };
+
+  if (!data) return null;
+  const ill = data.illustration;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="referral-structure">
+      <div className="p-4 border-b border-slate-100">
+        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Info className="w-4 h-4 text-[#0b3b8c]" /> The table printed in the plan book
+        </h2>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div className="p-3 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-900"
+          data-testid="referral-structure-notice">
+          {data.notice}
+        </div>
+
+        {data.chain?.length > 0 && (
+          <div className="flex flex-wrap gap-2" data-testid="referral-chain">
+            {data.chain.map((c) => (
+              <span key={c.level} className="px-2 py-1 rounded-full text-[10px] font-semibold border border-slate-200 bg-slate-50 text-slate-700">
+                Level {c.level}: {c.members} member{c.members === 1 ? '' : 's'}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] text-slate-600 mb-1">Work it out for a plan</label>
+            <select data-testid="referral-calc-scheme" value={code}
+              onChange={(e) => illustrate(e.target.value, '')}
+              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white">
+              <option value="">Choose a plan</option>
+              {schemes.map((sc) => <option key={sc.code} value={sc.code}>{sc.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-slate-600 mb-1">
+              {['daily', 'recurring'].includes(scheme?.scheme_type) ? 'Monthly instalment' : 'Amount'}
+            </label>
+            <select data-testid="referral-calc-amount" value={amount} disabled={!scheme}
+              onChange={(e) => illustrate(code, e.target.value)}
+              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white disabled:bg-slate-50">
+              <option value="">{scheme ? 'Choose an amount' : 'Choose a plan first'}</option>
+              {slabs.map((sl) => <option key={sl.unit} value={sl.unit}>{inr(sl.unit)}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {busy && <p className="text-[11px] text-slate-500">Working it out…</p>}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs min-w-[480px]">
+            <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
+              <tr>
+                <th className="p-2 font-semibold">Level</th>
+                {(ill ? ill.columns : data.instalment.columns).map((c) => (
+                  <th key={c} className="p-2 font-semibold text-right">{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {(ill ? ill.levels : data.instalment.levels).map((r) => (
+                <tr key={r.level} className="hover:bg-slate-50">
+                  <td className="p-2 font-semibold text-slate-900">{r.level}</td>
+                  {r.rates.map((rate, i) => (
+                    <td key={i} className="p-2 text-right text-slate-700">
+                      {rate === null ? <span className="text-slate-300">—</span> : (
+                        <>
+                          {ill && <span className="font-semibold">{inr(r.amounts[i] ?? 0)}</span>}
+                          <span className={ill ? 'text-slate-400 ml-1' : ''}>{rate}%</span>
+                        </>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-[11px] text-slate-500">
+          {ill
+            ? ill.basis === 'instalment'
+              ? `On ${ill.scheme.name} at ${inr(ill.unit)} a month, ${inr(ill.total_paid_in)} is paid in over the plan. `
+                + 'The four columns are years — the rate falls the longer the plan runs.'
+              : `On ${ill.scheme.name} at ${inr(ill.total_paid_in)} paid in once. `
+                + 'The four columns here are plan families, not years: the book prints a different '
+                + 'first-level rate for each.'
+            : 'Shown for instalment plans. Choose a plan above to see the amounts, and the one-time '
+              + 'plans use a separate table where the columns are plan families rather than years.'}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function ReferralPage() {
   const [data, setData] = useState(null);
@@ -153,6 +286,8 @@ export default function ReferralPage() {
           )}
         </div>
       </div>
+
+      <BrochureStructure />
     </div>
   );
 }

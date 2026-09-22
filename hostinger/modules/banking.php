@@ -386,6 +386,169 @@ function route_referral_history(array $d): void
         'count' => count($items)]);
 }
 
+// --- What the brochure's referral table actually says -------------------------------------
+// The printed book carries a twelve-level commission structure. The Nidhi Rules,
+// 2014 (Rule 6(d)) forbid a Nidhi from paying "any brokerage or incentive for
+// mobilising deposits from members", so this portal does not pay it and no code
+// here moves money on the strength of it. What it does is show the member the
+// figures they were shown on paper, so the desk and the book cannot tell two
+// different stories, and so nobody has to work the percentages out by hand.
+//
+// Kept as data rather than prose because the table is what the member asks
+// about, and a number retyped into a paragraph is a number that drifts.
+
+// Instalment plans. The four columns are years: the rate falls the longer the
+// plan runs. Levels 5 to 12 all carry the same row.
+const REFERRAL_STAGES = ['1st year', '2nd year', '3rd year', '4th year onward'];
+const REFERRAL_INSTALMENT = [
+    1 => [20.0, 11.0, 7.0, 5.0],
+    2 => [5.0, 1.0, 0.25, 0.25],
+    3 => [4.0, 1.0, 0.25, 0.25],
+    4 => [3.0, 0.5, 0.25, 0.25],
+    5 => [2.0, 0.5, 0.25, 0.25],
+];
+
+// One-time plans. Here the four columns are NOT years -- they are plan families,
+// each printed with its own level-1 rate. Levels 2 and 3 take 1%, and 4 to 12
+// take half a percent, and only the first two families have those rows printed
+// at all, which is exactly how the page reads.
+const REFERRAL_ONE_TIME_FAMILIES = [
+    ['label' => 'BN-4, BN-6, BN-7, BN-8, BN-10', 'level_1' => 9.0, 'deeper' => true],
+    ['label' => 'JANHIT', 'level_1' => 10.0, 'deeper' => true],
+    ['label' => 'BN-10', 'level_1' => 6.0, 'deeper' => false],
+    ['label' => 'BN-11', 'level_1' => 2.0, 'deeper' => false],
+];
+const REFERRAL_MAX_LEVEL = 12;
+
+function referral_instalment_rates(int $level): array
+{
+    return REFERRAL_INSTALMENT[min($level, 5)];
+}
+
+function referral_one_time_rate(int $level, array $family): ?float
+{
+    if ($level === 1) {
+        return $family['level_1'];
+    }
+    if (!$family['deeper']) {
+        return null;
+    }
+    return $level <= 3 ? 1.0 : 0.5;
+}
+
+// How many members sit at each level below this one. Walked a level at a time
+// rather than recursively, with everybody seen so far excluded, so a chain that
+// loops back on itself cannot spin here.
+function referral_chain(string $userId): array
+{
+    $seen = [$userId => true];
+    $frontier = [$userId];
+    $levels = [];
+    for ($level = 1; $level <= REFERRAL_MAX_LEVEL && $frontier !== []; $level++) {
+        $in = implode(',', array_fill(0, count($frontier), '?'));
+        $next = [];
+        foreach (rows("SELECT referee_id FROM referrals WHERE referrer_id IN ($in)", $frontier) as $r) {
+            if (!isset($seen[$r['referee_id']])) {
+                $seen[$r['referee_id']] = true;
+                $next[] = $r['referee_id'];
+            }
+        }
+        if ($next === []) {
+            break;
+        }
+        $levels[] = ['level' => $level, 'members' => count($next)];
+        $frontier = $next;
+    }
+    return $levels;
+}
+
+// What the printed table would pay on one plan at one denomination. Nothing is
+// written and nothing is credited -- this answers "if I introduce somebody and
+// they take this, what does the book say I get", which is the question the desk
+// is asked and could not previously answer without a calculator.
+function referral_illustration(array $scheme, float $unit): array
+{
+    $terms = scheme_deposit_terms($scheme, $unit);
+    $rows = [];
+    if ($terms['by_instalment']) {
+        // Each year's commission is a percentage of what is paid in during that
+        // year, so a plan that stops taking instalments early stops earning.
+        $payIn = (int)($scheme['contribution_months'] ?? 0) ?: (int)$scheme['tenure_months'];
+        $perYear = [];
+        for ($year = 1; $year <= 4; $year++) {
+            $months = max(0, min(12, $payIn - 12 * ($year - 1)));
+            // The fourth column runs from year four to the end of the pay-in.
+            $perYear[] = $year === 4 ? max(0, $payIn - 36) * $unit : $months * $unit;
+        }
+        for ($level = 1; $level <= REFERRAL_MAX_LEVEL; $level++) {
+            $rates = referral_instalment_rates($level);
+            $amounts = [];
+            foreach ($rates as $i => $rate) {
+                $amounts[] = round($perYear[$i] * $rate / 100, 2);
+            }
+            $rows[] = ['level' => $level, 'rates' => $rates, 'amounts' => $amounts,
+                'total' => round(array_sum($amounts), 2)];
+        }
+        return ['basis' => 'instalment', 'columns' => REFERRAL_STAGES,
+            'paid_in_per_column' => $perYear, 'levels' => $rows,
+            'scheme' => ['code' => $scheme['code'], 'name' => $scheme['name']],
+            'unit' => $unit, 'total_paid_in' => $terms['total_deposit']];
+    }
+    $deposit = $terms['total_deposit'];
+    for ($level = 1; $level <= REFERRAL_MAX_LEVEL; $level++) {
+        $rates = [];
+        $amounts = [];
+        foreach (REFERRAL_ONE_TIME_FAMILIES as $family) {
+            $rate = referral_one_time_rate($level, $family);
+            $rates[] = $rate;
+            $amounts[] = $rate === null ? null : round($deposit * $rate / 100, 2);
+        }
+        $rows[] = ['level' => $level, 'rates' => $rates, 'amounts' => $amounts, 'total' => null];
+    }
+    return ['basis' => 'one_time',
+        'columns' => array_column(REFERRAL_ONE_TIME_FAMILIES, 'label'),
+        'paid_in_per_column' => null, 'levels' => $rows,
+        'scheme' => ['code' => $scheme['code'], 'name' => $scheme['name']],
+        'unit' => $unit, 'total_paid_in' => $deposit];
+}
+
+function route_referral_structure(array $d): void
+{
+    $user = current_user();
+    $illustration = null;
+    $code = strtoupper(clip($_GET['scheme_code'] ?? '', 20));
+    if ($code !== '') {
+        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active'", [$code]);
+        if (!$scheme) {
+            fail(422, 'That plan is not one of our current schemes.');
+        }
+        $illustration = referral_illustration($scheme, (float)($_GET['amount'] ?? 0));
+    }
+    $instalment = [];
+    for ($level = 1; $level <= REFERRAL_MAX_LEVEL; $level++) {
+        $instalment[] = ['level' => $level, 'rates' => referral_instalment_rates($level)];
+    }
+    $oneTime = [];
+    for ($level = 1; $level <= REFERRAL_MAX_LEVEL; $level++) {
+        $oneTime[] = ['level' => $level,
+            'rates' => array_map(fn($f) => referral_one_time_rate($level, $f), REFERRAL_ONE_TIME_FAMILIES)];
+    }
+    respond([
+        // Said first and said plainly, because the table below is the thing
+        // people remember and it is not what this institution does.
+        'is_paid' => false,
+        'notice' => 'These are the figures printed in the plan book. Aadhunik Jeewan Sanchay Nidhi '
+            . 'Limited does not pay them: the Nidhi Rules, 2014 do not allow a Nidhi to pay brokerage '
+            . 'or incentive for bringing in deposits. What you do earn for an introduction is the '
+            . 'Refer & Earn bonus shown on this page, and your standing on the member ladder.',
+        'stages' => REFERRAL_STAGES,
+        'instalment' => ['columns' => REFERRAL_STAGES, 'levels' => $instalment],
+        'one_time' => ['columns' => array_column(REFERRAL_ONE_TIME_FAMILIES, 'label'), 'levels' => $oneTime],
+        'chain' => referral_chain($user['id']),
+        'illustration' => $illustration,
+    ]);
+}
+
 // --- Standing instructions --------------------------------------------------------------
 function owned_instruction(array $user, string $id): array
 {

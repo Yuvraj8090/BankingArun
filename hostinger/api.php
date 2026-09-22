@@ -1226,6 +1226,7 @@ $routes = [
     'GET /branches/locator' => 'route_branches',
     'GET /referrals/my-code' => 'route_referral_code',
     'GET /referrals/history' => 'route_referral_history',
+    'GET /referrals/structure' => 'route_referral_structure',
     'GET /standing-instructions' => 'route_si_list',
     'POST /standing-instructions' => 'route_si_create',
     // Statements (modules/statements.php)
