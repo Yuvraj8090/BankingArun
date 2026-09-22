@@ -539,6 +539,24 @@ function route_register(array $d): void
     $userId = uuid4();
     $accountNumber = 'AJSP0' . digits(9);
 
+    // The plan and the denomination are resolved before the transaction opens, so
+    // a slab that does not exist is refused without a half-opened account behind
+    // it. The deposit is booked in the same transaction as the account below:
+    // an account opened for a plan, with no plan on it, is the gap that had the
+    // member ringing the branch to ask what they had actually joined.
+    $scheme = null;
+    $terms = null;
+    $planCode = strtoupper(clip($d['scheme_code'] ?? '', 20));
+    if ($planCode !== '') {
+        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active'", [$planCode]);
+        if (!$scheme) {
+            fail(422, 'That plan is not one of our current schemes.');
+        }
+        if (isset($d['scheme_amount']) && money($d['scheme_amount']) > 0) {
+            $terms = scheme_deposit_terms($scheme, money($d['scheme_amount']));
+        }
+    }
+
     // Opening against an enquiry means opening against its document file, and
     // the file has to have been checked first. This is the whole point of
     // collecting documents at the enquiry: the verification gates the account
@@ -580,10 +598,17 @@ function route_register(array $d): void
             ($email === '' ? strtolower($accountNumber) : strstr($email, '@', true)) . '@ajspay',
             $branch, (int)$isJoint]);
     insert_card($userId, $accountNumber, $name, VIRTUAL_DEBIT_CARD);
+    // Opening can write three ledger rows at once, and now_utc() only resolves to
+    // the second, so they would tie and a statement could show the deposit debit
+    // above the credit that funded it. Each step is stamped a second apart, in
+    // the order it actually happened.
+    $ledgerAt = new DateTimeImmutable(now_utc());
+    $step = fn(int $n) => $ledgerAt->modify("+$n seconds")->format('Y-m-d H:i:s');
     insert_txn(['user_id' => $userId, 'account_number' => $accountNumber, 'type' => 'credit',
         'mode' => 'ACCOUNT_OPENING', 'amount' => $initial, 'balance_after' => $initial,
         'counterparty_name' => 'Account Opening Initial Fund', 'counterparty_acc' => 'BRANCH-CASH-DESK',
-        'ref_number' => 'AOF-' . random_int(1000000, 9999999), 'description' => 'Initial account deposit']);
+        'ref_number' => 'AOF-' . random_int(1000000, 9999999), 'description' => 'Initial account deposit',
+        'timestamp' => $step(0)]);
     // Opening against a lead carries its referral code through, which is the
     // join the chain was missing: the code arrived with the enquiry, and the
     // bonus is paid here, but nothing connected the two and a shared link paid
@@ -592,7 +617,52 @@ function route_register(array $d): void
     $bonus = $code === '' ? null : apply_referral_bonus($userId, $name, $email, $accountNumber, $initial, $code);
     // The enquiry is closed out here rather than left for someone to tidy later,
     // so the pipeline shows what actually happened to it.
-    $plan = null;
+    // A lump-sum plan is funded at the counter: the money is paid in with the
+    // opening cash and moved straight into the term deposit, so the savings
+    // statement shows both halves rather than a balance that silently vanished.
+    // An instalment plan is not funded here at all -- the first instalment is a
+    // collection, and booking it as paid today would be a lie on the statement.
+    $deposit = null;
+    if ($terms !== null) {
+        $balance = $initial;
+        if (!$terms['by_instalment']) {
+            $balance = $initial + $terms['due_today'];
+            $pdo->prepare('UPDATE accounts SET balance = ? WHERE account_number = ?')
+                ->execute([$balance, $accountNumber]);
+            insert_txn(['user_id' => $userId, 'account_number' => $accountNumber, 'type' => 'credit',
+                'mode' => 'ACCOUNT_OPENING', 'amount' => $terms['due_today'], 'balance_after' => $balance,
+                'counterparty_name' => 'Plan funding received at counter',
+                'counterparty_acc' => 'BRANCH-CASH-DESK',
+                'ref_number' => 'AOF-' . random_int(1000000, 9999999),
+                'description' => "Paid in for {$terms['scheme_name']}", 'timestamp' => $step(1)]);
+        }
+        $depositNumber = 'DEP' . random_int(10000000, 99999999);
+        $maturityDate = (new DateTimeImmutable('today', new DateTimeZone(IST)))
+            ->modify('+' . (int)($terms['tenure_months'] * 30.4) . ' days')->format('Y-m-d');
+        $pdo->prepare('INSERT INTO deposits (id, user_id, deposit_number, deposit_type, scheme_code,
+                source_account, principal_amount, interest_rate, tenure_months, interest_payout,
+                maturity_amount, maturity_date, nominee_name, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([uuid4(), $userId, $depositNumber, $terms['deposit_type'], $terms['scheme_code'],
+                $accountNumber, $terms['total_deposit'], $terms['interest_rate'], $terms['tenure_months'],
+                $terms['interest_payout'], $terms['maturity_amount'], $maturityDate,
+                $nominee === '' ? null : $nominee, 'active']);
+        if (!$terms['by_instalment']) {
+            $balance -= $terms['due_today'];
+            $pdo->prepare('UPDATE accounts SET balance = ? WHERE account_number = ?')
+                ->execute([$balance, $accountNumber]);
+            insert_txn(['user_id' => $userId, 'account_number' => $accountNumber, 'type' => 'debit',
+                'mode' => 'DEPOSIT_BOOKING', 'amount' => $terms['due_today'], 'balance_after' => $balance,
+                'counterparty_name' => $terms['scheme_name'], 'counterparty_acc' => $depositNumber,
+                'ref_number' => $depositNumber,
+                'description' => "{$terms['scheme_name']} #$depositNumber booked", 'timestamp' => $step(2)]);
+        }
+        $deposit = ['deposit_number' => $depositNumber, 'maturity_date' => $maturityDate] + $terms;
+        audit($opener, 'DEPOSIT_BOOKED', "$depositNumber {$terms['scheme_code']} "
+            . rupees($terms['total_deposit']) . " for $accountNumber"
+            . ($terms['exceeds_cap'] ? ' (above the 12.5% cap on its own printed figures)' : ''));
+    }
+
     if ($lead !== null) {
         $pdo->prepare('UPDATE crm_leads SET stage = ?, converted_user_id = ?, referral_status = ? WHERE id = ?')
             ->execute(['enrolled', $userId,
@@ -603,11 +673,21 @@ function route_register(array $d): void
         // for the same documents again the first time anything needed them.
         $pdo->prepare('UPDATE kyc_documents SET lead_id = NULL, user_id = ? WHERE lead_id = ?')
             ->execute([$userId, $lead['id']]);
-        if ($lead['scheme_code'] !== null) {
-            $plan = row("SELECT code, name, scheme_type, tenure_months, payout_type
-                FROM schemes WHERE code = ?", [$lead['scheme_code']]);
+        // The enquiry keeps the plan whether or not a deposit was booked today,
+        // so a member who is still deciding on an amount is not recorded as
+        // having come in for nothing.
+        if ($scheme === null && $lead['scheme_code'] !== null) {
+            $scheme = row("SELECT * FROM schemes WHERE code = ?", [$lead['scheme_code']]);
+        } elseif ($scheme !== null && $lead['scheme_code'] !== $scheme['code']) {
+            $pdo->prepare('UPDATE crm_leads SET scheme_code = ? WHERE id = ?')
+                ->execute([$scheme['code'], $lead['id']]);
         }
     }
+    $plan = $scheme === null ? null : [
+        'code' => $scheme['code'], 'name' => $scheme['name'],
+        'scheme_type' => $scheme['scheme_type'], 'tenure_months' => (int)$scheme['tenure_months'],
+        'payout_type' => $scheme['payout_type'],
+    ];
 
     $user = row('SELECT * FROM users WHERE id = ?', [$userId]);
     audit($opener, 'ACCOUNT_OPENED', "$accountNumber for {$user['email']}"
@@ -624,6 +704,7 @@ function route_register(array $d): void
     respond(['status' => 'SUCCESS', 'user' => public_user($user),
         'account_number' => $accountNumber, 'user_id' => $accountNumber,
         'referral_bonus' => $bonus, 'plan' => $plan === null ? null : out($plan),
+        'deposit' => $deposit,
         'kyc_status' => $user['kyc_status'],
         'message' => "Account $accountNumber opened for {$user['name']}."
             . ($plan === null ? '' : " Plan: {$plan['name']}.")]);

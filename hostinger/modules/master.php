@@ -116,6 +116,74 @@ function scheme_public(array $scheme): array
     return $scheme;
 }
 
+// The terms of one denomination of a plan, ready to be written as a deposit.
+// $unit is the slab the member picked -- the monthly instalment on an instalment
+// plan, the lump sum on a fixed or monthly-income one.
+//
+// The rate is worked backwards from the figures the brochure prints rather than
+// taken from the plan's headline. cron.php pays monthly interest as
+// principal x rate / 12, so a monthly-income plan only pays the printed amount
+// if the rate stored on the deposit is the one that produces it. Where that is
+// above the Nidhi cap, it is above the cap on paper too, and the caller is told
+// so rather than the figure being quietly trimmed to fit.
+function scheme_deposit_terms(array $scheme, float $unit): array
+{
+    $slabs = json_decode((string)($scheme['slabs'] ?? ''), true);
+    $slab = null;
+    foreach (is_array($slabs) ? $slabs : [] as $row) {
+        if (abs((float)$row['unit'] - $unit) < 0.005) {
+            $slab = $row;
+            break;
+        }
+    }
+    if ($slab === null) {
+        fail(422, 'That amount is not one of the denominations this plan is sold in.');
+    }
+    $months = (int)$scheme['tenure_months'];
+    $deposit = (float)$slab['deposit'];
+    $maturity = (float)$slab['maturity'];
+    $byInstalment = in_array($scheme['scheme_type'], ['daily', 'recurring'], true);
+    $monthly = ($scheme['payout_type'] ?? 'maturity') === 'monthly';
+
+    if ($monthly) {
+        // Printed per slab. Paying anything else would contradict the brochure
+        // the member was sold from.
+        $payout = (float)($slab['monthly_payout'] ?? 0);
+        if ($payout <= 0) {
+            fail(422, 'This plan is a monthly-income plan but that slab has no monthly payout printed.');
+        }
+        $rate = round($payout * 12 * 100 / $deposit, 2);
+    } else {
+        $rate = effective_rate([
+            'tenure_months' => $months,
+            'contribution_months' => $scheme['contribution_months'] ?? null,
+            'total_deposit' => $deposit,
+            'maturity_amount' => $maturity,
+            'scheme_type' => $scheme['scheme_type'],
+            'payout_type' => $scheme['payout_type'],
+        ]) ?? 0.0;
+    }
+
+    return [
+        'scheme_code' => $scheme['code'],
+        'scheme_name' => $scheme['name'],
+        'unit' => $unit,
+        // An instalment plan collects its total over the pay-in months; a lump
+        // sum plan takes it at the counter today. Only the second is money that
+        // has to change hands to open the account.
+        'by_instalment' => $byInstalment,
+        'due_today' => $byInstalment ? $unit : $deposit,
+        'total_deposit' => $deposit,
+        'maturity_amount' => $maturity,
+        'monthly_payout' => $monthly ? (float)$slab['monthly_payout'] : null,
+        'deposit_type' => $byInstalment ? 'recurring' : 'fixed',
+        'interest_payout' => $monthly ? 'monthly' : 'on_maturity',
+        'interest_rate' => $rate,
+        'tenure_months' => $months,
+        'exceeds_cap' => $rate > NIDHI_MAX_DEPOSIT_RATE,
+    ];
+}
+
 function scheme_payload(array $d, array $existing = []): array
 {
     $get = fn(string $key, $fallback = null) => $d[$key] ?? ($existing[$key] ?? $fallback);

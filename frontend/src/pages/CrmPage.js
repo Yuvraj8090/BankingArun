@@ -451,6 +451,69 @@ function ApplicationFile({ leadId, onChange }) {
   );
 }
 
+const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+
+// Plan and denomination together, because on their own neither opens a deposit.
+// The figures shown are the brochure's own for that slab — the same ones the
+// member was sold from — so the counter and the printed book cannot disagree.
+function PlanChoice({ schemes, account, setAccount }) {
+  const scheme = schemes.find((s) => s.code === account.scheme_code);
+  const slabs = scheme?.slabs || [];
+  const slab = slabs.find((s) => Number(s.unit) === Number(account.scheme_amount));
+  const byInstalment = ['daily', 'recurring'].includes(scheme?.scheme_type);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label className="block text-[11px] text-slate-600 mb-1">Plan they are taking</label>
+        <select data-testid="open-scheme" value={account.scheme_code}
+          onChange={(e) => setAccount({ ...account, scheme_code: e.target.value, scheme_amount: '' })}
+          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 bg-white">
+          <option value="">Not decided yet</option>
+          {schemes.map((sc) => <option key={sc.code} value={sc.code}>{sc.name} ({sc.code})</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-[11px] text-slate-600 mb-1">
+          {byInstalment ? 'Monthly instalment' : 'Amount'}
+        </label>
+        <select data-testid="open-scheme-amount" value={account.scheme_amount || ''}
+          disabled={!scheme}
+          onChange={(e) => setAccount({ ...account, scheme_amount: e.target.value })}
+          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 bg-white disabled:bg-slate-50">
+          <option value="">{scheme ? 'Choose an amount' : 'Choose a plan first'}</option>
+          {slabs.map((sl) => <option key={sl.unit} value={sl.unit}>{inr(sl.unit)}</option>)}
+        </select>
+      </div>
+
+      {slab && (
+        <div className="md:col-span-2 p-2.5 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-700"
+          data-testid="open-scheme-terms">
+          <div className="flex flex-wrap gap-x-5 gap-y-1">
+            <span>Pays in <b>{inr(slab.deposit)}</b>{byInstalment ? ` (${inr(slab.unit)} a month)` : ' today'}</span>
+            {slab.monthly_payout
+              ? <span>Receives <b>{inr(slab.monthly_payout)}</b> every month</span>
+              : null}
+            <span>Total back <b>{inr(slab.maturity)}</b> over {scheme.tenure_months} months</span>
+          </div>
+          {slab.exceeds_cap && (
+            <p className="mt-1 text-[#c8102e]">
+              These printed figures work out at {slab.effective_rate_pa}% a year, above the 12.5% a
+              Nidhi may pay on deposits. Say so to the member rather than letting them find out later.
+            </p>
+          )}
+          {byInstalment && (
+            <p className="mt-1 text-slate-500">
+              Nothing is collected at the counter today — the instalments are collected on schedule.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Leads -------------------------------------------------------------------
 function LeadsTab() {
   const [data, setData] = useState(null);
@@ -494,7 +557,7 @@ function LeadsTab() {
     setAccount({
       name: opening.name || '', email: opening.email || '', phone: opening.phone || '',
       password: '', transaction_password: '', pan_number: '', initial_deposit: 1000,
-      scheme_code: opening.scheme_code || '',
+      scheme_code: opening.scheme_code || '', scheme_amount: '',
     });
   }, [opening]);
 
@@ -588,21 +651,7 @@ function LeadsTab() {
               to change the password from Security &amp; Passkeys.
             </div>
             <ApplicationFile leadId={opening.id} onChange={setFile} />
-            <div>
-              <label className="block text-[11px] text-slate-600 mb-1">Plan they are taking</label>
-              <select data-testid="open-scheme" value={account.scheme_code}
-                onChange={(e) => setAccount({ ...account, scheme_code: e.target.value })}
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 bg-white">
-                <option value="">Not decided yet</option>
-                {schemes.map((sc) => (
-                  <option key={sc.code} value={sc.code}>{sc.name} ({sc.code})</option>
-                ))}
-              </select>
-              <p className="text-[10px] text-slate-400 mt-1">
-                Read back to the member when the account is opened, and kept against the enquiry.
-                The deposit itself is created afterwards under Deposits.
-              </p>
-            </div>
+            <PlanChoice schemes={schemes} account={account} setAccount={setAccount} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Full name" value={account.name} onChange={(v) => setAccount({ ...account, name: v })} testId="open-name" />
               <Field label="Phone" value={account.phone} onChange={(v) => setAccount({ ...account, phone: v })} testId="open-phone" />
@@ -645,6 +694,21 @@ function LeadsTab() {
                 </dd>
               </div>
             </dl>
+            {opened.deposit && (
+              <div className="p-3 rounded-md bg-slate-50 border border-slate-200 text-[11px] space-y-0.5"
+                data-testid="crm-opened-deposit">
+                <p className="font-semibold text-slate-900">Deposit {opened.deposit.deposit_number} booked</p>
+                <p className="text-slate-600">
+                  {opened.deposit.by_instalment
+                    ? `${inr(opened.deposit.unit)} a month, ${inr(opened.deposit.total_deposit)} in total`
+                    : `${inr(opened.deposit.total_deposit)} paid in today`}
+                  {opened.deposit.monthly_payout
+                    ? ` · ${inr(opened.deposit.monthly_payout)} paid out every month`
+                    : ''} · {inr(opened.deposit.maturity_amount)} over {opened.deposit.tenure_months} months
+                </p>
+                <p className="text-slate-500">Matures {opened.deposit.maturity_date}. Visible to the member under Deposits.</p>
+              </div>
+            )}
             <p className="text-[11px] text-slate-500">
               The documents you verified now sit on the member's own KYC record, so they will not be
               asked for them again.

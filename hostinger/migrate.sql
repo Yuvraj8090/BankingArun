@@ -631,3 +631,9 @@ CREATE TABLE IF NOT EXISTS rail_events (
     payload TEXT NOT NULL,
     received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Which published plan a deposit was booked under. Without it the deposit is a
+-- principal and a maturity figure with no way back to the brochure page the
+-- member was sold from, and nothing can answer "how many people are on MIS".
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS scheme_code VARCHAR(20) NULL;
+CREATE INDEX IF NOT EXISTS idx_deposit_scheme ON deposits (scheme_code, status);

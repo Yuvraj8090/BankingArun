@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS deposits (
     user_id VARCHAR(36) NOT NULL,
     deposit_number VARCHAR(30) NOT NULL UNIQUE,
     deposit_type VARCHAR(20) NOT NULL DEFAULT 'fixed',
+    scheme_code VARCHAR(20),                      -- the published plan it was booked under
     source_account VARCHAR(30),
     principal_amount DECIMAL(15,2) NOT NULL,
     interest_rate DECIMAL(5,2) NOT NULL,
@@ -169,6 +170,7 @@ CREATE TABLE IF NOT EXISTS deposits (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
     INDEX idx_maturity (status, maturity_date),
+    INDEX idx_deposit_scheme (scheme_code, status),
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
