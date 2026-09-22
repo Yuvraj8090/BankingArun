@@ -220,7 +220,7 @@ export default function AgentsPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {collections.collections.map(c => (
-                        <tr key={c.id}>
+                        <tr key={c.id} className="hover:bg-slate-50">
                           <td className="p-3 text-slate-600">{c.collected_on}</td>
                           <td className="p-3 font-mono text-slate-700">{c.account_number}</td>
                           <td className="p-3 text-slate-600">{c.scheme_code || '—'}</td>
