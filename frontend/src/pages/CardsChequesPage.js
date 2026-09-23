@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   CreditCard, Lock, Unlock, ShieldAlert, KeyRound, FileText, RefreshCw,
   Eye, EyeOff, Snowflake, QrCode, Zap, Sparkles, CheckCircle2, Clock,
@@ -63,7 +63,7 @@ export default function CardsChequesPage() {
   const [stopChequeNo, setStopChequeNo] = useState('');
   const [stopReason, setStopReason] = useState('Cheque lost in transit');
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
       const [c, u] = await Promise.all([api.getCards(), api.upiStatus()]);
@@ -79,9 +79,9 @@ export default function CardsChequesPage() {
       }
     } catch { toast.error("Failed to load card inventory"); }
     finally { setLoading(false); }
-  };
+  }, [selected]);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const doAction = async (payload, successMsg) => {
     try {

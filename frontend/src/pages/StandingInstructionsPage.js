@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Repeat, Home, TrendingUp, FileText, Shield, Plus, Play, Pause, Trash2, RefreshCw, Calendar, Save, X } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
@@ -24,17 +24,17 @@ export default function StandingInstructionsPage() {
     start_date: new Date().toISOString().slice(0, 10), end_date: '', remarks: ''
   });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [a, l] = await Promise.all([api.getAccounts(), api.siList()]);
       setAccounts(a.accounts || []);
       setItems(l.items || []);
-      if (a.accounts?.length && !form.from_account_number) {
-        setForm(f => ({ ...f, from_account_number: a.accounts[0].account_number }));
+      if (a.accounts?.length) {
+        setForm(f => f.from_account_number ? f : ({ ...f, from_account_number: a.accounts[0].account_number }));
       }
     } catch { toast.error('Failed to load standing instructions'); }
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const save = async () => {
     try {

@@ -99,7 +99,7 @@ export default function KycAccountPage() {
                 <input
                   type="text"
                   readOnly
-                  value={user?.pan_number || 'ABCPS8492K'}
+                  value={user?.pan_number || 'Not provided'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
                 <div className="w-56 shrink-0"><DocumentUpload kind="pan" label="PAN card" hint="JPEG, PNG or PDF, up to 3 MB" existing={docs.pan} onUploaded={(r) => setDocs((v) => ({ ...v, pan: r.document }))} /></div>
@@ -112,7 +112,7 @@ export default function KycAccountPage() {
                 <input
                   type="text"
                   readOnly
-                  value={user?.aadhaar_number || 'XXXX-XXXX-4892'}
+                  value={user?.aadhaar_number || 'Not provided'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
                 <div className="w-56 shrink-0"><DocumentUpload kind="aadhaar" label="Aadhaar / UIDAI document" hint="Mask all but the last four digits if you prefer" existing={docs.aadhaar} onUploaded={(r) => setDocs((v) => ({ ...v, aadhaar: r.document }))} /></div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert, RefreshCw, CheckCircle2, AlertTriangle, Flag, Undo2, Search } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ export default function FraudMonitorPage() {
   const [busy, setBusy] = useState('');
   const [anomalies, setAnomalies] = useState(null);
 
-  const load = async (which = tab) => {
+  const load = useCallback(async (which) => {
     try {
       const [queue, anom] = await Promise.all([
         api.fraudQueue(which),
@@ -26,8 +26,8 @@ export default function FraudMonitorPage() {
       setData(queue);
       if (anom) setAnomalies(anom);
     } catch (e) { toast.error(e.response?.data?.detail || 'Could not load the review queue'); }
-  };
-  useEffect(() => { load(tab); /* eslint-disable-next-line */ }, [tab]);
+  }, []);
+  useEffect(() => { load(tab); }, [load, tab]);
 
   const act = async (alert, action) => {
     setBusy(alert.id);
