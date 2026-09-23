@@ -259,7 +259,7 @@ function scheme_payload(array $d, array $existing = []): array
         'total_deposit' => money($get('total_deposit', 0)),
         'maturity_amount' => money($get('maturity_amount', 0)),
         'payout_type' => in_array($payout, ['maturity', 'monthly'], true) ? $payout : 'maturity',
-        'slabs' => scheme_slabs($get('slabs')),
+        'slabs' => scheme_slabs($get('slabs'), $payout === 'monthly'),
         'status' => $status,
         'notes' => clip($get('notes', ''), 255) ?: null,
     ];
@@ -270,7 +270,17 @@ function scheme_payload(array $d, array $existing = []): array
         fail(422, 'total_deposit and maturity_amount must both be greater than 0.');
     }
     $rate = effective_rate($scheme);
-    if ($status === 'active' && $rate !== null && $rate > NIDHI_MAX_DEPOSIT_RATE) {
+    // The cap gates *activating* a plan, not touching one that is already live.
+    // Applied to every save, it locked the three brochure plans that were
+    // published straight to the database above the cap: a director could not
+    // rename one, fix a typo in its notes, or even move it to draft, because the
+    // save that would have done it was refused. Refusing to let somebody stand a
+    // plan down is the opposite of what this check is for.
+    $wasActiveOverCap = $existing !== []
+        && ($existing['status'] ?? '') === 'active'
+        && ($existingRate = effective_rate($existing)) !== null
+        && $existingRate > NIDHI_MAX_DEPOSIT_RATE;
+    if ($status === 'active' && $rate !== null && $rate > NIDHI_MAX_DEPOSIT_RATE && !$wasActiveOverCap) {
         fail(422, sprintf(
             'This scheme returns about %.2f%% a year, above the %.1f%% cap in the Nidhi Rules, 2014. '
             . 'Save it as a draft or reduce the maturity amount.', $rate, NIDHI_MAX_DEPOSIT_RATE));
@@ -278,7 +288,7 @@ function scheme_payload(array $d, array $existing = []): array
     // A member buys one denomination, not the headline. A published slab table
     // can pay a different rate row by row, so every row has to clear the cap
     // before any of them may be sold.
-    if ($status === 'active' && $scheme['slabs'] !== null) {
+    if ($status === 'active' && $scheme['slabs'] !== null && !$wasActiveOverCap) {
         foreach (json_decode($scheme['slabs'], true) as $slab) {
             $slabRate = effective_rate([
                 'tenure_months' => $scheme['tenure_months'],
@@ -303,7 +313,12 @@ function scheme_payload(array $d, array $existing = []): array
 // The brochure sells each plan in fixed denominations. They are stored as JSON
 // rather than rows of their own because they are a published price list, not
 // something the ledger ever joins against.
-function scheme_slabs($raw): ?string
+// $monthly says the plan pays out every month, which makes each slab's
+// monthly_payout part of the plan rather than decoration. It was being dropped
+// on every save: the editor sent it, this threw it away, and cron.php then had
+// nothing to pay from. A director renaming a monthly-income plan would have
+// silently stopped its payouts.
+function scheme_slabs($raw, bool $monthly = false): ?string
 {
     if ($raw === null || $raw === '' || $raw === []) {
         return null;
@@ -326,7 +341,18 @@ function scheme_slabs($raw): ?string
         if ($unit <= 0 || $dep <= 0 || $mat <= 0) {
             fail(422, 'Every slab needs a unit, a deposit and a maturity above zero.');
         }
-        $clean[] = ['unit' => $unit, 'deposit' => $dep, 'maturity' => $mat];
+        $slab = ['unit' => $unit, 'deposit' => $dep, 'maturity' => $mat];
+        if ($monthly) {
+            // What the member is actually handed each month, and what the rate
+            // stored on their deposit is worked backwards from.
+            $payout = money($row['monthly_payout'] ?? 0);
+            if ($payout <= 0) {
+                fail(422, sprintf('The %s slab needs a monthly payout: this plan pays out every '
+                    . 'month, and without it nothing can be paid.', number_format($unit, 0)));
+            }
+            $slab['monthly_payout'] = $payout;
+        }
+        $clean[] = $slab;
     }
     usort($clean, fn($a, $b) => $a['unit'] <=> $b['unit']);
     return json_encode($clean);

@@ -16,13 +16,20 @@ const TYPE_LABEL = { daily: 'Daily', recurring: 'Recurring', fixed: 'Fixed depos
 
 // Slabs are edited as plain lines rather than JSON so a manager can paste a
 // column straight out of the brochure.
-const slabText = (slabs) =>
-  (slabs || []).map(s => `${s.unit}, ${s.deposit}, ${s.maturity}`).join('\n');
+// A monthly-income plan carries a fourth number per row: what the member is
+// handed each month. It was being dropped on the way out and again on the way
+// back, so editing such a plan silently removed the thing that gets paid.
+const slabText = (slabs, monthly) =>
+  (slabs || []).map(s => monthly
+    ? `${s.unit}, ${s.deposit}, ${s.maturity}, ${s.monthly_payout ?? ''}`
+    : `${s.unit}, ${s.deposit}, ${s.maturity}`).join('\n');
 
-const parseSlabs = (text) => text.split('\n')
+const parseSlabs = (text, monthly) => text.split('\n')
   .map(line => line.split(',').map(n => Number(n.trim())))
-  .filter(p => p.length === 3 && p.every(n => Number.isFinite(n) && n > 0))
-  .map(([unit, deposit, maturity]) => ({ unit, deposit, maturity }));
+  .filter(p => p.length >= (monthly ? 4 : 3) && p.every(n => Number.isFinite(n) && n > 0))
+  .map(([unit, deposit, maturity, monthlyPayout]) => (monthly
+    ? { unit, deposit, maturity, monthly_payout: monthlyPayout }
+    : { unit, deposit, maturity }));
 
 // Back-office scheme master. Nothing here is shown on the public site.
 export default function SchemesPage() {
@@ -233,16 +240,29 @@ export default function SchemesPage() {
                 The amounts this plan is sold in
               </label>
               <p className="text-[11px] text-slate-500 mb-1.5">
-                One line per amount: <span className="font-mono">unit, total deposit, maturity</span>.
-                Every line has to stay within the {data.max_rate_pa}% cap before the plan can go active.
+                One line per amount:{' '}
+                <span className="font-mono">
+                  unit, total deposit, maturity{form.payout_type === 'monthly' ? ', monthly payout' : ''}
+                </span>.
+                {form.payout_type === 'monthly' && (
+                  <> This plan pays out every month, so each line needs the fourth number — it is
+                  what the member is handed each month, and what their payout is calculated from.
+                  A line without it is rejected rather than saved with the payout missing.</>
+                )}{' '}
+                Every line has to stay within the {data.max_rate_pa}% cap before a new plan can go
+                active.
               </p>
               <textarea
                 data-testid="scheme-slabs"
                 rows={6}
-                value={slabText(form.slabs)}
-                onChange={e => setForm(f => ({ ...f, slabs: parseSlabs(e.target.value) }))}
+                value={slabText(form.slabs, form.payout_type === 'monthly')}
+                onChange={e => setForm(f => ({
+                  ...f, slabs: parseSlabs(e.target.value, f.payout_type === 'monthly'),
+                }))}
                 className="w-full px-3 py-2 rounded-md border border-slate-200 text-xs font-mono text-slate-900 bg-white"
-                placeholder={'500, 36000, 52500\n1000, 72000, 105000'}
+                placeholder={form.payout_type === 'monthly'
+                  ? '10000, 10000, 15000, 250\n20000, 20000, 30000, 500'
+                  : '500, 36000, 52500\n1000, 72000, 105000'}
               />
             </div>
             <div className="md:col-span-2">
