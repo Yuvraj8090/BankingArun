@@ -115,15 +115,35 @@ fi
 # a static file, /api/auth/me is PHP, and /api/public/features is proxied to the
 # Python service. Checking only the first two would call a deploy successful
 # while every ported route answered 502.
-if ! curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt | grep -qx "$revision" ||
-   [[ "$(curl -sS -o /dev/null -w '%{http_code}' https://ajspay.co.in/api/auth/me)" != 401 ]] ||
-   [[ "$(curl -sS -o /dev/null -w '%{http_code}' https://ajspay.co.in/api/public/features)" != 200 ]]; then
+# Each assertion reports what it actually saw. Rolling back with nothing but
+# "smoke check failed" is how three deploys in a row got diagnosed by guesswork:
+# the evidence dies with the release, because the rollback below puts the
+# working one back before anybody can look.
+smoke_failed=""
+served=$(curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt 2>&1 | head -c 80 || true)
+[[ "$served" == "$revision" ]] ||
+  smoke_failed="$smoke_failed"$'\n'"  version.txt served '$served', expected '$revision'"
+for probe in "/api/auth/me 401 PHP" "/api/public/features 200 Python"; do
+  read -r path want backend <<<"$probe"
+  got=$(curl -sS -o /tmp/smoke.body -w '%{http_code}' "https://ajspay.co.in$path" || echo 000)
+  [[ "$got" == "$want" ]] ||
+    smoke_failed="$smoke_failed"$'\n'"  $path ($backend) answered $got, expected $want: $(head -c 160 /tmp/smoke.body | tr '\n' ' ')"
+done
+if [[ -n "$smoke_failed" ]]; then
+  echo "Deployment smoke check failed:$smoke_failed" >&2
+  # Only the Python half can fail without the PHP half noticing, so its log is
+  # the one worth capturing before the rollback hides the cause.
+  if systemctl is-enabled --quiet ajspay-pyapi 2>/dev/null; then
+    echo '--- last 20 lines from the Python service ---' >&2
+    journalctl -u ajspay-pyapi -n 20 --no-pager 2>&1 | sed 's/^/  /' >&2 || true
+  fi
   if [[ -n "$previous" ]]; then
     ln -s "$previous" current.rollback
     mv -Tf current.rollback current
     sudo -n /usr/bin/systemctl reload php8.5-fpm || true
+    sudo -n /usr/bin/systemctl restart ajspay-pyapi 2>/dev/null || true
+    echo "Rolled back to $previous" >&2
   fi
-  echo 'Deployment smoke check failed' >&2
   exit 1
 fi
 rm "incoming/$revision.tar.gz"
