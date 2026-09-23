@@ -144,7 +144,7 @@ export default function ReturnsCalculator({ schemes, cap }) {
 
             <p className="text-[10px] text-slate-500 leading-relaxed">
               These are the plan&apos;s own figures for this amount, not an estimate. Amounts between the
-              listed denominations are not offered, so only the ones above can be chosen.
+              listed amounts are not offered, so only the ones above can be chosen.
             </p>
           </div>
         )}

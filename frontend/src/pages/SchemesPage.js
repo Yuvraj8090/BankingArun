@@ -120,7 +120,7 @@ export default function SchemesPage() {
               <th className="p-3 font-semibold text-right">Tenure</th>
               <th className="p-3 font-semibold text-right">Deposit</th>
               <th className="p-3 font-semibold text-right">Maturity</th>
-              <th className="p-3 font-semibold text-right">Denominations</th>
+              <th className="p-3 font-semibold text-right">Amounts offered</th>
               <th className="p-3 font-semibold text-right">Effective p.a.</th>
               <th className="p-3 font-semibold">Status</th>
               {canEdit && <th className="p-3 font-semibold text-right">Actions</th>}
@@ -230,7 +230,7 @@ export default function SchemesPage() {
               onChange={v => setForm(f => ({ ...f, status: v }))} testId="scheme-status" />
             <div className="md:col-span-2">
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                Denominations this plan is sold in
+                The amounts this plan is sold in
               </label>
               <p className="text-[11px] text-slate-500 mb-1.5">
                 One line per amount: <span className="font-mono">unit, total deposit, maturity</span>.
