@@ -2,13 +2,18 @@
 // AJSPay: scheduled money movement. Runs standing instructions and one-off
 // scheduled transfers that have come due.
 //
-// Runs once a day from the systemd timer installed by scripts/provision-cron.sh:
+// Runs once a day from a systemd timer on the VPS:
 //   /usr/bin/php /srv/ajspay/current/cron.php --verbose
 //
-// The comment here used to point at Hostinger's shared-hosting cron panel, which
-// the VPS this now runs on does not have -- so nothing executed this file in
-// production at all. Every job below was written, tested and never run. If you
-// move the site again, move the schedule with it and check it fired.
+// The header here long pointed at Hostinger's shared-hosting cron panel, which
+// this VPS does not have. That was a stale comment, not a missing schedule: a
+// timer had been installed on the box out of band and has been running nightly
+// since 17 September 2026. Reading the repository and concluding the job never
+// ran was wrong, and worth recording here because the repository still cannot
+// tell you what is scheduled on the server -- only the server can.
+//
+// scripts/provision-cron.sh installs the timer this repository defines. Check
+// what is actually installed before running it: systemctl cat ajspay-cron.service
 //
 // CLI only — never reachable over HTTP (.htaccess denies it as well).
 // Safe to run more often than daily: each instruction is attempted at most once

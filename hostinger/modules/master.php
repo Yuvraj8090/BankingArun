@@ -922,12 +922,13 @@ function route_product_delete(array $d, string $id = ''): void
 }
 
 // --- Scheduled automation ----------------------------------------------------------------
-// Whether the nightly run is actually happening. This exists because it was not:
-// cron.php pointed at a cron panel the VPS does not have, so monthly deposit
-// interest, maturities, standing instructions and rail settlement were all
-// implemented, all tested, and never once executed -- and nothing in the
-// application could tell, because the only record a run left was a line in the
-// server's journal.
+// Whether the nightly run is actually happening, and against which code.
+//
+// This exists because the question could not be answered from inside the
+// application at all: a run's only record was a line in the server's journal, so
+// "it has never run", "it runs but against a stale copy" and "it ran and found
+// nothing to do" were indistinguishable from every screen. All three of those
+// turned out to be live possibilities here, and the second one was true.
 
 // A daily job is late once it has missed its window with room to spare. The
 // timer fires at 01:30 IST with up to five minutes of jitter; 26 hours is a full
