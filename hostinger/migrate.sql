@@ -938,3 +938,15 @@ INSERT IGNORE INTO rank_tiers (id, position, name, direct_required, required_bel
 (UUID(), 7, 'Emerald',          2, 6, 'active'),
 (UUID(), 8, 'Ambassador',       2, 7, 'active'),
 (UUID(), 9, 'Brand Ambassador', 2, 8, 'active');
+
+-- A stable order for statements. timestamp only resolves to the second, and
+-- several payments legitimately land in the same one -- an account opening that
+-- pays a referral bonus and funds a plan writes four rows at once, and a cron
+-- run pays interest and maturity together. Sorted by timestamp alone those rows
+-- come back in whatever order the engine chooses, so a member could see their
+-- maturity credited before the interest that preceded it, and a running balance
+-- that appeared to jump backwards.
+--
+-- AUTO_INCREMENT needs a key of its own; the primary key is the uuid and stays
+-- that way, so this is a second unique key rather than a replacement.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS seq BIGINT NOT NULL AUTO_INCREMENT UNIQUE;

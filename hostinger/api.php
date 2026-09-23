@@ -625,11 +625,17 @@ function route_register(array $d): void
     // collection, and booking it as paid today would be a lie on the statement.
     $deposit = null;
     if ($terms !== null) {
-        $balance = $initial;
+        // Relative, and read back, never computed from $initial. An absolute
+        // "SET balance = opening + plan" silently erased the referral bonus
+        // credited a few lines above: the member's statement showed the bonus
+        // and their balance did not contain it.
+        $balanceOf = fn() => (float)scalar('SELECT balance FROM accounts WHERE account_number = ?',
+            [$accountNumber]);
+        $balance = $balanceOf();
         if (!$terms['by_instalment']) {
-            $balance = $initial + $terms['due_today'];
-            $pdo->prepare('UPDATE accounts SET balance = ? WHERE account_number = ?')
-                ->execute([$balance, $accountNumber]);
+            $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE account_number = ?')
+                ->execute([$terms['due_today'], $accountNumber]);
+            $balance = $balanceOf();
             insert_txn(['user_id' => $userId, 'account_number' => $accountNumber, 'type' => 'credit',
                 'mode' => 'ACCOUNT_OPENING', 'amount' => $terms['due_today'], 'balance_after' => $balance,
                 'counterparty_name' => 'Plan funding received at counter',
@@ -649,9 +655,9 @@ function route_register(array $d): void
                 $terms['interest_payout'], $terms['maturity_amount'], $maturityDate,
                 $nominee === '' ? null : $nominee, 'active']);
         if (!$terms['by_instalment']) {
-            $balance -= $terms['due_today'];
-            $pdo->prepare('UPDATE accounts SET balance = ? WHERE account_number = ?')
-                ->execute([$balance, $accountNumber]);
+            $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE account_number = ?')
+                ->execute([$terms['due_today'], $accountNumber]);
+            $balance = $balanceOf();
             insert_txn(['user_id' => $userId, 'account_number' => $accountNumber, 'type' => 'debit',
                 'mode' => 'DEPOSIT_BOOKING', 'amount' => $terms['due_today'], 'balance_after' => $balance,
                 'counterparty_name' => $terms['scheme_name'], 'counterparty_acc' => $depositNumber,
@@ -821,7 +827,7 @@ function route_transactions(array $d): void
         $like = '%' . clip($_GET['q'], 60) . '%';
         array_push($params, $like, $like, $like);
     }
-    [$txns, $meta] = paginate("$sql ORDER BY timestamp DESC, id", $params, 25, 200);
+    [$txns, $meta] = paginate("$sql ORDER BY timestamp DESC, seq DESC, id", $params, 25, 200);
     respond(['transactions' => out_all($txns), 'pagination' => $meta]);
 }
 

@@ -93,7 +93,7 @@ function score_transfer(array $user, array $txn): array
     $history = array_map('floatval', array_column(rows(
         "SELECT amount FROM transactions WHERE user_id = ? AND type = 'debit'
            AND ref_number <> ? AND timestamp >= DATE_SUB(?, INTERVAL 180 DAY)
-         ORDER BY timestamp DESC LIMIT 500",
+         ORDER BY timestamp DESC, seq DESC LIMIT 500",
         [$user['id'], (string)($txn['ref_number'] ?? ''), now_utc()]
     ), 'amount'));
 
@@ -352,7 +352,7 @@ function assistant_answer(string $message, ?array $user): array
 
             case 'transactions':
                 $txns = rows("SELECT type, amount, counterparty_name, description, timestamp, mode
-                    FROM transactions WHERE user_id = ? ORDER BY timestamp DESC LIMIT 5", [$user['id']]);
+                    FROM transactions WHERE user_id = ? ORDER BY timestamp DESC, seq DESC LIMIT 5", [$user['id']]);
                 if ($txns === []) {
                     return ['reply' => 'I cannot see any transactions on your accounts yet.',
                         'intent' => $intent, 'suggestions' => ['What is my balance?']];

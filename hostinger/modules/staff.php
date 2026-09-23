@@ -154,10 +154,10 @@ function route_admin_overview(array $d): void
             'statutory_crr_slr_status' => 'Compliant (CRR: 4.50%, SLR: 18.00%)',
         ],
         'high_value_transactions' => out_all(rows('SELECT * FROM transactions WHERE amount >= 50000
-            ORDER BY timestamp DESC LIMIT 10')),
+            ORDER BY timestamp DESC, seq DESC LIMIT 10')),
         'pending_kyc_users' => array_map('public_user',
             rows("SELECT * FROM users WHERE kyc_status = 'pending_approval' ORDER BY created_at DESC LIMIT 20")),
-        'audit_logs' => out_all(rows('SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 15')),
+        'audit_logs' => out_all(rows('SELECT * FROM audit_logs ORDER BY timestamp DESC, seq DESC LIMIT 15')),
     ]);
 }
 
@@ -182,8 +182,8 @@ function route_admin_kyc_action(array $d): void
 function route_rbi_reports(array $d): void
 {
     staff_user(ADMIN_ROLES);
-    $ctr = out_all(rows('SELECT * FROM transactions WHERE amount >= 100000 ORDER BY timestamp DESC LIMIT 50'));
-    $str = out_all(rows("SELECT * FROM transactions WHERE mode = 'CORPORATE_BULK' ORDER BY timestamp DESC LIMIT 50"));
+    $ctr = out_all(rows('SELECT * FROM transactions WHERE amount >= 100000 ORDER BY timestamp DESC, seq DESC LIMIT 50'));
+    $str = out_all(rows("SELECT * FROM transactions WHERE mode = 'CORPORATE_BULK' ORDER BY timestamp DESC, seq DESC LIMIT 50"));
     respond([
         'report_generated_on' => iso(now_utc()),
         // A Nidhi company reports CTR/STR to FIU-IND under the PMLA; it is not RBI-licensed,

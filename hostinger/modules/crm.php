@@ -55,7 +55,7 @@ function route_crm_member(array $d, string $id = ''): void
             eligibility_status, status, created_at FROM loan_applications WHERE user_id = ?
             ORDER BY created_at DESC LIMIT 20', [$uid])),
         'recent_transactions' => out_all(rows('SELECT timestamp, type, mode, amount, counterparty_name,
-            ref_number FROM transactions WHERE user_id = ? ORDER BY timestamp DESC LIMIT 10', [$uid])),
+            ref_number FROM transactions WHERE user_id = ? ORDER BY timestamp DESC, seq DESC LIMIT 10', [$uid])),
         'standing_instructions' => out_all(rows("SELECT beneficiary_name, amount, frequency, next_run, status,
             last_status, last_error FROM standing_instructions WHERE user_id = ? ORDER BY created_at DESC", [$uid])),
         'tickets' => out_all(rows('SELECT ticket_id, subject, status, priority, due_at, created_at
