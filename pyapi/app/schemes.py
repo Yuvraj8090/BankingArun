@@ -63,11 +63,47 @@ def effective_rate(scheme: dict[str, Any]) -> float | None:
     return php_round(((1 + (low + high) / 2) ** 12 - 1) * 100, 2)
 
 
+def cap_compliant_maturity(scheme: dict[str, Any]) -> dict[str, Any] | None:
+    """The maturity figure a plan would have to print to sit exactly on the cap.
+
+    effective_rate answers "what does this cost"; this answers "what would it
+    have to say instead", which is the only form of the question anyone can act
+    on. Same discounting, solved the other way round. Ported from
+    cap_compliant_maturity() in modules/master.php -- the two must agree, because
+    a rate card and an admin screen quoting different remedies for the same plan
+    is worse than neither quoting one.
+    """
+    months = int(scheme['tenure_months'] or 0)
+    deposit = float(scheme['total_deposit'] or 0)
+    if months < 1 or deposit <= 0:
+        return None
+    r = (1 + NIDHI_MAX_DEPOSIT_RATE / 100) ** (1 / 12) - 1
+    by_instalment = scheme.get('scheme_type') in ('daily', 'recurring')
+    pay_in = int(scheme.get('contribution_months') or 0) or months
+    pay_in = max(1, min(pay_in, months))
+
+    paid_in = deposit
+    if by_instalment:
+        each = deposit / pay_in
+        paid_in = sum(each / (1 + r) ** (i - 1) for i in range(1, pay_in + 1))
+
+    if (scheme.get('payout_type') or 'maturity') == 'monthly':
+        factor = sum(1 / (1 + r) ** i for i in range(1, months + 1))
+        if factor <= 0:
+            return None
+        maturity = paid_in * months / factor
+        return {'maturity_amount': php_round(maturity, 2),
+                'monthly_payout': php_round(maturity / months, 2)}
+    return {'maturity_amount': php_round(paid_in * (1 + r) ** months, 2), 'monthly_payout': None}
+
+
 def scheme_public(scheme: dict[str, Any]) -> dict[str, Any]:
     shaped = out(scheme)
     rate = effective_rate(shaped)
     shaped['effective_rate_pa'] = rate
     shaped['exceeds_cap'] = rate is not None and rate > NIDHI_MAX_DEPOSIT_RATE
+    # Only worked out where it is needed: a plan inside the cap has nothing to fix.
+    shaped['cap_compliant'] = cap_compliant_maturity(shaped) if shaped['exceeds_cap'] else None
 
     # Every denomination is rated, not only the representative one. A slab whose
     # own figures imply a different return is either priced differently on
