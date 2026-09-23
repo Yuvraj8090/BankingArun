@@ -1,5 +1,5 @@
 [Unit]
-Description=AJSPay scheduled money movement (deposit interest, maturities, standing instructions)
+Description=AJSPay scheduled money movement (standing instructions, transfers, deposit interest, maturities, rail settlement)
 Documentation=file:/srv/ajspay/current/cron.php
 After=network.target mariadb.service
 Requires=mariadb.service
@@ -9,23 +9,29 @@ Type=oneshot
 User=www-data
 Group=www-data
 # The live release, by the symlink the deploy swaps, so a run always uses the
-# code that is currently serving rather than whichever release was current when
-# the unit was installed.
+# code that is currently serving. The unit this replaces pointed at
+# /var/www/ajspay/cron.php -- the document root from before the move to atomic
+# releases -- so it kept running the copy that was on the box when it was first
+# provisioned, and every deploy since left the scheduled job behind.
 ExecStart=/usr/bin/php /srv/ajspay/current/cron.php --verbose
 
-# It moves members' money. Give it nothing it does not need.
+# Hardening kept to what cannot break the job. Three directives were dropped
+# after the unit they would replace turned out to be a working one:
+#
+#   MemoryDenyWriteExecute  breaks PHP's JIT, and whether the server has JIT on
+#                           is not knowable from here
+#   ProtectSystem=strict    makes the whole hierarchy read-only, including the
+#                           path to MariaDB's unix socket
+#   ReadOnlyPaths           redundant once ProtectSystem covers /etc
+#
+# None of that is worth finding out about at 02:00 when a payout does not run.
 NoNewPrivileges=true
 PrivateTmp=true
-PrivateDevices=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
 SystemCallArchitectures=native
-SystemCallFilter=@system-service
-ReadOnlyPaths=/srv/ajspay /etc/ajspay

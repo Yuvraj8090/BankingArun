@@ -46,6 +46,15 @@ systemctl daemon-reload
 systemctl enable --now ajspay-cron.timer
 
 echo
+echo "Verifying it can actually run before trusting the schedule:"
+if systemctl start ajspay-cron.service; then
+  systemctl --no-pager -n 12 status ajspay-cron.service || true
+else
+  echo "ERROR: the unit failed on its first run. The previous files are beside" >&2
+  echo "       the new ones with a .replaced- suffix. journalctl -u ajspay-cron -n 30" >&2
+  exit 1
+fi
+echo
 echo "Timer installed. Next run:"
 systemctl list-timers ajspay-cron.timer --no-pager
 echo
