@@ -94,7 +94,7 @@ export default function BranchAdminPage() {
           <div className="flex items-center gap-2 border border-slate-200 rounded-md px-3 h-9 bg-slate-50 flex-1 max-w-sm">
             <Search className="w-4 h-4 text-slate-500" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} data-testid="branch-search"
-              placeholder="Filter by name, code or address" className="flex-1 bg-transparent text-xs outline-none" />
+              placeholder="Filter by name, code or address" className="flex-1 bg-transparent text-xs outline-none py-1.5" />
           </div>
           <button onClick={load} className="px-3 py-2 rounded-md border border-slate-200 text-xs text-slate-700 flex items-center gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh

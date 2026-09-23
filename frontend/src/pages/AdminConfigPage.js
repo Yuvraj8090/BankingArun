@@ -36,7 +36,7 @@ function AutomationPanel() {
             {data.state.replace('_', ' ')}
           </span>
           <button onClick={load} disabled={busy} data-testid="automation-refresh"
-            className="text-[10px] font-semibold underline disabled:opacity-50">
+            className="text-[10px] font-semibold underline disabled:opacity-50 py-1.5 px-1 -mx-1">
             {busy ? 'checking…' : 'check again'}
           </button>
         </div>

@@ -183,8 +183,8 @@ export default function SchemesPage() {
                 {canEdit && (
                   <td className="p-3 text-right whitespace-nowrap">
                     <button onClick={() => setForm({ ...s })} data-testid={`scheme-edit-${s.code}`}
-                      className="text-[#0b3b8c] font-semibold hover:underline">Edit</button>
-                    <button onClick={() => remove(s)} className="ml-3 text-[#c8102e] hover:underline inline-flex items-center gap-1">
+                      className="text-[#0b3b8c] font-semibold hover:underline py-1.5 px-1 -mx-1">Edit</button>
+                    <button onClick={() => remove(s)} className="ml-2 text-[#c8102e] hover:underline inline-flex items-center gap-1 py-1.5 px-1">
                       <Trash2 className="w-3 h-3" /> Delete
                     </button>
                   </td>

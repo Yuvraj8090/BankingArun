@@ -90,7 +90,7 @@ export default function MemberRanksPage() {
             <Search className="w-4 h-4 text-slate-500" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} data-testid="ranks-search"
               placeholder="Find a member by name, phone or standing"
-              className="flex-1 bg-transparent text-xs outline-none" />
+              className="flex-1 bg-transparent text-xs outline-none py-1.5" />
           </div>
         </div>
         <div className="overflow-x-auto">

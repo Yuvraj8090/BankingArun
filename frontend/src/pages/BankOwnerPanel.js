@@ -53,7 +53,7 @@ export default function BankOwnerPanel() {
               <p className="text-xl font-bold text-slate-900 mt-1">{p.value}</p>
               <button data-testid={`policy-edit-${p.key}`}
                 onClick={() => toast.success(`${p.label} sent for board approval`)}
-                className="text-[11px] text-[#0b3b8c] font-semibold mt-2 hover:underline">Propose change →</button>
+                className="text-[11px] text-[#0b3b8c] font-semibold mt-2 hover:underline py-1.5 px-1 -mx-1">Propose change →</button>
             </div>
           ))}
         </div>

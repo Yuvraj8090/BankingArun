@@ -92,7 +92,7 @@ function MembersTab({ onOpen }) {
             className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-md text-sm"
           />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+        <label className="flex items-center gap-1.5 text-xs text-slate-600 py-1.5">
           <input type="checkbox" checked={uncontacted} onChange={(e) => { setUncontacted(e.target.checked); setPage(1); }} />
           Never contacted
         </label>
@@ -884,7 +884,7 @@ function TasksTab() {
           className="border border-slate-200 rounded-md px-3 py-2 text-xs bg-white">
           {['open', 'done', 'cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+        <label className="flex items-center gap-1.5 text-xs text-slate-600 py-1.5">
           <input type="checkbox" checked={all} onChange={(e) => { setAll(e.target.checked); setPage(1); }} />
           Everyone's
         </label>
