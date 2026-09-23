@@ -938,6 +938,19 @@ INSERT IGNORE INTO site_products (id, group_key, slug, title, tagline, summary, 
 
 -- One row per CAPTCHA served. The answer is never stored, only a salted hash of
 -- it, and a row is spent the moment it is used so an answer cannot be replayed.
+-- Every scheduled run, so "is the automation running" is a question the
+-- application can answer rather than one only the server's journal knows.
+CREATE TABLE IF NOT EXISTS cron_runs (
+    id VARCHAR(36) PRIMARY KEY,
+    started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at DATETIME NULL,
+    dry_run TINYINT(1) NOT NULL DEFAULT 0,
+    status VARCHAR(12) NOT NULL DEFAULT 'running',  -- running | ok | attention | failed
+    jobs TEXT,                                      -- per-job counts, as JSON
+    error VARCHAR(500),
+    INDEX idx_cron_started (started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS captcha_challenges (
     id VARCHAR(36) PRIMARY KEY,
     code_hash CHAR(64) NOT NULL,

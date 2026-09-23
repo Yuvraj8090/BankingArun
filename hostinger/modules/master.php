@@ -921,6 +921,92 @@ function route_product_delete(array $d, string $id = ''): void
     respond(['status' => 'SUCCESS', 'message' => "Page /{$product['group_key']}/{$product['slug']} removed."]);
 }
 
+// --- Scheduled automation ----------------------------------------------------------------
+// Whether the nightly run is actually happening. This exists because it was not:
+// cron.php pointed at a cron panel the VPS does not have, so monthly deposit
+// interest, maturities, standing instructions and rail settlement were all
+// implemented, all tested, and never once executed -- and nothing in the
+// application could tell, because the only record a run left was a line in the
+// server's journal.
+
+// A daily job is late once it has missed its window with room to spare. The
+// timer fires at 01:30 IST with up to five minutes of jitter; 26 hours is a full
+// day plus enough slack that a slow night is not reported as a failure.
+const CRON_STALE_HOURS = 26;
+const CRON_JOB_LABELS = [
+    'standing_instructions' => 'Standing instructions',
+    'scheduled_payments' => 'Scheduled transfers',
+    'deposit_interest' => 'Deposit interest (MIS monthly payouts)',
+    'deposit_maturities' => 'Maturities',
+    'payment_rail' => 'Payment rail settlement',
+];
+
+function route_automation_status(array $d): void
+{
+    staff_user(SCHEME_READ_ROLES);
+    // Dry runs prove the wiring but move no money, so they must not be what
+    // makes the page look healthy.
+    $last = row("SELECT * FROM cron_runs WHERE dry_run = 0 ORDER BY started_at DESC LIMIT 1");
+    $lastOk = row("SELECT * FROM cron_runs WHERE dry_run = 0 AND status IN ('ok', 'attention')
+        ORDER BY started_at DESC LIMIT 1");
+    $hours = $lastOk === null ? null
+        : (float)scalar('SELECT TIMESTAMPDIFF(MINUTE, ?, NOW()) / 60', [$lastOk['started_at']]);
+
+    // Three different answers, because they need three different actions: it has
+    // never run, it has stopped running, or it is running and something in it
+    // failed. Collapsing them into one "unhealthy" is what makes a warning
+    // easy to ignore.
+    if ($lastOk === null) {
+        $state = 'never_run';
+        $message = $last === null
+            ? 'The nightly run has never happened. No deposit interest, maturity or standing '
+                . 'instruction has ever been processed automatically. As root on the server, run '
+                . 'scripts/provision-cron.sh to install the timer.'
+            : 'The nightly run has been attempted but has never completed. See its error below.';
+    } elseif ($hours !== null && $hours > CRON_STALE_HOURS) {
+        $state = 'stale';
+        $message = sprintf('The last completed run was %d hours ago. It should run every night at '
+            . '01:30 IST. Check the timer on the server: systemctl list-timers ajspay-cron.timer',
+            (int)$hours);
+    } elseif ($last !== null && $last['status'] === 'attention') {
+        $state = 'attention';
+        $message = 'The last run completed but some items failed. They are counted below and are '
+            . 'retried on the next run.';
+    } else {
+        $state = 'ok';
+        $message = sprintf('Last completed %s hours ago. Runs nightly at 01:30 IST.',
+            $hours === null ? '?' : number_format($hours, 1));
+    }
+
+    $jobs = [];
+    $decoded = $lastOk === null ? [] : (json_decode((string)$lastOk['jobs'], true) ?: []);
+    foreach (CRON_JOB_LABELS as $key => $label) {
+        $jobs[] = ['key' => $key, 'label' => $label,
+            'done' => (int)($decoded[$key]['done'] ?? 0),
+            'failed' => (int)($decoded[$key]['failed'] ?? 0)];
+    }
+
+    respond([
+        'state' => $state,
+        'message' => $message,
+        'healthy' => in_array($state, ['ok', 'attention'], true),
+        'hours_since_last_run' => $hours === null ? null : round($hours, 1),
+        'stale_after_hours' => CRON_STALE_HOURS,
+        'schedule' => 'Daily at 01:30 IST (systemd timer ajspay-cron.timer)',
+        'jobs' => $jobs,
+        'last_run' => $last === null ? null : [
+            'started_at' => out($last)['started_at'],
+            'finished_at' => out($last)['finished_at'],
+            'status' => $last['status'],
+            'error' => $last['error'],
+        ],
+        'recent' => array_map(fn($r) => [
+            'started_at' => out($r)['started_at'], 'status' => $r['status'],
+            'dry_run' => (bool)$r['dry_run'], 'error' => $r['error'],
+        ], rows('SELECT * FROM cron_runs ORDER BY started_at DESC LIMIT 10')),
+    ]);
+}
+
 // --- Recycle bin ------------------------------------------------------------------------
 // The four tables above mark rows deleted rather than removing them, which is
 // only half a feature: without somewhere to see and undo it, a soft delete is

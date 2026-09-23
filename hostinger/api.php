@@ -1230,6 +1230,7 @@ $routes = [
     'GET /referrals/my-code' => 'route_referral_code',
     'GET /referrals/history' => 'route_referral_history',
     'GET /referrals/structure' => 'route_referral_structure',
+    'GET /admin/automation' => 'route_automation_status',
     'GET /admin/recycle-bin' => 'route_recycle_bin',
     'POST /admin/recycle-bin/restore' => 'route_recycle_restore',
     'GET /standing-instructions' => 'route_si_list',

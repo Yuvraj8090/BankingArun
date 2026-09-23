@@ -1,7 +1,84 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle2, Percent, UserCheck, Send } from 'lucide-react';
+import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle2, Percent, UserCheck, Send, Clock } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+
+const STATE_STYLE = {
+  ok: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+  attention: 'bg-amber-50 border-amber-200 text-amber-900',
+  stale: 'bg-red-50 border-red-200 text-[#c8102e]',
+  never_run: 'bg-red-50 border-red-200 text-[#c8102e]',
+};
+
+// Whether the nightly run is happening. Worth a panel of its own because the
+// answer was "no" for months and nothing on any screen said so: the jobs were
+// written and tested, and simply never invoked.
+function AutomationPanel() {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    setBusy(true);
+    try { setData(await api.automationStatus()); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not read the automation status'); }
+    finally { setBusy(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  if (!data) return null;
+
+  return (
+    <Section title="Scheduled automation" icon={Clock}>
+      <div className={`p-3 rounded-md border text-[11px] ${STATE_STYLE[data.state] || STATE_STYLE.attention}`}
+        data-testid="automation-state">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-bold uppercase tracking-wide text-[10px]">
+            {data.state.replace('_', ' ')}
+          </span>
+          <button onClick={load} disabled={busy} data-testid="automation-refresh"
+            className="text-[10px] font-semibold underline disabled:opacity-50">
+            {busy ? 'checking…' : 'check again'}
+          </button>
+        </div>
+        <p className="mt-1">{data.message}</p>
+      </div>
+
+      <div className="mt-3 rounded-md border border-slate-200 overflow-hidden">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
+            <tr>
+              <th className="p-2 font-semibold">Job</th>
+              <th className="p-2 font-semibold text-right">Processed</th>
+              <th className="p-2 font-semibold text-right">Failed</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data.jobs.map((j) => (
+              <tr key={j.key} data-testid={`automation-job-${j.key}`}>
+                <td className="p-2 text-slate-800">{j.label}</td>
+                <td className="p-2 text-right font-semibold text-slate-900">{j.done}</td>
+                <td className={`p-2 text-right font-semibold ${j.failed ? 'text-[#c8102e]' : 'text-slate-400'}`}>
+                  {j.failed}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] text-slate-400 mt-1.5">
+        {data.schedule}. Counts are from the last completed run — a quiet night legitimately shows
+        zeros, which is why the banner above reports when the run itself last happened rather than
+        what it found. Dry runs are excluded: they prove the wiring but move no money.
+      </p>
+
+      {data.last_run?.error && (
+        <p className="text-[11px] text-[#c8102e] mt-1.5" data-testid="automation-error">
+          Last error: {data.last_run.error}
+        </p>
+      )}
+    </Section>
+  );
+}
 
 export default function AdminConfigPage() {
   const [cfg, setCfg] = useState(null);
@@ -60,6 +137,8 @@ export default function AdminConfigPage() {
         </div>
         <span className="px-2.5 py-1 rounded bg-blue-50 text-[#0b3b8c] border border-blue-200 text-[10px] font-bold">DIRECTOR</span>
       </div>
+
+      <AutomationPanel />
 
       {/* Live OTP toggle */}
       <Section title="OTP Delivery Mode" icon={ShieldCheck}>
@@ -292,7 +371,7 @@ function SecretInput({ label, value, onChange, show, onToggle, placeholder, test
         <input type={show ? 'text' : 'password'} value={value} placeholder={placeholder} data-testid={testId}
           onChange={e => onChange(e.target.value)}
           className="w-full border border-slate-200 rounded-md px-3 py-2 pr-10 text-sm text-slate-900 font-mono" />
-        <button type="button" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-700">
+        <button type="button" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-700">
           {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         </button>
       </div>

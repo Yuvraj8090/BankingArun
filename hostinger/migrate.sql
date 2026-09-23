@@ -881,3 +881,20 @@ UPDATE schemes SET name = 'Niyamit Aay 60 Month MIS', scheme_type = 'mis',
     total_deposit = 200000.0, maturity_amount = 300000.0,
     payout_type = 'monthly', status = 'active', slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]'
     WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL;
+
+-- Every scheduled run, so "is the automation running" is a question the
+-- application can answer. cron.php wrote to the journal and nowhere else, which
+-- is how it went months without being invoked at all: nothing inside the system
+-- could tell the difference between a run that paid nothing and no run.
+CREATE TABLE IF NOT EXISTS cron_runs (
+    id VARCHAR(36) PRIMARY KEY,
+    started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at DATETIME NULL,
+    dry_run TINYINT(1) NOT NULL DEFAULT 0,
+    -- running: started and not yet finished, which after a few minutes means it
+    -- died. attention: it ran, but a job reported failures.
+    status VARCHAR(12) NOT NULL DEFAULT 'running',
+    jobs TEXT,
+    error VARCHAR(500),
+    INDEX idx_cron_started (started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

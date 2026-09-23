@@ -417,6 +417,14 @@ if ((int)scalar('SELECT GET_LOCK(?, 0)', [CRON_LOCK]) !== 1) {
     exit(0);
 }
 
+// Written before any work, not after it. A run that dies half way through
+// leaves a row stuck at 'running', which is the state worth being able to see;
+// a row only written on success would make a crash look exactly like a night
+// with nothing to do.
+$runId = uuid4();
+$pdo->prepare('INSERT INTO cron_runs (id, dry_run, status) VALUES (?, ?, ?)')
+    ->execute([$runId, (int)$dryRun, 'running']);
+
 try {
     [$siDone, $siFailed] = run_standing_instructions($today, $dryRun, $verbose);
     [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
@@ -429,6 +437,10 @@ try {
     }
     error_log('AJSPay cron error: ' . $e);
     say('ERROR: ' . $e->getMessage());
+    // Recorded before the lock goes, and deliberately not inside a transaction
+    // that may have just been rolled back.
+    $pdo->prepare("UPDATE cron_runs SET finished_at = NOW(), status = 'failed', error = ? WHERE id = ?")
+        ->execute([mb_substr($e->getMessage(), 0, 500), $runId]);
     scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
     exit(1);  // $finished stays false; the shutdown handler would do this anyway
 }
@@ -443,4 +455,13 @@ $finished = true;
 // A rail transaction that is still pending is not a failure — the partner has
 // simply not answered yet — so it does not make the run report a problem.
 $problems = $siFailed + $payFailed + $intFailed + $matFailed + $railFailed;
+$pdo->prepare('UPDATE cron_runs SET finished_at = NOW(), status = ?, jobs = ? WHERE id = ?')
+    ->execute([$problems > 0 ? 'attention' : 'ok', json_encode([
+        'standing_instructions' => ['done' => $siDone, 'failed' => $siFailed],
+        'scheduled_payments' => ['done' => $payDone, 'failed' => $payFailed],
+        'deposit_interest' => ['done' => $intDone, 'failed' => $intFailed],
+        'deposit_maturities' => ['done' => $matDone, 'failed' => $matFailed],
+        'payment_rail' => ['done' => $railDone, 'failed' => $railFailed,
+            'dispatched' => $railSent, 'pending' => $railStuck],
+    ]), $runId]);
 exit($problems > 0 ? 2 : 0);  // 2 = ran, but something needs a look
