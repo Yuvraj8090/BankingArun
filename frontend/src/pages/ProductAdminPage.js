@@ -35,9 +35,9 @@ function StringList({ label, hint, values, onChange, placeholder }) {
             </button>
           </div>
         ))}
-        {!values.length && <p className="text-[11px] text-slate-400">None yet.</p>}
+        {!values.length && <p className="text-[11px] text-slate-500">None yet.</p>}
       </div>
-      {hint && <p className="text-[10px] text-slate-400 mt-1">{hint}</p>}
+      {hint && <p className="text-[10px] text-slate-500 mt-1">{hint}</p>}
     </div>
   );
 }
@@ -66,7 +66,7 @@ function FactList({ values, onChange }) {
             </button>
           </div>
         ))}
-        {!values.length && <p className="text-[11px] text-slate-400">No rows yet.</p>}
+        {!values.length && <p className="text-[11px] text-slate-500">No rows yet.</p>}
       </div>
     </div>
   );
@@ -165,7 +165,7 @@ export default function ProductAdminPage() {
                     </div>
                     <div className="text-[11px] text-slate-500 font-mono mt-0.5">/{p.path}</div>
                     <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{p.tagline}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">
+                    <p className="text-[10px] text-slate-500 mt-1">
                       {p.highlights.length} highlights · {p.facts.length} detail rows · {p.documents.length} documents
                     </p>
                   </div>
@@ -255,16 +255,16 @@ export default function ProductAdminPage() {
               values={form.documents} onChange={(documents) => setForm({ ...form, documents })} />
 
             <label className="block">
-              <span className="block text-slate-500 mb-1">Footnote <span className="text-slate-400">(optional)</span></span>
+              <span className="block text-slate-500 mb-1">Footnote <span className="text-slate-500">(optional)</span></span>
               <textarea rows={2} className={input} value={form.note || ''}
                 onChange={(e) => setForm({ ...form, note: e.target.value })} />
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="block text-slate-500 mb-1">Requires authorisation <span className="text-slate-400">(optional)</span></span>
+                <span className="block text-slate-500 mb-1">Requires authorisation <span className="text-slate-500">(optional)</span></span>
                 <input className={`${input} font-mono`} value={form.requires || ''} placeholder="debit_cards"
                   onChange={(e) => setForm({ ...form, requires: e.target.value })} />
-                <span className="block text-[10px] text-slate-400 mt-1">
+                <span className="block text-[10px] text-slate-500 mt-1">
                   Shows a "not currently offered" notice unless the institution holds this authorisation.
                 </span>
               </label>

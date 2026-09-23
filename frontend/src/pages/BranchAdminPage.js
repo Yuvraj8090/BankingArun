@@ -14,7 +14,7 @@ const Field = ({ label, hint, children }) => (
   <label className="block">
     <span className="block text-slate-500 mb-1">{label}</span>
     {children}
-    {hint && <span className="block text-[10px] text-slate-400 mt-1">{hint}</span>}
+    {hint && <span className="block text-[10px] text-slate-500 mt-1">{hint}</span>}
   </label>
 );
 

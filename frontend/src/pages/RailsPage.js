@@ -431,7 +431,7 @@ function DriverButton({ label, active, onClick, testId }) {
   return (
     <button type="button" onClick={onClick} data-testid={testId} disabled={active}
       className={`px-3 py-1.5 rounded-md text-[11px] font-semibold border transition ${active
-        ? 'bg-white border-slate-300 text-slate-400 cursor-default'
+        ? 'bg-white border-slate-300 text-slate-500 cursor-default'
         : 'bg-[#0b3b8c] border-[#0b3b8c] text-white hover:bg-[#092e6f]'}`}>
       {active ? `${label} (current)` : `Switch to ${label}`}
     </button>
@@ -452,11 +452,11 @@ function Gate({ label, on, hint, testId }) {
     <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
       <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
       <div data-testid={testId}
-        className={`text-sm font-bold mt-1 flex items-center gap-1.5 ${on ? 'text-emerald-700' : 'text-slate-400'}`}>
+        className={`text-sm font-bold mt-1 flex items-center gap-1.5 ${on ? 'text-emerald-700' : 'text-slate-500'}`}>
         {on ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
         {on ? 'Authorised' : 'Not authorised'}
       </div>
-      <div className="text-[10px] text-slate-400 mt-0.5">{hint}</div>
+      <div className="text-[10px] text-slate-500 mt-0.5">{hint}</div>
     </div>
   );
 }

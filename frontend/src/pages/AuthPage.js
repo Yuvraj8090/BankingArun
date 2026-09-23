@@ -328,7 +328,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                     inputMode="numeric" autoComplete="off" maxLength={6} placeholder="12345"
                     className="w-full bg-white border border-slate-300 rounded-md px-3 py-2.5 text-sm tracking-[0.3em] font-mono focus:outline-none focus:border-[#0b3b8c]" />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
+                <p className="text-[10px] text-slate-500 mt-1">
                   Can't read it? Use the refresh button for a new number, or call 9105015464.
                 </p>
               </div>

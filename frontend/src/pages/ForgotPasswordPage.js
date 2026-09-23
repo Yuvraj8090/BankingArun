@@ -112,7 +112,7 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setPassword(e.target.value)} autoComplete="new-password"
                 className={`${input} pl-3`} />
             </label>
-            <p className="text-[10px] text-slate-400 -mt-2 leading-relaxed">
+            <p className="text-[10px] text-slate-500 -mt-2 leading-relaxed">
               At least 8 characters, and not one that has appeared in a known breach.
               We check this without your password leaving our server.
             </p>

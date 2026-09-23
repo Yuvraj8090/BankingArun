@@ -192,7 +192,7 @@ export default function KycAccountPage() {
             >
               {savingNominee ? 'Saving…' : 'Update Nominee Registration'}
             </button>
-            <p className="text-[10px] text-slate-400 leading-relaxed">
+            <p className="text-[10px] text-slate-500 leading-relaxed">
               A nomination decides who the deposit is paid to, so the change is recorded
               against your account and kept in the audit trail.
             </p>

@@ -120,7 +120,7 @@ export default function DocumentUpload({ kind, label, hint, existing, onUploaded
 
       <input ref={inputRef} type="file" className="hidden"
         accept="image/jpeg,image/png,application/pdf" onChange={choose} />
-      {hint && <p className="text-[10px] text-slate-400 mt-1">{hint}</p>}
+      {hint && <p className="text-[10px] text-slate-500 mt-1">{hint}</p>}
     </div>
   );
 }

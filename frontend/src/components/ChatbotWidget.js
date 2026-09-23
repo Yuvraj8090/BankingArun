@@ -94,7 +94,7 @@ export default function ChatbotWidget() {
                         hover:border-[#0b3b8c] hover:text-[#0b3b8c] hover:bg-blue-50/60 transition"
                     >
                       <span>{p}</span>
-                      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-500" />
                     </button>
                   ))}
                 </div>

@@ -84,7 +84,7 @@ export default function SearchBox({ items, onPick, placeholder, testId = 'global
                     <span className="block truncate">{item.label}</span>
                     {item.hint && <span className="block truncate text-[11px] text-slate-500">{item.hint}</span>}
                   </span>
-                  {i === cursor && <CornerDownLeft className="w-3 h-3 text-slate-400 shrink-0" />}
+                  {i === cursor && <CornerDownLeft className="w-3 h-3 text-slate-500 shrink-0" />}
                 </button>
               );
             })
