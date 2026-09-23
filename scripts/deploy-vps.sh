@@ -105,6 +105,14 @@ if systemctl list-unit-files ajspay-pyapi.service >/dev/null 2>&1 &&
    systemctl is-enabled --quiet ajspay-pyapi 2>/dev/null; then
   sudo -n /usr/bin/systemctl restart ajspay-pyapi ||
     echo 'WARNING: could not restart the Python service; it is serving the previous code' >&2
+  # systemctl returns as soon as the unit is activated, not when uvicorn has
+  # bound its port, and Apache proxies with retry=0 -- so the smoke check below
+  # was racing a service that had not finished starting and getting a 503. Wait
+  # for the port itself, which is the only thing that actually answers.
+  for _ in $(seq 1 30); do
+    (exec 3<>/dev/tcp/127.0.0.1/8081) 2>/dev/null && { exec 3>&- 3<&-; break; }
+    sleep 1
+  done
   # The proxy map in the repository is the record of which routes have moved;
   # applying it here keeps the running configuration equal to it.
   sudo -n /usr/local/sbin/ajspay-apply-proxy ||
@@ -125,17 +133,24 @@ served=$(curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt 2>
   smoke_failed="$smoke_failed"$'\n'"  version.txt served '$served', expected '$revision'"
 for probe in "/api/auth/me 401 PHP" "/api/public/features 200 Python"; do
   read -r path want backend <<<"$probe"
-  got=$(curl -sS -o /tmp/smoke.body -w '%{http_code}' "https://ajspay.co.in$path" || echo 000)
+  for attempt in $(seq 1 10); do
+    got=$(curl -sS -o /tmp/smoke.body -w '%{http_code}' "https://ajspay.co.in$path" || echo 000)
+    [[ "$got" == "$want" ]] && break
+    sleep 2
+  done
   [[ "$got" == "$want" ]] ||
-    smoke_failed="$smoke_failed"$'\n'"  $path ($backend) answered $got, expected $want: $(head -c 160 /tmp/smoke.body | tr '\n' ' ')"
+    smoke_failed="$smoke_failed"$'\n'"  $path ($backend) answered $got after 10 tries, expected $want: $(head -c 160 /tmp/smoke.body | tr '\n' ' ')"
 done
 if [[ -n "$smoke_failed" ]]; then
   echo "Deployment smoke check failed:$smoke_failed" >&2
-  # Only the Python half can fail without the PHP half noticing, so its log is
-  # the one worth capturing before the rollback hides the cause.
+  # The deploy account cannot read the journal -- it is not in adm or
+  # systemd-journal and its sudo grants cover three commands, none of them
+  # journalctl -- so asking for the log just printed "No entries" and looked
+  # like the service had said nothing. Report what it can actually see.
   if systemctl is-enabled --quiet ajspay-pyapi 2>/dev/null; then
-    echo '--- last 20 lines from the Python service ---' >&2
-    journalctl -u ajspay-pyapi -n 20 --no-pager 2>&1 | sed 's/^/  /' >&2 || true
+    echo "  Python service is $(systemctl is-active ajspay-pyapi 2>&1), port 8081 $(
+      (exec 3<>/dev/tcp/127.0.0.1/8081) 2>/dev/null && echo 'accepting' || echo 'not accepting')" >&2
+    echo '  For its log, as root on the VPS: journalctl -u ajspay-pyapi -n 50' >&2
   fi
   if [[ -n "$previous" ]]; then
     ln -s "$previous" current.rollback
