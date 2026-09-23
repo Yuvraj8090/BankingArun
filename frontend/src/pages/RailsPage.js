@@ -381,7 +381,7 @@ export default function RailsPage() {
                 </td></tr>
               )}
               {txns.map((t) => (
-                <tr key={t.id} data-testid="rails-txn-row" className="border-t border-slate-100 hover:bg-slate-50">
+                <tr key={t.id} data-testid="rails-txn-row" className="border-t border-slate-100 hover:bg-blue-50/40 transition-colors">
                   <Td>
                     <span className="inline-flex items-center gap-1">
                       {t.direction === 'payout'

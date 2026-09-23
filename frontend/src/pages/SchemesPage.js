@@ -135,7 +135,7 @@ export default function SchemesPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.schemes.map(s => (
-              <tr key={s.id} data-testid={`scheme-row-${s.code}`} className="hover:bg-slate-50">
+              <tr key={s.id} data-testid={`scheme-row-${s.code}`} className="hover:bg-blue-50/40 transition-colors">
                 <td className="p-3 font-mono font-semibold text-slate-900">{s.code}</td>
                 <td className="p-3 text-slate-700">{s.name}</td>
                 <td className="p-3 text-slate-600">{TYPE_LABEL[s.scheme_type] || s.scheme_type}</td>

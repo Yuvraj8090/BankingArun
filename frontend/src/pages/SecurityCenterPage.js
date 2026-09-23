@@ -158,7 +158,7 @@ export default function SecurityCenterPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {events.events.map(e => (
-                  <tr key={e.id} className="hover:bg-slate-50">
+                  <tr key={e.id} className="hover:bg-blue-50/40 transition-colors">
                     <td className="p-3 text-slate-500 whitespace-nowrap">{new Date(e.created_at).toLocaleString('en-IN')}</td>
                     <td className="p-3">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${SEVERITY[e.severity]}`}>

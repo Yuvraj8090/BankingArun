@@ -96,7 +96,7 @@ export default function AdminPortal() {
               className={`px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${
                 activeTab === t.key
                   ? 'border-[#0b3b8c] text-[#0b3b8c]'
-                  : 'border-transparent text-slate-600 hover:text-white'
+                  : 'border-transparent text-slate-600 hover:text-[#0b3b8c] hover:bg-blue-50/60'
               }`}
             >
               <t.icon className="w-3.5 h-3.5" /> {t.label}
@@ -142,7 +142,7 @@ export default function AdminPortal() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(overview?.high_value_transactions || []).map(t => (
-                    <tr key={t.id} className="hover:bg-slate-50">
+                    <tr key={t.id} className="hover:bg-blue-50/40 transition-colors">
                       <td className="p-3 font-mono text-[#0b3b8c]">{t.ref_number}</td>
                       <td className="p-3 font-semibold text-slate-800">{t.mode}</td>
                       <td className="p-3 text-slate-700">{t.counterparty_name}</td>
@@ -256,7 +256,7 @@ export default function AdminPortal() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(overview?.audit_logs || []).map(a => (
-                  <tr key={a.id} className="hover:bg-slate-50">
+                  <tr key={a.id} className="hover:bg-blue-50/40 transition-colors">
                     <td className="p-3 font-semibold text-[#0b3b8c]">{a.action}</td>
                     <td className="p-3 font-mono text-slate-700">{a.email}</td>
                     <td className="p-3 text-slate-700">{a.details}</td>

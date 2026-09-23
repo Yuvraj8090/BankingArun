@@ -770,7 +770,7 @@ function LeadsTab() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.leads.map((l) => (
-                    <tr key={l.id} data-testid={`crm-lead-${l.id}`} className="hover:bg-slate-50">
+                    <tr key={l.id} data-testid={`crm-lead-${l.id}`} className="hover:bg-blue-50/40 transition-colors">
                       <td className="p-3 font-semibold text-slate-900">{l.name}</td>
                       <td className="p-3 text-slate-600">{l.phone}<br /><span className="text-slate-500">{l.email || '—'}</span></td>
                       <td className="p-3 text-slate-600">{l.source}{l.agent_name ? ` · ${l.agent_name}` : ''}</td>

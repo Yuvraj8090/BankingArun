@@ -20,7 +20,16 @@ const ROLE_BADGE = {
 export default function Navbar({ onNavigate, activeTab }) {
   const { user, logout, features } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const badge = ROLE_BADGE[user?.role] || ROLE_BADGE.retail;
+  const notifications = [
+    activeTab === 'collection'
+      ? ['Collection follow-up due', 'Review active recovery cases']
+      : activeTab === 'loan-dept'
+      ? ['Loan pipeline updated', 'Applications are waiting for decision']
+      : ['Security reminder', 'Review pending dashboard actions'],
+    ['Session protected', 'Encrypted member portal session is active']
+  ];
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -43,17 +52,41 @@ export default function Navbar({ onNavigate, activeTab }) {
 
           {/* Right */}
           <div className="flex items-center gap-2">
-            <button data-testid="notification-bell-btn" className="relative p-2 rounded-md hover:bg-slate-100 text-slate-600">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#c8102e] rounded-full" />
-            </button>
+            <div className="relative">
+              <button
+                data-testid="notification-bell-btn"
+                aria-label="Open notifications"
+                aria-expanded={showNotifications}
+                onClick={() => { setShowNotifications(v => !v); setShowMenu(false); }}
+                className="relative p-2 rounded-md hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/25 active:scale-95 text-slate-600 transition"
+              >
+                <Bell className="w-4 h-4" />
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#c8102e] rounded-full" />
+              </button>
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-md shadow-lg p-2 z-50" data-testid="notification-dropdown">
+                  <div className="px-3 py-2 border-b border-slate-100">
+                    <p className="font-semibold text-slate-900 text-sm">Notifications</p>
+                    <p className="text-[11px] text-slate-500">Latest portal alerts</p>
+                  </div>
+                  <div className="py-1">
+                    {notifications.map(([title, detail]) => (
+                      <button key={title} className="w-full text-left px-3 py-2 rounded hover:bg-slate-50 focus:outline-none focus:bg-slate-50 transition">
+                        <span className="block text-xs font-semibold text-slate-800">{title}</span>
+                        <span className="block text-[11px] text-slate-500 mt-0.5">{detail}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {user && (
               <div className="relative">
                 <button
                   data-testid="user-profile-menu-btn"
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-md border border-slate-200 hover:border-[#0b3b8c] text-xs transition bg-white"
+                  onClick={() => { setShowMenu(!showMenu); setShowNotifications(false); }}
+                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-md border border-slate-200 hover:border-[#0b3b8c] focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/25 active:scale-[0.98] text-xs transition bg-white"
                 >
                   <div className="w-7 h-7 rounded-full bg-[#0b3b8c] text-white flex items-center justify-center font-bold text-[11px]">
                     {user.name ? user.name[0].toUpperCase() : 'U'}

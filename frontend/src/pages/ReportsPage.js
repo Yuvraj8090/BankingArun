@@ -283,7 +283,7 @@ function ReportView({ report }) {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.rows.map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
+                    <tr key={i} className="hover:bg-blue-50/40 transition-colors">
                       {columns.map(([col, format]) => (
                         <td key={col} className={`p-3 ${
                           format === 'money' || format === 'int'

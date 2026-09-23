@@ -95,7 +95,7 @@ export default function DataRequestsPage() {
                 const left = daysLeft(r.due_by);
                 const late = r.status === 'open' && left < 0;
                 return (
-                  <tr key={r.id} data-testid={`request-row-${r.reference}`} className="hover:bg-slate-50">
+                  <tr key={r.id} data-testid={`request-row-${r.reference}`} className="hover:bg-blue-50/40 transition-colors">
                     <td className="p-3 font-mono font-semibold text-slate-900 whitespace-nowrap">{r.reference}</td>
                     <td className="p-3">
                       <div className="font-semibold text-slate-900">{r.name}</div>

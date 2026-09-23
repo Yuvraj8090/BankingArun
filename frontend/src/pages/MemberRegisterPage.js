@@ -139,7 +139,7 @@ export default function MemberRegisterPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.members.map((m) => (
-                <tr key={m.id} data-testid={`register-row-${m.folio_no}`} className="hover:bg-slate-50">
+                <tr key={m.id} data-testid={`register-row-${m.folio_no}`} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3 font-mono font-semibold text-slate-900 whitespace-nowrap">{m.folio_no}</td>
                   <td className="p-3">
                     <div className="font-semibold text-slate-900">{m.name}</div>

@@ -105,7 +105,7 @@ export default function MemberRanksPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {shown.map((m) => (
-                <tr key={m.id} data-testid={`rank-row-${m.id}`} className="hover:bg-slate-50">
+                <tr key={m.id} data-testid={`rank-row-${m.id}`} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3">
                     <div className="font-semibold text-slate-900">{m.name}</div>
                     <div className="text-[11px] text-slate-500">{m.phone}{m.email ? ` · ${m.email}` : ''}</div>

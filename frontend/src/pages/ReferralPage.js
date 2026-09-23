@@ -102,7 +102,7 @@ function BrochureStructure() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {(ill ? ill.levels : data.instalment.levels).map((r) => (
-                <tr key={r.level} className="hover:bg-slate-50">
+                <tr key={r.level} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-2 font-semibold text-slate-900">{r.level}</td>
                   {r.rates.map((rate, i) => (
                     <td key={i} className="p-2 text-right text-slate-700">
@@ -275,7 +275,7 @@ export default function ReferralPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {history.referrals.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-50">
+                  <tr key={r.id} className="hover:bg-blue-50/40 transition-colors">
                     <td className="p-3 font-semibold text-slate-900">{r.referee_name}</td>
                     <td className="p-3 text-slate-600">{r.referee_email}</td>
                     <td className="p-3 text-slate-500">{new Date(r.created_at).toLocaleDateString('en-IN')}</td>

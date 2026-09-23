@@ -143,7 +143,7 @@ export default function PublicRatesPage() {
                                 // A row pricing above the statutory cap is tinted as well as
                                 // labelled: colour alone is not a disclosure for a reader who
                                 // cannot distinguish it.
-                                <tr key={i} className={slab.exceeds_cap ? 'bg-rose-50' : 'hover:bg-slate-50'}>
+                                <tr key={i} className={slab.exceeds_cap ? 'bg-rose-50' : 'hover:bg-blue-50/40 transition-colors'}>
                                   <td className="p-2.5 font-semibold text-slate-900 tabular-nums whitespace-nowrap">₹{inr(slab.unit)}</td>
                                   <td className="p-2.5 text-right text-slate-700 tabular-nums whitespace-nowrap">₹{inr(slab.deposit)}</td>
                                   <td className="p-2.5 text-right font-semibold text-slate-900 tabular-nums whitespace-nowrap">₹{inr(slab.maturity)}</td>

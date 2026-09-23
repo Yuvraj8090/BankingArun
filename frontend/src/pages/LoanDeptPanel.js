@@ -35,7 +35,7 @@ export default function LoanDeptPanel() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Kpi label="Applications" value={k.total_applications} icon={FileSearch} />
-        <Kpi label="Disbursed" value={`₹${k.disbursed_amount.toLocaleString('en-IN')}`} icon={TrendingUp} color="text-emerald-700" />
+        <Kpi label="Disbursed" value={`₹${Number(k.disbursed_amount).toLocaleString('en-IN')}`} icon={TrendingUp} color="text-emerald-700" />
         <Kpi label="In Review" value={k.in_review} icon={GanttChartSquare} color="text-amber-700" />
         <Kpi label="NPA Ratio" value={k.npa_ratio} icon={Calculator} color="text-[#c8102e]" />
       </div>
@@ -60,10 +60,10 @@ export default function LoanDeptPanel() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.applications.map(a => (
-                <tr key={a.id} className="hover:bg-slate-50">
+                <tr key={a.id} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3 font-semibold text-slate-900">{a.applicant}</td>
                   <td className="p-3">{a.loan_type}</td>
-                  <td className="p-3 font-bold text-[#0b3b8c]">₹{a.amount.toLocaleString('en-IN')}</td>
+                  <td className="p-3 font-bold text-[#0b3b8c]">₹{Number(a.amount).toLocaleString('en-IN')}</td>
                   <td className="p-3">{a.tenure_months} mo</td>
                   <td className="p-3">{a.roi}%</td>
                   <td className="p-3">
@@ -86,6 +86,9 @@ export default function LoanDeptPanel() {
                   </td>
                 </tr>
               ))}
+              {!data.applications.length && (
+                <tr><td colSpan={8} className="p-6 text-center text-slate-500">No loan applications in the pipeline.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -108,8 +111,8 @@ function Kpi({ label, value, icon: Icon, color = 'text-[#0b3b8c]' }) {
 
 function IconBtn({ icon: Icon, title, onClick, color = 'text-[#0b3b8c]', testId }) {
   return (
-    <button data-testid={testId} onClick={onClick} title={title}
-      className={`w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center ${color}`}>
+    <button data-testid={testId} onClick={onClick} title={title} aria-label={title}
+      className={`w-8 h-8 rounded-md hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/20 active:scale-95 transition flex items-center justify-center ${color}`}>
       <Icon className="w-3.5 h-3.5" />
     </button>
   );

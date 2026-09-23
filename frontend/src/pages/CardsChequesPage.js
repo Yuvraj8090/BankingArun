@@ -155,7 +155,7 @@ export default function CardsChequesPage() {
               data-testid={`cards-tab-${t.k}`}
               onClick={() => setTab(t.k)}
               className={`px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition ${
-                tab === t.k ? 'border-[#0b3b8c] text-[#0b3b8c]' : 'border-transparent text-slate-600 hover:text-white'
+                tab === t.k ? 'border-[#0b3b8c] text-[#0b3b8c]' : 'border-transparent text-slate-600 hover:text-[#0b3b8c] hover:bg-blue-50/60'
               }`}
             >
               <t.i className="w-3.5 h-3.5" /> {t.l}

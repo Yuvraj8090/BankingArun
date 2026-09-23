@@ -113,7 +113,7 @@ export default function GrievancePage() {
                 const left = daysLeft(g.grievance_due_by);
                 const late = g.grievance_status === 'open' && left < 0;
                 return (
-                  <tr key={g.id} data-testid={`grievance-row-${g.ticket_id}`} className="hover:bg-slate-50">
+                  <tr key={g.id} data-testid={`grievance-row-${g.ticket_id}`} className="hover:bg-blue-50/40 transition-colors">
                     <td className="p-3 font-mono font-semibold text-slate-900 whitespace-nowrap">{g.ticket_id}</td>
                     <td className="p-3">
                       <div className="font-semibold text-slate-900">{g.user_name}</div>

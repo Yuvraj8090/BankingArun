@@ -110,7 +110,7 @@ function Hits() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.hits.map((h) => (
-                <tr key={h.id} data-testid={`hit-row-${h.id}`} className="hover:bg-slate-50">
+                <tr key={h.id} data-testid={`hit-row-${h.id}`} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3">
                     <div className="font-semibold text-slate-900">{h.member_name || h.screened_name}</div>
                     <div className="text-[11px] text-slate-500">{h.member_email || 'Lead, not yet a member'}</div>
@@ -276,7 +276,7 @@ function Watchlist() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.entries.map((e) => (
-                <tr key={e.id} className="hover:bg-slate-50">
+                <tr key={e.id} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-slate-100 text-slate-700 border-slate-200">
                       {e.list_name}

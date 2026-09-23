@@ -53,7 +53,7 @@ export default function BankOwnerPanel() {
               <p className="text-xl font-bold text-slate-900 mt-1">{p.value}</p>
               <button data-testid={`policy-edit-${p.key}`}
                 onClick={() => toast.success(`${p.label} sent for board approval`)}
-                className="text-[11px] text-[#0b3b8c] font-semibold mt-2 hover:underline py-1.5 px-1 -mx-1">Propose change →</button>
+                className="text-[11px] text-[#0b3b8c] font-semibold mt-2 hover:underline focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/20 active:scale-[0.98] rounded py-1.5 px-1 -mx-1 transition">Propose change →</button>
             </div>
           ))}
         </div>
@@ -65,7 +65,7 @@ export default function BankOwnerPanel() {
           <h2 className="text-sm font-semibold text-slate-900">Branch Network</h2>
           <button data-testid="add-branch-btn"
             onClick={() => toast.success('Branch creation form queued for BOD approval')}
-            className="px-3 py-1.5 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold">+ Add Branch</button>
+            className="px-3 py-1.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/25 active:scale-[0.98] transition text-white text-xs font-semibold">+ Add Branch</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -79,7 +79,7 @@ export default function BankOwnerPanel() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.branches.map(b => (
-                <tr key={b.id} className="hover:bg-slate-50">
+                <tr key={b.id} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3 font-semibold text-[#0b3b8c]">{b.bank}</td>
                   <td className="p-3">{b.name}<div className="text-[10px] text-slate-500">{b.address}</div></td>
                   <td className="p-3 font-mono">{b.code}</td>
@@ -90,6 +90,9 @@ export default function BankOwnerPanel() {
                   </td>
                 </tr>
               ))}
+              {!data.branches.length && (
+                <tr><td colSpan={4} className="p-6 text-center text-slate-500">No branches found.</td></tr>
+              )}
             </tbody>
           </table>
         </div>

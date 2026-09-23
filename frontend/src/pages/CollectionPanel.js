@@ -27,7 +27,7 @@ export default function CollectionPanel() {
   if (!data) return <div className="p-10 flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" /> Loading collection cases…</div>;
 
   const k = data.kpis;
-  const progress = Math.round((k.recovered_month / k.recovery_target_month) * 100);
+  const progress = k.recovery_target_month ? Math.round((k.recovered_month / k.recovery_target_month) * 100) : 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -47,7 +47,7 @@ export default function CollectionPanel() {
             <Target className="w-3.5 h-3.5 text-emerald-700" />
             <p className="text-[11px] text-slate-600">Monthly Recovery Target</p>
           </div>
-          <p className="text-sm font-bold text-slate-900 mt-2">₹{k.recovered_month.toLocaleString('en-IN')} / ₹{k.recovery_target_month.toLocaleString('en-IN')}</p>
+          <p className="text-sm font-bold text-slate-900 mt-2">₹{Number(k.recovered_month).toLocaleString('en-IN')} / ₹{Number(k.recovery_target_month).toLocaleString('en-IN')}</p>
           <div className="w-full h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, progress)}%` }}></div>
           </div>
@@ -74,7 +74,7 @@ export default function CollectionPanel() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.cases.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50">
+                <tr key={c.id} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3">
                     <div className="font-semibold text-slate-900">{c.borrower}</div>
                     <div className="text-[10px] text-slate-500 flex items-center gap-1"><Phone className="w-3 h-3" /> {c.phone}</div>
@@ -97,6 +97,9 @@ export default function CollectionPanel() {
                   </td>
                 </tr>
               ))}
+              {!data.cases.length && (
+                <tr><td colSpan={7} className="p-6 text-center text-slate-500">No active recovery cases.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -119,8 +122,8 @@ function Kpi({ label, value, icon: Icon, color = 'text-[#0b3b8c]' }) {
 
 function IconBtn({ icon: Icon, title, onClick, color = 'text-[#0b3b8c]', testId }) {
   return (
-    <button data-testid={testId} onClick={onClick} title={title}
-      className={`w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center ${color}`}>
+    <button data-testid={testId} onClick={onClick} title={title} aria-label={title}
+      className={`w-8 h-8 rounded-md hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/20 active:scale-95 transition flex items-center justify-center ${color}`}>
       <Icon className="w-3.5 h-3.5" />
     </button>
   );

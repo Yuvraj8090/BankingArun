@@ -114,7 +114,7 @@ export default function BranchAdminPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {shown.map((b) => (
-                <tr key={b.id} data-testid={`branch-row-${b.code}`} className="hover:bg-slate-50">
+                <tr key={b.id} data-testid={`branch-row-${b.code}`} className="hover:bg-blue-50/40 transition-colors">
                   <td className="px-4 py-3 align-top">
                     <div className="font-semibold text-slate-900">{b.name}</div>
                     <div className="text-[11px] text-slate-500 font-mono">{b.code}</div>

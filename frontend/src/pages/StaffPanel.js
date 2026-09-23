@@ -44,7 +44,7 @@ export default function StaffPanel() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.recent_customers.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50">
+                <tr key={c.id} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3">
                     <div className="font-semibold text-slate-900">{c.name}</div>
                     <div className="text-[10px] text-slate-500">{c.role}</div>
@@ -63,12 +63,15 @@ export default function StaffPanel() {
                   <td className="p-3 text-right">
                     <button data-testid={`staff-assist-${c.id}`}
                       onClick={() => toast.success(`Assisting ${c.name}`)}
-                      className="px-3 py-1 rounded-md bg-[#0b3b8c] text-white text-[11px] font-semibold">
+                      className="px-3 py-1 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/25 active:scale-[0.98] transition text-white text-[11px] font-semibold">
                       Assist
                     </button>
                   </td>
                 </tr>
               ))}
+              {!data.recent_customers.length && (
+                <tr><td colSpan={5} className="p-6 text-center text-slate-500">No recent customers.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
