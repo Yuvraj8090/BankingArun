@@ -898,3 +898,43 @@ CREATE TABLE IF NOT EXISTS cron_runs (
     error VARCHAR(500),
     INDEX idx_cron_started (started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ranks were nine names in a PHP constant and a width of 2, so changing the
+-- ladder meant a developer and a deploy. They become rows the director edits.
+--
+-- The seed reproduces the constant exactly -- same nine names, same rule that
+-- each rank needs two direct introductions holding the rank below -- so moving
+-- the ladder into the database changes nobody's standing on the day it lands.
+CREATE TABLE IF NOT EXISTS rank_tiers (
+    id VARCHAR(36) PRIMARY KEY,
+    position INT NOT NULL UNIQUE,           -- 1 is the entry rank
+    name VARCHAR(60) NOT NULL,
+    -- How many directly-introduced members are needed, and what standing each of
+    -- them must already hold. required_below = 0 means "any member", which is
+    -- what makes the entry rank reachable.
+    direct_required INT NOT NULL DEFAULT 2,
+    required_below INT NOT NULL DEFAULT 0,
+    -- What the tier is worth, as the brochure states it. Held as text and an
+    -- optional figure for display: nothing in this system pays it. The Nidhi
+    -- Rules, 2014 do not permit brokerage or incentive for mobilising deposits.
+    reward_label VARCHAR(200),
+    reward_amount DECIMAL(15,2),
+    notes VARCHAR(500),
+    status VARCHAR(10) NOT NULL DEFAULT 'active',   -- active | draft
+    deleted_at DATETIME NULL,
+    deleted_by VARCHAR(36) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_rank_live (deleted_at, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO rank_tiers (id, position, name, direct_required, required_below, status) VALUES
+(UUID(), 1, 'Silver',           2, 0, 'active'),
+(UUID(), 2, 'Gold',             2, 1, 'active'),
+(UUID(), 3, 'Platinum',         2, 2, 'active'),
+(UUID(), 4, 'Diamond',          2, 3, 'active'),
+(UUID(), 5, 'Ruby',             2, 4, 'active'),
+(UUID(), 6, 'Blue Diamond',     2, 5, 'active'),
+(UUID(), 7, 'Emerald',          2, 6, 'active'),
+(UUID(), 8, 'Ambassador',       2, 7, 'active'),
+(UUID(), 9, 'Brand Ambassador', 2, 8, 'active');

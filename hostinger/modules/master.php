@@ -1008,6 +1008,130 @@ function route_automation_status(array $d): void
     ]);
 }
 
+// --- Rank tiers, as the director maintains them -------------------------------------------
+// Adding a rung, renaming one, or changing how many introductions it takes is a
+// row now, not a deploy.
+//
+// reward_label and reward_amount describe what a tier is worth as the plan book
+// states it. Nothing here pays them and no code reads reward_amount to move
+// money: the Nidhi Rules, 2014 do not permit brokerage or incentive for
+// mobilising deposits, and the owner's standing decision is recognition without
+// commission. They are held so the same figure appears at the counter and on the
+// page, rather than being quoted from memory.
+
+function rank_tier_payload(array $d, array $existing = []): array
+{
+    $get = fn(string $k, $fallback = null) => $d[$k] ?? ($existing[$k] ?? $fallback);
+    $name = clip((string)$get('name', ''), 60);
+    if (mb_strlen($name) < 2) {
+        fail(422, 'Give the rank a name.');
+    }
+    $position = (int)$get('position', 0);
+    if ($position < 1 || $position > 50) {
+        fail(422, 'Position must be between 1 and 50. 1 is the entry rank.');
+    }
+    $direct = (int)$get('direct_required', 2);
+    if ($direct < 1 || $direct > 100) {
+        fail(422, 'A rank must need between 1 and 100 direct introductions.');
+    }
+    $below = (int)$get('required_below', 0);
+    if ($below < 0 || $below >= $position) {
+        // A tier that required its own rank, or a higher one, could never be
+        // reached by anybody: the map would need the answer before computing it.
+        fail(422, 'The rank each introduction must hold has to be below this one. '
+            . 'Use 0 for "any member", which is what the entry rank uses.');
+    }
+    $status = clip((string)$get('status', 'active'), 10);
+    if (!in_array($status, ['active', 'draft'], true)) {
+        fail(422, 'status must be active or draft.');
+    }
+    $amount = $get('reward_amount', null);
+    return [
+        'position' => $position,
+        'name' => $name,
+        'direct_required' => $direct,
+        'required_below' => $below,
+        'reward_label' => clip((string)$get('reward_label', ''), 200) ?: null,
+        'reward_amount' => ($amount === null || $amount === '') ? null : money($amount),
+        'notes' => clip((string)$get('notes', ''), 500) ?: null,
+        'status' => $status,
+    ];
+}
+
+function route_rank_tiers(array $d): void
+{
+    staff_user(SCHEME_READ_ROLES);
+    respond(['tiers' => out_all(rows('SELECT * FROM rank_tiers WHERE deleted_at IS NULL
+        ORDER BY position')),
+        // Said on the screen that edits them, not only in the code.
+        'pays_money' => false,
+        'notice' => 'Ranks are recognition. Nothing here pays a member: the Nidhi Rules, 2014 do '
+            . 'not permit brokerage or incentive for mobilising deposits. A reward written against '
+            . 'a rank is shown to members and to the counter, and is never disbursed by this system.']);
+}
+
+function route_rank_tier_create(array $d): void
+{
+    global $pdo;
+    $owner = staff_user(SCHEME_WRITE_ROLES);
+    $tier = rank_tier_payload($d);
+    if ($held = row('SELECT deleted_at FROM rank_tiers WHERE position = ?', [$tier['position']])) {
+        fail(400, $held['deleted_at'] === null
+            ? 'Another rank already sits at that position.'
+            : 'That position belongs to a deleted rank. Restore it from the recycle bin, '
+                . 'or use another position.');
+    }
+    $id = uuid4();
+    $pdo->prepare('INSERT INTO rank_tiers (id, position, name, direct_required, required_below,
+            reward_label, reward_amount, notes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute(array_merge([$id], array_values($tier)));
+    audit($owner, 'RANK_TIER_CREATED', "{$tier['position']} {$tier['name']}");
+    respond(['status' => 'SUCCESS', 'id' => $id,
+        'message' => "{$tier['name']} added at position {$tier['position']}."]);
+}
+
+function route_rank_tier_update(array $d, string $id = ''): void
+{
+    global $pdo;
+    $owner = staff_user(SCHEME_WRITE_ROLES);
+    $existing = row('SELECT * FROM rank_tiers WHERE id = ? AND deleted_at IS NULL', [$id]);
+    if (!$existing) {
+        fail(404, 'Rank not found.');
+    }
+    $tier = rank_tier_payload($d, $existing);
+    if ($tier['position'] !== (int)$existing['position']
+        && row('SELECT id FROM rank_tiers WHERE position = ? AND deleted_at IS NULL', [$tier['position']])) {
+        fail(400, 'Another rank already sits at that position.');
+    }
+    $pdo->prepare('UPDATE rank_tiers SET position = ?, name = ?, direct_required = ?, required_below = ?,
+            reward_label = ?, reward_amount = ?, notes = ?, status = ? WHERE id = ?')
+        ->execute(array_merge(array_values($tier), [$id]));
+    audit($owner, 'RANK_TIER_UPDATED', "{$existing['name']} -> {$tier['name']}");
+    respond(['status' => 'SUCCESS', 'message' => "{$tier['name']} saved."]);
+}
+
+function route_rank_tier_delete(array $d, string $id = ''): void
+{
+    global $pdo;
+    $owner = staff_user(SCHEME_WRITE_ROLES);
+    $tier = row('SELECT * FROM rank_tiers WHERE id = ? AND deleted_at IS NULL', [$id]);
+    if (!$tier) {
+        fail(404, 'Rank not found.');
+    }
+    // Removing a rung from the middle would leave the tiers above it requiring a
+    // standing that no longer exists, and every member holding it would silently
+    // drop. Say so rather than let the ladder rearrange itself.
+    if (row('SELECT id FROM rank_tiers WHERE required_below = ? AND deleted_at IS NULL
+            AND status = ? AND id <> ?', [(int)$tier['position'], 'active', $id])) {
+        fail(400, "Other ranks are defined as needing members who hold {$tier['name']}. "
+            . 'Point those at a different rank first, or set this one to draft instead.');
+    }
+    $pdo->prepare('UPDATE rank_tiers SET deleted_at = NOW(), deleted_by = ? WHERE id = ?')
+        ->execute([$owner['id'], $id]);
+    audit($owner, 'RANK_TIER_DELETED', "{$tier['position']} {$tier['name']}");
+    respond(['status' => 'SUCCESS', 'message' => "{$tier['name']} removed. It is in the recycle bin."]);
+}
+
 // --- Recycle bin ------------------------------------------------------------------------
 // The four tables above mark rows deleted rather than removing them, which is
 // only half a feature: without somewhere to see and undo it, a soft delete is
@@ -1017,6 +1141,7 @@ const RECYCLABLE = [
     'agent'   => ['table' => 'agents',        'label' => 'code', 'name' => 'name'],
     'branch'  => ['table' => 'branches',      'label' => 'code', 'name' => 'name'],
     'product' => ['table' => 'site_products', 'label' => 'slug', 'name' => 'title'],
+    'rank' => ['table' => 'rank_tiers', 'label' => 'position', 'name' => 'name'],
 ];
 
 function route_recycle_bin(array $d): void
@@ -1073,20 +1198,33 @@ function route_recycle_restore(array $d): void
 // members have reached in turn. It is recognition only: nothing here pays anybody. The
 // Nidhi Rules, 2014 prohibit brokerage or incentives for mobilising deposits, so there is
 // no commission attached to a rank and none is calculated anywhere in this file.
-const MEMBER_RANKS = [
-    1 => 'Silver',
-    2 => 'Gold',
-    3 => 'Platinum',
-    4 => 'Diamond',
-    5 => 'Ruby',
-    6 => 'Blue Diamond',
-    7 => 'Emerald',
-    8 => 'Ambassador',
-    9 => 'Brand Ambassador',
-];
-// Each rank needs two members directly introduced who hold the rank below it. Silver is
-// the entry: two introductions of any standing.
-const RANK_WIDTH = 2;
+// The ladder is rows now, not a constant: the director adds a tier, renames one,
+// or changes how many introductions it takes, without a deploy. The seed in
+// migrate.sql reproduces the nine names and the width of two that were compiled
+// in here before, so the move changed nobody's standing.
+//
+// Read once per request and kept, because the rank map walks it for every member
+// on every pass and re-querying inside that loop would turn one query into
+// thousands.
+function rank_tiers(): array
+{
+    static $tiers = null;
+    if ($tiers === null) {
+        $tiers = rows("SELECT * FROM rank_tiers WHERE deleted_at IS NULL AND status = 'active'
+            ORDER BY position");
+    }
+    return $tiers;
+}
+
+// position => name, which is the shape the rest of this file already expected.
+function rank_names(): array
+{
+    $names = [];
+    foreach (rank_tiers() as $tier) {
+        $names[(int)$tier['position']] = $tier['name'];
+    }
+    return $names;
+}
 
 function member_rank_map(): array
 {
@@ -1097,23 +1235,27 @@ function member_rank_map(): array
         $children[$r['referrer_id']][] = $r['referee_id'];
     }
 
+    // Highest tier first, so the first one a member satisfies is the best one.
+    $tiers = array_reverse(rank_tiers());
     $rank = [];
     // Settle by repetition rather than recursion: a rank can only rise when one
-    // below it rises, so nine passes is the most the ladder can need.
-    for ($pass = 0; $pass < count(MEMBER_RANKS); $pass++) {
+    // below it rises, so one pass per tier is the most the ladder can need.
+    for ($pass = 0; $pass < count($tiers); $pass++) {
         $changed = false;
         foreach ($children as $parent => $kids) {
             $best = 0;
-            for ($level = count(MEMBER_RANKS); $level >= 1; $level--) {
-                $needed = $level - 1;   // Silver needs two of rank 0, i.e. any member
+            foreach ($tiers as $tier) {
+                // Each tier states its own requirement now. required_below = 0
+                // means "any member", which is what the entry rank uses.
+                $needed = (int)$tier['required_below'];
                 $qualifying = 0;
                 foreach ($kids as $kid) {
                     if (($rank[$kid] ?? 0) >= $needed) {
                         $qualifying++;
                     }
                 }
-                if ($qualifying >= RANK_WIDTH) {
-                    $best = $level;
+                if ($qualifying >= (int)$tier['direct_required']) {
+                    $best = (int)$tier['position'];
                     break;
                 }
             }
@@ -1157,46 +1299,58 @@ function route_my_standing(array $d): void
         $theirLevel = $ranks[$r['referee_id']] ?? 0;
         $introduced[] = [
             'name' => $r['member_name'] ?? $r['referee_name'],
-            'standing' => $theirLevel === 0 ? null : MEMBER_RANKS[$theirLevel],
+            'standing' => $theirLevel === 0 ? null : (rank_names()[$theirLevel] ?? null),
             'standing_level' => $theirLevel,
             'joined_at' => iso($r['created_at']),
         ];
     }
 
     $next = null;
-    if ($level < count(MEMBER_RANKS)) {
+    if ($level < count(rank_names())) {
         $nextLevel = $level + 1;
         $needAt = $nextLevel - 1;   // Silver counts any member; every rung above counts the one below
         $have = count(array_filter($introduced, fn($m) => $m['standing_level'] >= $needAt));
-        $short = max(0, RANK_WIDTH - $have);
+        $nextTier = null;
+        foreach (rank_tiers() as $tier) {
+            if ((int)$tier['position'] === $nextLevel) {
+                $nextTier = $tier;
+            }
+        }
+        $short = max(0, ((int)($nextTier['direct_required'] ?? 2)) - $have);
         $next = [
-            'standing' => MEMBER_RANKS[$nextLevel],
-            'needs' => RANK_WIDTH,
-            'needs_standing' => $needAt === 0 ? null : MEMBER_RANKS[$needAt],
+            'standing' => (rank_names()[$nextLevel] ?? ''),
+            'needs' => $nextTier === null ? null : (int)$nextTier['direct_required'],
+            'needs_standing' => $needAt === 0 ? null : (rank_names()[$needAt] ?? ''),
             'have' => $have,
             'short_by' => $short,
             'step' => $needAt === 0
                 ? ($short === 0
-                    ? 'You have everything you need for ' . MEMBER_RANKS[$nextLevel] . '.'
+                    ? 'You have everything you need for ' . (rank_names()[$nextLevel] ?? '') . '.'
                     : 'Introduce ' . $short . ' more member' . ($short === 1 ? '' : 's') . '. '
                       . 'Anyone who opens an account and completes their KYC counts.')
                 : ($short === 0
-                    ? 'You have everything you need for ' . MEMBER_RANKS[$nextLevel] . '.'
+                    ? 'You have everything you need for ' . (rank_names()[$nextLevel] ?? '') . '.'
                     : $short . ' more of the members you introduced ' . ($short === 1 ? 'needs' : 'need')
-                      . ' to reach ' . MEMBER_RANKS[$needAt] . '. Helping the ones you have already '
+                      . ' to reach ' . (rank_names()[$needAt] ?? '') . '. Helping the ones you have already '
                       . 'introduced get there counts for you as well as for them.'),
         ];
     }
 
     $code = ensure_referral_code($user);
     respond([
-        'standing' => $level === 0 ? null : MEMBER_RANKS[$level],
+        'standing' => $level === 0 ? null : (rank_names()[$level] ?? null),
         'standing_level' => $level,
         'introduced' => $introduced,
         'introduced_count' => count($introduced),
         'next' => $next,
-        'ladder' => array_values(MEMBER_RANKS),
-        'width' => RANK_WIDTH,
+        'ladder' => array_values(rank_names()),
+        // Every tier's own rule, because the ladder no longer has one shared width.
+        'tiers' => array_map(fn($t) => [
+            'position' => (int)$t['position'], 'name' => $t['name'],
+            'direct_required' => (int)$t['direct_required'],
+            'required_below' => (int)$t['required_below'],
+            'reward_label' => $t['reward_label'], 'reward_amount' => $t['reward_amount'],
+        ], rank_tiers()),
         'referral_code' => $code,
         'referral_link' => rtrim((string)$config['public_app_url'], '/') . '/open-account?ref=' . rawurlencode($code),
         'note' => 'A standing is recognition only. No commission, brokerage or incentive is paid on it — '
@@ -1224,17 +1378,17 @@ function route_member_ranks(array $d): void
             'phone' => $u['phone'],
             'branch' => $u['branch'],
             'rank_level' => $level,
-            'rank' => $level === 0 ? null : MEMBER_RANKS[$level],
+            'rank' => $level === 0 ? null : (rank_names()[$level] ?? null),
             'introduced' => $counts[$u['id']] ?? 0,
             // What the next step would take, so a member can be told plainly.
-            'next_rank' => $level >= count(MEMBER_RANKS) ? null : MEMBER_RANKS[$level + 1],
+            'next_rank' => $level >= count(rank_names()) ? null : (rank_names()[$level + 1] ?? null),
         ];
     }
     // Highest standing first, then by how many they have introduced.
     usort($members, fn($a, $b) => [$b['rank_level'], $b['introduced']] <=> [$a['rank_level'], $a['introduced']]);
 
     $byRank = [];
-    foreach (MEMBER_RANKS as $level => $name) {
+    foreach (rank_names() as $level => $name) {
         $byRank[$name] = count(array_filter($members, fn($m) => $m['rank_level'] === $level));
     }
 
@@ -1242,8 +1396,14 @@ function route_member_ranks(array $d): void
         'members' => $members,
         'by_rank' => $byRank,
         'unranked' => count(array_filter($members, fn($m) => $m['rank_level'] === 0)),
-        'ladder' => array_values(MEMBER_RANKS),
-        'width' => RANK_WIDTH,
+        'ladder' => array_values(rank_names()),
+        // Every tier's own rule, because the ladder no longer has one shared width.
+        'tiers' => array_map(fn($t) => [
+            'position' => (int)$t['position'], 'name' => $t['name'],
+            'direct_required' => (int)$t['direct_required'],
+            'required_below' => (int)$t['required_below'],
+            'reward_label' => $t['reward_label'], 'reward_amount' => $t['reward_amount'],
+        ], rank_tiers()),
         'note' => 'Standing only. No commission, brokerage or incentive is paid on it — '
             . 'the Nidhi Rules, 2014 prohibit paying for the mobilising of deposits.',
     ]);
