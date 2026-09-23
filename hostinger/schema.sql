@@ -543,13 +543,18 @@ INSERT IGNORE INTO deposits (id, user_id, deposit_number, deposit_type, principa
 ('fd-retail-001', 'retail-001', 'FD88492019', 'fixed', 250000.00, 7.25, 24, 288625.00,
     DATE_ADD(UTC_DATE(), INTERVAL 730 DAY));
 
-INSERT IGNORE INTO cards (id, user_id, account_number, card_number, card_holder, card_type, network, expiry_date, pin_hash, status, is_virtual, issued_by, online_limit, atm_limit, international_enabled, contactless_enabled, ecom_enabled, upi_linked, created_at) VALUES
-(Issuer Only),
-(),
-(Issuer Only),
-(),
-(Issuer Only),
-();
+INSERT IGNORE INTO cards (id, user_id, account_number, card_number, card_holder, card_type, network, expiry_date,
+    pin_hash, status, is_virtual, issued_by, online_limit, atm_limit, international_enabled, contactless_enabled,
+    ecom_enabled, upi_linked, created_at) VALUES
+('card-visa-001', 'retail-001', 'AJSP00984521098', '4532 9845 2109 8821', 'RAHUL SHARMA', 'Visa Platinum Debit', 'Visa',
+    '08/29', '$2y$12$gzTa0eudv73cta0BIq4rpOGK2r2UVg7joErtmeBm28tyVXlHyw.eu', 'active', 1, 'AJSPay (Issuer Only)', 100000.00, 50000.00, 1, 1, 1, 0,
+    UTC_TIMESTAMP() - INTERVAL 30 DAY),
+('card-rupay-001', 'retail-001', 'AJSP00984521098', '5241 7373 2160 2721', 'RAHUL SHARMA',
+    'RuPay / Mastercard Global Debit', 'RuPay', '06/31', '$2y$12$gzTa0eudv73cta0BIq4rpOGK2r2UVg7joErtmeBm28tyVXlHyw.eu', 'dispatch_queued', 0,
+    'AJSPay (Issuer Only)', 75000.00, 40000.00, 0, 1, 1, 0, UTC_TIMESTAMP() - INTERVAL 30 DAY + INTERVAL 1 SECOND),
+('card-rupay-002', 'retail-001', 'AJSP00984521098', '5241 9548 3082 4607', 'RAHUL SHARMA',
+    'RuPay / Mastercard Global Debit', 'Mastercard', '06/31', '$2y$12$gzTa0eudv73cta0BIq4rpOGK2r2UVg7joErtmeBm28tyVXlHyw.eu', 'dispatch_queued', 0,
+    'AJSPay (Issuer Only)', 75000.00, 40000.00, 1, 1, 1, 0, UTC_TIMESTAMP() - INTERVAL 30 DAY + INTERVAL 2 SECOND);
 
 INSERT IGNORE INTO transactions (id, user_id, account_number, type, mode, amount, balance_after, counterparty_name,
     counterparty_acc, ref_number, description, timestamp) VALUES

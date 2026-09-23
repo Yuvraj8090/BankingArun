@@ -91,7 +91,16 @@ grep -q 'ajspay-cron' scripts/deploy-vps.sh || missing_schedule="$missing_schedu
 [[ -z "$missing_schedule" ]] && ok "cron has a scheduler" \
   || bad "cron has a scheduler" "cron.php would never run:$missing_schedule"
 
-# 10. The disclosure contact must not silently expire.
+# 10. The seed data must not be left syntactically broken.
+# A commit that dropped the cvv column rewrote the cards seed into "(Issuer Only),
+# (), ..." and nobody noticed for months: production was already installed, so
+# only a fresh build would have hit it, and nothing built fresh. Everything after
+# line 546 of schema.sql -- half the tables -- silently never ran.
+empty_tuples=$(grep -nE '^\s*\(\s*\),?\s*$' hostinger/schema.sql hostinger/migrate.sql 2>/dev/null | head -3)
+[[ -z "$empty_tuples" ]] && ok "seed rows intact" \
+  || bad "seed rows intact" "empty VALUES tuple, seed data was mangled: $(echo "$empty_tuples" | tr '\n' ' ')"
+
+# 11. The disclosure contact must not silently expire.
 if [[ -f frontend/public/.well-known/security.txt ]]; then
   exp=$(grep -i '^Expires:' frontend/public/.well-known/security.txt | head -1 | cut -d' ' -f2)
   if python3 -c "
