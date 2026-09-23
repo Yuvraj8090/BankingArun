@@ -148,6 +148,8 @@ export const api = {
 
   // Referrals
   referralCode: async () => (await axios.get(`${API}/referrals/my-code`, getAuthHeaders())).data,
+  // A member's own standing and what the next rung would take.
+  myStanding: async () => (await axios.get(`${API}/my-standing`, getAuthHeaders())).data,
   referralHistory: async () => (await axios.get(`${API}/referrals/history`, getAuthHeaders())).data,
   // The brochure's twelve-level table, shown but never paid — see
   // route_referral_structure for why.

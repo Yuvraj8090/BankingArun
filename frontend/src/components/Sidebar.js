@@ -8,10 +8,14 @@ export default function Sidebar({ activeTab, onSelectTab }) {
   const role = user?.role || 'retail';
   const navItems = navFor(role, features);
 
+  // Stacked above the content on a phone, a column beside it from md up. The
+  // full height and the fixed width only apply once it is a column: on a phone
+  // they made every screen open on a screenful of menu, with the page itself a
+  // scroll away.
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-4 shrink-0 min-h-[calc(100vh-4rem)]">
-      <div className="space-y-1">
-        <div className="px-3 py-2 flex items-center gap-2">
+    <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col justify-between p-3 md:p-4 shrink-0 md:min-h-[calc(100vh-4rem)]">
+      <div className="flex md:block gap-1.5 md:gap-0 md:space-y-1 overflow-x-auto md:overflow-x-visible -mx-1 px-1 md:mx-0 md:px-0">
+        <div className="hidden md:flex px-3 py-2 items-center gap-2">
           <div className="w-1 h-4 bg-[#0b3b8c] rounded" />
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
             {ROLE_LABEL[role] || 'Banking'} Menu
@@ -26,7 +30,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
               key={item.id}
               data-testid={item.testId}
               onClick={() => onSelectTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-md text-xs font-medium transition ${
+              className={`shrink-0 md:w-full flex items-center gap-2 md:gap-3 px-3 md:px-3.5 py-2 md:py-2.5 rounded-md text-xs font-medium transition whitespace-nowrap ${
                 isActive
                   ? 'bg-[#0b3b8c] text-white shadow-sm font-semibold'
                   : item.highlight
@@ -44,7 +48,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
       </div>
 
       {/* Support card */}
-      <div className="mt-6 p-3 rounded-md bg-slate-50 border border-slate-200 text-slate-700 text-[11px] space-y-2">
+      <div className="hidden md:block mt-6 p-3 rounded-md bg-slate-50 border border-slate-200 text-slate-700 text-[11px] space-y-2">
         <div className="flex items-center gap-2 text-[#0b3b8c] font-semibold">
           <HeadphonesIcon className="w-3.5 h-3.5" /> 24×7 Member Help
         </div>

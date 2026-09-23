@@ -1225,6 +1225,8 @@ $routes = [
     'GET /support/my-tickets' => 'route_my_tickets',
     'POST /support/chat' => 'route_chat',
     'GET /branches/locator' => 'route_branches',
+    // A member's own standing, and what the next rung would take.
+    'GET /my-standing' => 'route_my_standing',
     'GET /referrals/my-code' => 'route_referral_code',
     'GET /referrals/history' => 'route_referral_history',
     'GET /referrals/structure' => 'route_referral_structure',

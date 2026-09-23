@@ -16,6 +16,7 @@ export const NAV_BY_ROLE = {
     { id: 'loans', label: 'Loans', icon: Banknote, testId: 'tab-loans' },
     { id: 'standing-instructions', label: 'Standing Instructions', icon: Repeat, testId: 'tab-si' },
     { id: 'referrals', label: 'Refer & Earn', icon: Gift, testId: 'tab-referrals' },
+    { id: 'my-standing', label: 'My Standing', icon: Award, testId: 'tab-my-standing' },
     { id: 'statements', label: 'Statements (PDF/Excel)', icon: FileText, testId: 'tab-statements' },
     { id: 'video-kyc', label: 'Video KYC', icon: Video, testId: 'tab-video-kyc' },
     { id: 'security', label: 'Security & Passkeys', icon: ShieldCheck, testId: 'tab-security' },

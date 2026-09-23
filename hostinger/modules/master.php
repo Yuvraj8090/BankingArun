@@ -1042,6 +1042,81 @@ function member_rank_map(): array
     return array_filter($rank, fn($level) => $level > 0);
 }
 
+// What a member sees about their own standing. The director's view above lists
+// everybody; this answers the only two questions a member actually asks --
+// where am I, and what do I do next -- and answers the second as a number
+// rather than as the ladder's rule, because "introduce two members who have
+// reached Silver" is a rule and "you need one more" is an instruction.
+//
+// Deliberately no money anywhere in this response. A standing is a standing:
+// the Nidhi Rules, 2014 forbid paying brokerage or incentive for bringing in
+// deposits, and a screen that showed a figure beside a rung would be read as a
+// promise to pay it.
+function route_my_standing(array $d): void
+{
+    global $config;
+    $user = current_user();
+    $ranks = member_rank_map();
+    $level = $ranks[$user['id']] ?? 0;
+
+    // Everyone this member introduced, and where each of them stands. This is
+    // the "who is under whom" of the ladder, one level deep: a member may see
+    // the people they introduced, and not the rest of anybody's chain.
+    $introduced = [];
+    foreach (rows("SELECT r.referee_id, r.referee_name, r.created_at, u.name AS member_name
+        FROM referrals r LEFT JOIN users u ON u.id = r.referee_id
+        WHERE r.referrer_id = ? AND r.status = 'paid'
+        ORDER BY r.created_at DESC", [$user['id']]) as $r) {
+        $theirLevel = $ranks[$r['referee_id']] ?? 0;
+        $introduced[] = [
+            'name' => $r['member_name'] ?? $r['referee_name'],
+            'standing' => $theirLevel === 0 ? null : MEMBER_RANKS[$theirLevel],
+            'standing_level' => $theirLevel,
+            'joined_at' => iso($r['created_at']),
+        ];
+    }
+
+    $next = null;
+    if ($level < count(MEMBER_RANKS)) {
+        $nextLevel = $level + 1;
+        $needAt = $nextLevel - 1;   // Silver counts any member; every rung above counts the one below
+        $have = count(array_filter($introduced, fn($m) => $m['standing_level'] >= $needAt));
+        $short = max(0, RANK_WIDTH - $have);
+        $next = [
+            'standing' => MEMBER_RANKS[$nextLevel],
+            'needs' => RANK_WIDTH,
+            'needs_standing' => $needAt === 0 ? null : MEMBER_RANKS[$needAt],
+            'have' => $have,
+            'short_by' => $short,
+            'step' => $needAt === 0
+                ? ($short === 0
+                    ? 'You have everything you need for ' . MEMBER_RANKS[$nextLevel] . '.'
+                    : 'Introduce ' . $short . ' more member' . ($short === 1 ? '' : 's') . '. '
+                      . 'Anyone who opens an account and completes their KYC counts.')
+                : ($short === 0
+                    ? 'You have everything you need for ' . MEMBER_RANKS[$nextLevel] . '.'
+                    : $short . ' more of the members you introduced ' . ($short === 1 ? 'needs' : 'need')
+                      . ' to reach ' . MEMBER_RANKS[$needAt] . '. Helping the ones you have already '
+                      . 'introduced get there counts for you as well as for them.'),
+        ];
+    }
+
+    $code = ensure_referral_code($user);
+    respond([
+        'standing' => $level === 0 ? null : MEMBER_RANKS[$level],
+        'standing_level' => $level,
+        'introduced' => $introduced,
+        'introduced_count' => count($introduced),
+        'next' => $next,
+        'ladder' => array_values(MEMBER_RANKS),
+        'width' => RANK_WIDTH,
+        'referral_code' => $code,
+        'referral_link' => rtrim((string)$config['public_app_url'], '/') . '/open-account?ref=' . rawurlencode($code),
+        'note' => 'A standing is recognition only. No commission, brokerage or incentive is paid on it — '
+            . 'the Nidhi Rules, 2014 prohibit a Nidhi from paying for the mobilising of deposits.',
+    ]);
+}
+
 function route_member_ranks(array $d): void
 {
     staff_user(SCHEME_READ_ROLES);
