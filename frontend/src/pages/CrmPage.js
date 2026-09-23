@@ -788,18 +788,18 @@ function LeadsTab() {
                                 : 'pays on enrolment'}
                             </span>
                           </div>
-                        ) : <span className="text-slate-400">—</span>}
+                        ) : <span className="text-slate-500">—</span>}
                       </td>
                       <td className="p-3 text-slate-600">
                         {l.scheme_name
                           ? <span title={l.scheme_code}>{l.scheme_name}</span>
-                          : <span className="text-slate-400">{l.interest || '—'}</span>}
+                          : <span className="text-slate-500">{l.interest || '—'}</span>}
                       </td>
                       <td className="p-3">
                         {/* What is actually holding the opening up, without
                             having to open the dialog to find out. */}
                         {Number(l.documents_uploaded) === 0 ? (
-                          <span className="text-slate-400">none yet</span>
+                          <span className="text-slate-500">none yet</span>
                         ) : (
                           <span className={Number(l.documents_verified) > 0 ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
                             {l.documents_verified} of {l.documents_uploaded} verified

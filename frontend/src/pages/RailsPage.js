@@ -376,7 +376,7 @@ export default function RailsPage() {
             </thead>
             <tbody>
               {txns.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                   Nothing on the rail yet.
                 </td></tr>
               )}

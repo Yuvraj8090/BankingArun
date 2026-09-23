@@ -121,7 +121,7 @@ export default function BranchAdminPage() {
                     {b.phone && <div className="text-[11px] text-slate-500">{b.phone}</div>}
                   </td>
                   <td className="px-4 py-3 align-top text-slate-600 max-w-xs">
-                    {b.address || <span className="text-slate-400">—</span>}
+                    {b.address || <span className="text-slate-500">—</span>}
                     {b.timing && <div className="text-[11px] text-slate-500 mt-1">{b.timing}</div>}
                   </td>
                   <td className="px-4 py-3 align-top">

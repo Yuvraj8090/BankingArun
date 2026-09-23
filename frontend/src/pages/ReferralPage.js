@@ -106,10 +106,10 @@ function BrochureStructure() {
                   <td className="p-2 font-semibold text-slate-900">{r.level}</td>
                   {r.rates.map((rate, i) => (
                     <td key={i} className="p-2 text-right text-slate-700">
-                      {rate === null ? <span className="text-slate-300">—</span> : (
+                      {rate === null ? <span className="text-slate-500">—</span> : (
                         <>
                           {ill && <span className="font-semibold">{inr(r.amounts[i] ?? 0)}</span>}
-                          <span className={ill ? 'text-slate-400 ml-1' : ''}>{rate}%</span>
+                          <span className={ill ? 'text-slate-500 ml-1' : ''}>{rate}%</span>
                         </>
                       )}
                     </td>

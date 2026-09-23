@@ -115,13 +115,13 @@ export default function MemberRanksPage() {
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${RANK_STYLE[m.rank]}`}>
                         {m.rank}
                       </span>
-                    ) : <span className="text-slate-400">—</span>}
+                    ) : <span className="text-slate-500">—</span>}
                   </td>
                   <td className="p-3 text-right tabular-nums text-slate-700">{m.introduced}</td>
                   <td className="p-3 text-slate-600">
                     {m.next_rank
                       ? <>{m.next_rank} — needs {data.width} × {m.rank || 'introduced member'}</>
-                      : <span className="text-slate-400">top of the ladder</span>}
+                      : <span className="text-slate-500">top of the ladder</span>}
                   </td>
                 </tr>
               ))}

@@ -135,7 +135,7 @@ export default function SchemesPage() {
                 <td className="p-3 text-right text-slate-600">
                   {s.tenure_months} mo
                   {s.contribution_months && s.contribution_months < s.tenure_months
-                    && <span className="block text-[9px] text-slate-400">pay in {s.contribution_months} mo</span>}
+                    && <span className="block text-[9px] text-slate-500">pay in {s.contribution_months} mo</span>}
                 </td>
                 <td className="p-3 text-right text-slate-700">₹{Number(s.total_deposit).toLocaleString('en-IN')}</td>
                 <td className="p-3 text-right text-slate-700">₹{Number(s.maturity_amount).toLocaleString('en-IN')}</td>
