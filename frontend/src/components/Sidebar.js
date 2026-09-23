@@ -52,7 +52,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
         <p className="text-slate-600">Cyber Fraud: <strong className="text-[#c8102e]">1930</strong></p>
         <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
           <span>Session Active</span>
-          <span className="flex items-center gap-1 text-emerald-600">
+          <span className="flex items-center gap-1 text-emerald-700">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Encrypted
           </span>
         </div>

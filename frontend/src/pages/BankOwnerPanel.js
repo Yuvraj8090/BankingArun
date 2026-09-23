@@ -25,7 +25,7 @@ export default function BankOwnerPanel() {
             <p className="text-xs text-slate-500">Enterprise-wide view · Policy control · Approvals</p>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded bg-white text-amber-600 text-[10px] font-bold">BANK OWNER</span>
+        <span className="px-2.5 py-1 rounded bg-white text-amber-700 text-[10px] font-bold">BANK OWNER</span>
       </div>
 
       {/* KPI Grid */}
