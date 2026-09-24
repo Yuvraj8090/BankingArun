@@ -1023,27 +1023,30 @@ UPDATE schemes SET status = 'active',
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
     contribution_amount, principal_amount, total_deposit, maturity_amount, payout_type, status, notes, slabs) VALUES
 ('sch-sl-21y', 'AJS-SL-21Y', 'Shubh Lakshmi payout at 21', 'recurring', 252, 72,
-    6000.00, NULL, 432000.00, 3849700.00, 'maturity', 'active',
-    'Brochure p8. 72 monthly instalments, held to year 21.',
-    '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]');
+    6000.00, NULL, 432000.00, 3692825.00, 'maturity', 'active',
+    'Brochure p8, repriced to sit at/under the 12.5% Nidhi cap (was 12.75% effective on the printed figures). 72 monthly instalments, held to year 21.',
+    '[{"unit":500,"deposit":36000,"maturity":307735},{"unit":1000,"deposit":72000,"maturity":615470},{"unit":1500,"deposit":108000,"maturity":923206},{"unit":2000,"deposit":144000,"maturity":1230941},{"unit":3000,"deposit":216000,"maturity":1846412},{"unit":4000,"deposit":288000,"maturity":2461883},{"unit":5000,"deposit":360000,"maturity":3077354},{"unit":6000,"deposit":432000,"maturity":3692825}]');
 
 -- INSERT IGNORE alone was not enough: production already held this plan as a
 -- draft, so the insert was skipped and the plan stayed hidden. The update runs
 -- either way, which is what makes this migration idempotent whether the row
--- was already there or has just been created.
+-- was already there or has just been created. Repriced to sit at/under the
+-- 12.5% Nidhi cap -- the brochure's printed figures worked out to 12.75%.
 UPDATE schemes SET status = 'active',
     tenure_months = 252, contribution_months = 72,
-    contribution_amount = 6000.00, total_deposit = 432000.00, maturity_amount = 3849700.00,
-    slabs = '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]',
-    notes = 'Brochure p8. 72 monthly instalments, held to year 21.'
+    contribution_amount = 6000.00, total_deposit = 432000.00, maturity_amount = 3692825.00,
+    slabs = '[{"unit":500,"deposit":36000,"maturity":307735},{"unit":1000,"deposit":72000,"maturity":615470},{"unit":1500,"deposit":108000,"maturity":923206},{"unit":2000,"deposit":144000,"maturity":1230941},{"unit":3000,"deposit":216000,"maturity":1846412},{"unit":4000,"deposit":288000,"maturity":2461883},{"unit":5000,"deposit":360000,"maturity":3077354},{"unit":6000,"deposit":432000,"maturity":3692825}]',
+    notes = 'Brochure p8, repriced to sit at/under the 12.5% Nidhi cap (was 12.75% effective on the printed figures). 72 monthly instalments, held to year 21.'
     WHERE code = 'AJS-SL-21Y';
 
--- The fixed-deposit brochure plan, activated on the owner's instruction. It prices
--- well above the cap on its own printed figures -- the deposit triples in eight
--- years -- so every row carries the mark the rate card puts on an over-cap slab.
+-- The fixed-deposit brochure plan, activated on the owner's instruction. Its
+-- printed figures worked out to 14.72% effective -- above the 12.5% Nidhi Rules
+-- cap -- so every slab is repriced down to sit at the cap before activating,
+-- rather than activated on the brochure's own over-cap numbers.
 UPDATE schemes SET status = 'active',
-    slabs = '[{"unit":2500,"deposit":2500,"maturity":7500},{"unit":3000,"deposit":3000,"maturity":9000},{"unit":3500,"deposit":3500,"maturity":10500},{"unit":4000,"deposit":4000,"maturity":12000},{"unit":4500,"deposit":4500,"maturity":13500},{"unit":5000,"deposit":5000,"maturity":15000},{"unit":5500,"deposit":5500,"maturity":16500},{"unit":6000,"deposit":6000,"maturity":18000},{"unit":7000,"deposit":7000,"maturity":21000},{"unit":8000,"deposit":8000,"maturity":24000},{"unit":9000,"deposit":9000,"maturity":27000},{"unit":10000,"deposit":10000,"maturity":30000},{"unit":12000,"deposit":12000,"maturity":36000},{"unit":14000,"deposit":14000,"maturity":42000},{"unit":15000,"deposit":15000,"maturity":45000},{"unit":17000,"deposit":17000,"maturity":51000},{"unit":18000,"deposit":18000,"maturity":54000},{"unit":20000,"deposit":20000,"maturity":60000},{"unit":25000,"deposit":25000,"maturity":75000},{"unit":30000,"deposit":30000,"maturity":90000},{"unit":33000,"deposit":33000,"maturity":99000},{"unit":35000,"deposit":35000,"maturity":105000},{"unit":40000,"deposit":40000,"maturity":120000},{"unit":45000,"deposit":45000,"maturity":135000},{"unit":50000,"deposit":50000,"maturity":150000},{"unit":60000,"deposit":60000,"maturity":180000},{"unit":70000,"deposit":70000,"maturity":210000},{"unit":80000,"deposit":80000,"maturity":240000},{"unit":90000,"deposit":90000,"maturity":270000},{"unit":100000,"deposit":100000,"maturity":300000},{"unit":125000,"deposit":125000,"maturity":375000},{"unit":150000,"deposit":150000,"maturity":450000}]',
-    notes = 'Brochure p10-11. Every amount triples over eight years.'
+    total_deposit = 150000.00, maturity_amount = 384867.00,
+    slabs = '[{"unit":2500,"deposit":2500,"maturity":6414},{"unit":3000,"deposit":3000,"maturity":7697},{"unit":3500,"deposit":3500,"maturity":8980},{"unit":4000,"deposit":4000,"maturity":10263},{"unit":4500,"deposit":4500,"maturity":11546},{"unit":5000,"deposit":5000,"maturity":12828},{"unit":5500,"deposit":5500,"maturity":14111},{"unit":6000,"deposit":6000,"maturity":15394},{"unit":7000,"deposit":7000,"maturity":17960},{"unit":8000,"deposit":8000,"maturity":20526},{"unit":9000,"deposit":9000,"maturity":23092},{"unit":10000,"deposit":10000,"maturity":25657},{"unit":12000,"deposit":12000,"maturity":30789},{"unit":14000,"deposit":14000,"maturity":35920},{"unit":15000,"deposit":15000,"maturity":38486},{"unit":17000,"deposit":17000,"maturity":43618},{"unit":18000,"deposit":18000,"maturity":46184},{"unit":20000,"deposit":20000,"maturity":51315},{"unit":25000,"deposit":25000,"maturity":64144},{"unit":30000,"deposit":30000,"maturity":76973},{"unit":33000,"deposit":33000,"maturity":84670},{"unit":35000,"deposit":35000,"maturity":89802},{"unit":40000,"deposit":40000,"maturity":102631},{"unit":45000,"deposit":45000,"maturity":115460},{"unit":50000,"deposit":50000,"maturity":128289},{"unit":60000,"deposit":60000,"maturity":153947},{"unit":70000,"deposit":70000,"maturity":179604},{"unit":80000,"deposit":80000,"maturity":205262},{"unit":90000,"deposit":90000,"maturity":230920},{"unit":100000,"deposit":100000,"maturity":256578},{"unit":125000,"deposit":125000,"maturity":320723},{"unit":150000,"deposit":150000,"maturity":384867}]',
+    notes = 'Brochure p10-11, repriced to sit at/under the 12.5% Nidhi cap (was 14.72% effective on the printed figures, which tripled every amount over eight years).'
     WHERE code = 'AJS-FD-8Y';
 
 -- The MIS plan's printed figures (₹250/month per ₹10,000 unit) worked out to an
@@ -1051,8 +1054,8 @@ UPDATE schemes SET status = 'active',
 -- repriced down to sit at the cap before being activated, rather than being
 -- activated on the brochure's own over-cap numbers.
 UPDATE schemes SET status = 'active',
+    total_deposit = 200000.00, maturity_amount = 265920.00,
     slabs = '[{"unit":10000,"deposit":10000,"maturity":13260,"monthly_payout":221},{"unit":20000,"deposit":20000,"maturity":26580,"monthly_payout":443},{"unit":30000,"deposit":30000,"maturity":39840,"monthly_payout":664},{"unit":40000,"deposit":40000,"maturity":53160,"monthly_payout":886},{"unit":50000,"deposit":50000,"maturity":66480,"monthly_payout":1108},{"unit":60000,"deposit":60000,"maturity":79740,"monthly_payout":1329},{"unit":70000,"deposit":70000,"maturity":93060,"monthly_payout":1551},{"unit":80000,"deposit":80000,"maturity":106320,"monthly_payout":1772},{"unit":100000,"deposit":100000,"maturity":132960,"monthly_payout":2216},{"unit":200000,"deposit":200000,"maturity":265920,"monthly_payout":4432}]',
-    maturity_amount = 13260.00,
     notes = 'Brochure p9, repriced to sit at/under the 12.5% Nidhi cap (was 18.71% effective on the printed ₹250/month figure). Monthly payout for sixty months; the maturity column is the total received.'
     WHERE code = 'AJS-MIS-5Y';
 
