@@ -228,6 +228,12 @@ export const api = {
   // Opening an account is a counter action: staff only, after the applicant's
   // documents have been seen.
   openAccount: async (payload) => (await axios.post(`${API}/register/account`, payload, getAuthHeaders())).data,
+  // The ladder the director maintains -- see route_rank_tiers.
+  rankTiers: async () => (await axios.get(`${API}/rank-tiers`, getAuthHeaders())).data,
+  rankTierCreate: async (payload) => (await axios.post(`${API}/rank-tiers`, payload, getAuthHeaders())).data,
+  rankTierUpdate: async (id, payload) =>
+    (await axios.patch(`${API}/rank-tiers/${id}`, payload, getAuthHeaders())).data,
+  rankTierDelete: async (id) => (await axios.delete(`${API}/rank-tiers/${id}`, getAuthHeaders())).data,
   memberRanks: async () => (await axios.get(`${API}/member-ranks`, getAuthHeaders())).data,
   testSms: async (to) => (await axios.post(`${API}/admin/config/test-sms`, { to }, getAuthHeaders())).data,
   revokeSession: async (id) => (await axios.delete(`${API}/auth/sessions/${id}`, getAuthHeaders())).data,

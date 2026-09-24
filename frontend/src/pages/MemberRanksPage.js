@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Award, RefreshCw, Search, Info } from 'lucide-react';
+import { Award, RefreshCw, Search, Info, Plus, Pencil, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import Modal from '../components/Modal';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
@@ -17,7 +19,222 @@ const RANK_STYLE = {
   'Brand Ambassador': 'bg-[#0b3b8c] text-white border-[#0b3b8c]',
 };
 
+const nextNeeds = (tiers, level) =>
+  (tiers || []).find((t) => t.position === level + 1)?.direct_required ?? 2;
+
+const rankName = (tiers, position) =>
+  (tiers || []).find((t) => t.position === position)?.name || `rank ${position}`;
+
+
+const BLANK = {
+  position: '', name: '', direct_required: 2, required_below: 0,
+  reward_label: '', reward_amount: '', notes: '', status: 'active',
+};
+
+// The ladder, editable. Every rung was a line in a PHP constant until recently,
+// so adding Crown Ambassador or making Gold harder to reach meant a developer
+// and a deploy. The director does it here.
+function LadderEditor({ onChanged }) {
+  const [tiers, setTiers] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    try {
+      const r = await api.rankTiers();
+      setTiers(r.tiers);
+      setNotice(r.notice);
+    } catch (e) { toast.error(e.response?.data?.detail || 'Could not load the ladder'); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const body = {
+        ...editing,
+        position: Number(editing.position),
+        direct_required: Number(editing.direct_required),
+        required_below: Number(editing.required_below),
+        // Sent as an empty string rather than 0 so "no figure" stays no figure.
+        reward_amount: editing.reward_amount === '' ? '' : Number(editing.reward_amount),
+      };
+      const r = editing.id
+        ? await api.rankTierUpdate(editing.id, body)
+        : await api.rankTierCreate(body);
+      toast.success(r.message);
+      setEditing(null);
+      await load();
+      onChanged?.();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Could not save this rank');
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (tier) => {
+    if (!window.confirm(`Remove ${tier.name}? It goes to the recycle bin and can be restored.`)) return;
+    try {
+      toast.success((await api.rankTierDelete(tier.id)).message);
+      await load();
+      onChanged?.();
+    } catch (e) { toast.error(e.response?.data?.detail || 'Could not remove this rank'); }
+  };
+
+  if (!tiers) return null;
+  const below = [{ position: 0, name: 'Any member' }, ...tiers];
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="ladder-editor">
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Ranks and rewards</h2>
+          <p className="text-[11px] text-slate-500">Add a rank, change what it takes, or write what it is worth.</p>
+        </div>
+        <button data-testid="rank-add" onClick={() => setEditing({ ...BLANK, position: tiers.length + 1 })}
+          className="px-3 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5">
+          <Plus className="w-3.5 h-3.5" /> Add a rank
+        </button>
+      </div>
+
+      {notice && (
+        <p className="m-4 p-3 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-900"
+          data-testid="rank-pay-notice">{notice}</p>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
+            <tr>
+              <th className="p-3 font-semibold">#</th>
+              <th className="p-3 font-semibold">Rank</th>
+              <th className="p-3 font-semibold">To reach it</th>
+              <th className="p-3 font-semibold">Reward (shown, never paid)</th>
+              <th className="p-3 font-semibold">Status</th>
+              <th className="p-3 font-semibold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {tiers.map((t) => (
+              <tr key={t.id} data-testid={`rank-tier-${t.position}`} className="hover:bg-slate-50">
+                <td className="p-3 tabular-nums text-slate-500">{t.position}</td>
+                <td className="p-3 font-semibold text-slate-900">{t.name}</td>
+                <td className="p-3 text-slate-600">
+                  {t.direct_required} {t.direct_required === 1 ? 'member' : 'members'} introduced
+                  {t.required_below > 0 && <>, each already {rankName(tiers, t.required_below)}</>}
+                </td>
+                <td className="p-3 text-slate-600">
+                  {t.reward_label || <span className="text-slate-400">—</span>}
+                  {t.reward_amount != null && t.reward_amount !== '' && (
+                    <span className="block text-[10px] text-slate-500">
+                      ₹{Number(t.reward_amount).toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </td>
+                <td className="p-3">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                    t.status === 'active'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-300'}`}>{t.status}</span>
+                </td>
+                <td className="p-3 text-right whitespace-nowrap">
+                  <button data-testid={`rank-edit-${t.position}`}
+                    onClick={() => setEditing({ ...t, reward_amount: t.reward_amount ?? '' })}
+                    className="text-[11px] font-semibold text-[#0b3b8c] hover:underline inline-flex items-center gap-1">
+                    <Pencil className="w-3 h-3" /> edit
+                  </button>
+                  <button data-testid={`rank-delete-${t.position}`} onClick={() => remove(t)}
+                    className="ml-3 text-[11px] font-semibold text-[#c8102e] hover:underline inline-flex items-center gap-1">
+                    <Trash2 className="w-3 h-3" /> remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {editing && (
+        <Modal
+          testId="rank-modal"
+          title={editing.id ? `Edit ${editing.name}` : 'Add a rank'}
+          subtitle="Position 1 is the entry rank. A rank may only require standings below its own."
+          onClose={() => setEditing(null)}
+          footer={<>
+            <button onClick={() => setEditing(null)}
+              className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+            <button data-testid="rank-save" onClick={save} disabled={saving || !editing.name}
+              className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save rank'}
+            </button>
+          </>}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Position</span>
+              <input type="number" min="1" data-testid="rank-position" value={editing.position}
+                onChange={(e) => setEditing({ ...editing, position: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Name</span>
+              <input data-testid="rank-name" value={editing.name}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Members to introduce</span>
+              <input type="number" min="1" data-testid="rank-direct" value={editing.direct_required}
+                onChange={(e) => setEditing({ ...editing, direct_required: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Each of them must already be</span>
+              <select data-testid="rank-below" value={editing.required_below}
+                onChange={(e) => setEditing({ ...editing, required_below: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white">
+                {below
+                  .filter((b) => b.position < Number(editing.position || 1))
+                  .map((b) => <option key={b.position} value={b.position}>{b.name}</option>)}
+              </select>
+            </label>
+            <label className="block md:col-span-2">
+              <span className="block text-[11px] text-slate-600 mb-1">What this rank is worth</span>
+              <input data-testid="rank-reward" value={editing.reward_label ?? ''}
+                placeholder="e.g. Recognised at the annual meet"
+                onChange={(e) => setEditing({ ...editing, reward_label: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Figure, if the book states one</span>
+              <input type="number" min="0" data-testid="rank-reward-amount" value={editing.reward_amount ?? ''}
+                onChange={(e) => setEditing({ ...editing, reward_amount: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Status</span>
+              <select data-testid="rank-status" value={editing.status}
+                onChange={(e) => setEditing({ ...editing, status: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white">
+                <option value="active">active</option>
+                <option value="draft">draft — off the ladder, nobody can hold it</option>
+              </select>
+            </label>
+          </div>
+          <p className="mt-3 p-2.5 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+            The reward is shown to members and at the counter so both quote the same thing. This
+            system never pays it: the Nidhi Rules, 2014 do not permit brokerage or incentive for
+            bringing in deposits.
+          </p>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 export default function MemberRanksPage() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'bank_owner';
   const [data, setData] = useState(null);
   const [query, setQuery] = useState('');
 
@@ -68,21 +285,28 @@ export default function MemberRanksPage() {
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-5">
         <h2 className="text-sm font-semibold text-slate-900 mb-3">The ladder</h2>
         <div className="flex flex-wrap gap-2">
-          {data.ladder.map((name, i) => (
-            <div key={name} className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${RANK_STYLE[name] || 'bg-slate-100 text-slate-700 border-slate-300'}`}>
-              {name}
+          {(data.tiers || []).map((t) => (
+            <div key={t.position} data-testid={`ladder-${t.position}`}
+              className={`px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${RANK_STYLE[t.name] || 'bg-slate-100 text-slate-700 border-slate-300'}`}>
+              {t.name}
+              {/* Each rung states its own rule now: they no longer share one width. */}
               <span className="block text-[10px] font-normal opacity-80">
-                {i === 0
-                  ? `${data.width} members introduced`
-                  : `${data.width} × ${data.ladder[i - 1]}`}
+                {t.required_below === 0
+                  ? `${t.direct_required} members introduced`
+                  : `${t.direct_required} × ${rankName(data.tiers, t.required_below)}`}
               </span>
               <span className="block text-[10px] font-normal opacity-70">
-                {data.by_rank[name]} {data.by_rank[name] === 1 ? 'member' : 'members'}
+                {data.by_rank[t.name] ?? 0} {(data.by_rank[t.name] ?? 0) === 1 ? 'member' : 'members'}
               </span>
+              {t.reward_label && (
+                <span className="block text-[10px] font-normal opacity-70">{t.reward_label}</span>
+              )}
             </div>
           ))}
         </div>
       </div>
+
+      {canEdit && <LadderEditor onChanged={load} />}
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         <div className="p-3 border-b border-slate-100">
@@ -119,8 +343,10 @@ export default function MemberRanksPage() {
                   </td>
                   <td className="p-3 text-right tabular-nums text-slate-700">{m.introduced}</td>
                   <td className="p-3 text-slate-600">
+                    {/* The next rung's own requirement, not a shared width. */}
                     {m.next_rank
-                      ? <>{m.next_rank} — needs {data.width} × {m.rank || 'introduced member'}</>
+                      ? <>{m.next_rank} — needs {nextNeeds(data.tiers, m.rank_level)} ×{' '}
+                        {m.rank || 'introduced member'}</>
                       : <span className="text-slate-500">top of the ladder</span>}
                   </td>
                 </tr>
