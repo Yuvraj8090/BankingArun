@@ -202,18 +202,32 @@ function BrochureStructure() {
 
 export default function ReferralPage() {
   const [data, setData] = useState(null);
-  const [history, setHistory] = useState(null);
+  const [history, setHistory] = useState({ referrals: [], total_earned: 0, count: 0 });
   const [standing, setStanding] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    Promise.all([api.referralCode(), api.referralHistory()])
-      .then(([c, h]) => { setData(c); setHistory(h); })
-      .catch(() => toast.error('Failed to load referrals'))
+  const loadReferrals = () => {
+    setLoading(true);
+    setError('');
+    api.referralCode()
+      .then(setData)
+      .catch((e) => {
+        const detail = e.response?.data?.detail || 'Failed to load referrals';
+        setError(detail);
+        toast.error(detail);
+      })
       .finally(() => setLoading(false));
+    api.referralHistory()
+      .then(setHistory)
+      .catch(() => setHistory({ referrals: [], total_earned: 0, count: 0 }));
     // Separate, and allowed to fail quietly: the ladders are worth showing here
     // but nobody came to this page to be told they could not be loaded.
     api.myStanding().then(setStanding).catch(() => setStanding(null));
+  };
+
+  useEffect(() => {
+    loadReferrals();
   }, []);
 
   const copyLink = () => {
@@ -233,7 +247,17 @@ export default function ReferralPage() {
     window.open(urls[channel], '_blank', 'noopener,noreferrer');
   };
 
-  if (loading || !data) return <div className="p-10 flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" /> Loading referrals…</div>;
+  if (loading) return <div className="p-10 flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" /> Loading referrals…</div>;
+  if (!data) return (
+    <div className="p-10 text-slate-600">
+      <p className="text-sm font-semibold text-slate-900">Could not load referrals.</p>
+      {error && <p className="mt-1 text-xs">{error}</p>}
+      <button onClick={loadReferrals}
+        className="mt-4 px-3 py-2 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold">
+        Retry
+      </button>
+    </div>
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
