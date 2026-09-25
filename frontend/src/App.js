@@ -95,7 +95,7 @@ function HomeRoute() {
 }
 
 // ---------------- Auth ----------------
-function AuthRoute({ isRegister }) {
+function AuthRoute({ isRegister, portal }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -114,6 +114,7 @@ function AuthRoute({ isRegister }) {
       </div>
       <AuthPage
         defaultIsRegister={isRegister}
+        portal={portal}
         onSuccess={(role) => navigate(from || homeFor(role), { replace: true })}
       />
       <Toaster position="top-right" richColors theme="light" />
@@ -298,8 +299,9 @@ export default function App() {
       <BankThemeProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<AuthRoute isRegister={false} />} />
-            <Route path="/open-account" element={<AuthRoute isRegister />} />
+            <Route path="/login" element={<AuthRoute isRegister={false} portal="member" />} />
+            <Route path="/open-account" element={<AuthRoute isRegister portal="member" />} />
+            <Route path="/corporate-login" element={<AuthRoute isRegister={false} portal="staff" />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/app" element={<AppHome />} />
             <Route path="/app/:tab" element={<AppShell />} />

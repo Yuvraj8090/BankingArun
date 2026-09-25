@@ -719,6 +719,7 @@ function route_register(array $d): void
 
 function route_login(array $d): void
 {
+    captcha_verify($d);
     // The field has always said "Email / User ID" but only ever accepted an
     // email, so a member given an account number by their branch could not sign
     // in with it. Any of the three identifiers a member is actually given now
@@ -749,6 +750,18 @@ function route_login(array $d): void
         fail(401, "Invalid login or password. $left attempt(s) remaining before security lockout.");
     }
     clear_fails($identifier);
+    // The public member page and the staff/director page share this same route,
+    // but a member typing their password into the staff door (or the reverse)
+    // is not what either side is for -- send them to the door that matches the
+    // account, rather than letting either page sign in anyone with any role.
+    $portal = ($d['portal'] ?? 'member') === 'staff' ? 'staff' : 'member';
+    $isInternal = in_array($user['role'], USER_ACCESS_ROLES, true);
+    if ($portal === 'staff' && !$isInternal) {
+        fail(403, 'This sign-in is for staff and directors. Please use the member login page.');
+    }
+    if ($portal === 'member' && $isInternal) {
+        fail(403, 'This sign-in is for members. Staff and directors should use the corporate login page.');
+    }
     // With an authenticator enrolled, the password alone does not produce a
     // session: hand back a short-lived challenge and wait for the code.
     if (!empty($user['totp_enabled'])) {

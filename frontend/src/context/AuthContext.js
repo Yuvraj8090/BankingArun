@@ -43,11 +43,12 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [API]);
 
-  const login = async (email, password, deviceName = "Web Portal") => {
+  const login = async (email, password, deviceName = "Web Portal", extra = {}) => {
     const res = await axios.post(`${API}/auth/login`, {
       email,
       password,
-      device_name: deviceName
+      device_name: deviceName,
+      ...extra
     }, { withCredentials: true });
 
     if (res.data?.token) {

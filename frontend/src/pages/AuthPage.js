@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { api } from '../services/api';
 import { b64uToBuf, bufToB64u } from '../utils/webauthn';
 
-export default function AuthPage({ onSuccess, defaultIsRegister }) {
+export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'member' }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   // The two tabs are real URLs, so the route decides which form shows. Holding
@@ -50,25 +50,34 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
   const doLogin = async (e) => {
     e?.preventDefault();
     if (!email || !password) return toast.error('Enter email and password');
+    if (!captchaAnswer.trim()) return toast.error('Please type the number shown in the image');
     setLoading(true);
     try {
-      const r = await login(email, password);
+      const r = await login(email, password, 'Web Portal', {
+        captcha_id: captcha?.captcha_id, captcha_answer: captchaAnswer.trim(), portal,
+      });
       toast.success('Welcome back');
       onSuccess?.(r.user?.role);
-    } catch (err) { toast.error(err.response?.data?.detail || 'Login failed'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Login failed');
+      // The image is spent whether the answer was right or wrong, so the one on
+      // screen is already invalid — replace it rather than let them retype it.
+      newCaptcha();
+    } finally { setLoading(false); }
   };
 
   // A Nidhi cannot enrol a member off a web form — identity documents have to be
   // seen and verified — so this raises an enquiry and the sales desk takes it
   // from there. No account is created here and no credentials are collected.
+  // Signing in matters just as much: a captcha guards every credentialed form
+  // here, login included, not only registration.
   const newCaptcha = useCallback(async () => {
     setCaptchaAnswer('');
     try { setCaptcha(await api.publicCaptcha()); }
     catch { setCaptcha(null); }
   }, []);
 
-  useEffect(() => { if (isRegister) newCaptcha(); }, [isRegister, newCaptcha]);
+  useEffect(() => { newCaptcha(); }, [isRegister, newCaptcha]);
 
   // The published plans, so somebody who came from the rate card can say which
   // one they were reading about instead of the desk having to ask.
@@ -178,23 +187,35 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
       {/* Right panel — form */}
       <div className="lg:col-span-3 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-sm p-6 lg:p-8">
-          {/* Tabs are real URLs: /login and /open-account */}
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-md mb-2 text-xs">
-            <Link to="/login" data-testid="auth-tab-login"
-              className={`flex-1 py-2 rounded font-semibold transition text-center ${!isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
-              Customer / Retail Login
-            </Link>
-            <Link to="/open-account" data-testid="auth-tab-register"
-              className={`flex-1 py-2 rounded font-semibold transition text-center ${isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
-              Customer / Retail Signup
-            </Link>
-          </div>
-          {!isRegister && (
-            <p className="text-[11px] text-slate-500 mb-4 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 shrink-0" />
-              Corporate Login: sign in above with your registered corporate email — for a new corporate
-              account, call Relationship Desk on 9105015464.
-            </p>
+          {portal === 'staff' ? (
+            <div className="mb-4">
+              <h1 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-[#0b3b8c]" /> Corporate Login
+              </h1>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Directors, branch managers and staff sign in here with their registered email.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Tabs are real URLs: /login and /open-account */}
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-md mb-2 text-xs">
+                <Link to="/login" data-testid="auth-tab-login"
+                  className={`flex-1 py-2 rounded font-semibold transition text-center ${!isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
+                  Customer / Retail Login
+                </Link>
+                <Link to="/open-account" data-testid="auth-tab-register"
+                  className={`flex-1 py-2 rounded font-semibold transition text-center ${isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
+                  Customer / Retail Signup
+                </Link>
+              </div>
+              {!isRegister && (
+                <p className="text-[11px] text-slate-500 mb-4">
+                  Director, branch manager or staff? <Link to="/corporate-login" data-testid="auth-corporate-login-link"
+                    className="font-semibold text-[#0b3b8c] hover:text-[#092e6f]">Sign in at Corporate Login →</Link>
+                </p>
+              )}
+            </>
           )}
 
           {!isRegister ? (
@@ -215,6 +236,11 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
                   className="text-[11px] font-semibold text-[#0b3b8c] hover:text-[#092e6f] py-1">
                   Forgot password?
                 </Link>
+              </div>
+
+              <div>
+                <CaptchaField testId="login-captcha" captcha={captcha} captchaAnswer={captchaAnswer}
+                  setCaptchaAnswer={setCaptchaAnswer} onRefresh={newCaptcha} />
               </div>
 
               <button data-testid="login-submit-btn" type="submit" disabled={loading}
@@ -311,30 +337,8 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
               </label>
 
               <div>
-                <span className="block text-[11px] text-slate-600 mb-1 font-medium">
-                  Type the number shown
-                </span>
-                <div className="flex items-center gap-2">
-                  {captcha ? (
-                    <img src={captcha.image} alt="Verification number"
-                      data-testid="enquiry-captcha-image"
-                      className="h-14 w-40 rounded-md border border-slate-300 bg-white shrink-0" />
-                  ) : (
-                    <div className="h-14 w-40 rounded-md border border-slate-300 bg-slate-50 shrink-0
-                      flex items-center justify-center text-[10px] text-slate-500 text-center px-2">
-                      Could not load the image
-                    </div>
-                  )}
-                  <button type="button" onClick={newCaptcha} data-testid="enquiry-captcha-refresh"
-                    aria-label="Show a different number"
-                    className="p-3 rounded-md border border-slate-300 text-slate-600 hover:border-[#0b3b8c] hover:text-[#0b3b8c] shrink-0">
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                  <input data-testid="enquiry-captcha-input" required value={captchaAnswer}
-                    onChange={e => setCaptchaAnswer(e.target.value.replace(/\D/g, ''))}
-                    inputMode="numeric" autoComplete="off" maxLength={6} placeholder="12345"
-                    className="w-full bg-white border border-slate-300 rounded-md px-3 py-2.5 text-sm tracking-[0.3em] font-mono focus:outline-none focus:border-[#0b3b8c]" />
-                </div>
+                <CaptchaField testId="enquiry-captcha" captcha={captcha} captchaAnswer={captchaAnswer}
+                  setCaptchaAnswer={setCaptchaAnswer} onRefresh={newCaptcha} />
                 <p className="text-[10px] text-slate-500 mt-1">
                   Can't read it? Use the refresh button for a new number, or call 9105015464.
                 </p>
@@ -384,6 +388,37 @@ function PasswordInput({ value, onChange, testId, label, placeholder, dense = fa
         {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
       </button>
     </div>
+  );
+}
+
+// The same number-image challenge behind every credentialed form here —
+// signup and login alike — so it lives once rather than being retyped per form.
+function CaptchaField({ testId, captcha, captchaAnswer, setCaptchaAnswer, onRefresh }) {
+  return (
+    <>
+      <span className="block text-[11px] text-slate-600 mb-1 font-medium">Type the number shown</span>
+      <div className="flex items-center gap-2">
+        {captcha ? (
+          <img src={captcha.image} alt="Verification number"
+            data-testid={`${testId}-image`}
+            className="h-14 w-40 rounded-md border border-slate-300 bg-white shrink-0" />
+        ) : (
+          <div className="h-14 w-40 rounded-md border border-slate-300 bg-slate-50 shrink-0
+            flex items-center justify-center text-[10px] text-slate-500 text-center px-2">
+            Could not load the image
+          </div>
+        )}
+        <button type="button" onClick={onRefresh} data-testid={`${testId}-refresh`}
+          aria-label="Show a different number"
+          className="p-3 rounded-md border border-slate-300 text-slate-600 hover:border-[#0b3b8c] hover:text-[#0b3b8c] shrink-0">
+          <RefreshCw className="w-4 h-4" />
+        </button>
+        <input data-testid={`${testId}-input`} required value={captchaAnswer}
+          onChange={e => setCaptchaAnswer(e.target.value.replace(/\D/g, ''))}
+          inputMode="numeric" autoComplete="off" maxLength={6} placeholder="12345"
+          className="w-full bg-white border border-slate-300 rounded-md px-3 py-2.5 text-sm tracking-[0.3em] font-mono focus:outline-none focus:border-[#0b3b8c]" />
+      </div>
+    </>
   );
 }
 
