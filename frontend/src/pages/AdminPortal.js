@@ -345,8 +345,7 @@ function UserAccessPanel() {
         <select value={role} onChange={(e) => { const nextRole = e.target.value; setRole(nextRole); load({ role: nextRole }); }}
           data-testid="admin-user-role" className={`${inputClass} w-auto`}>
           <option value="">All roles</option>
-          {['bank_owner', 'admin', 'branch_manager', 'staff', 'collection_agent', 'loan_officer', 'corporate', 'retail']
-            .map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+          {ACCESS_ROLES.map(([r]) => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
         </select>
         <button onClick={load}
           className="px-3 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 flex items-center gap-1.5">

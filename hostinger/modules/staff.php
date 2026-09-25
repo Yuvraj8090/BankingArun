@@ -220,9 +220,9 @@ function route_admin_users(array $d): void
     $sql = "SELECT u.id, u.name, u.email, u.phone, u.role, u.branch, u.designation, u.kyc_status, u.created_at,
             (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at, a.id LIMIT 1) AS account_number,
             (SELECT m.folio_no FROM member_register m WHERE m.user_id = u.id ORDER BY m.admitted_on DESC LIMIT 1) AS folio_no
-        FROM users u WHERE 1 = 1";
-    $params = [];
-    if (!empty($_GET['role'])) {
+        FROM users u WHERE u.role IN (" . implode(',', array_fill(0, count(USER_ACCESS_ROLES), '?')) . ')';
+    $params = USER_ACCESS_ROLES;
+    if (!empty($_GET['role']) && in_array($_GET['role'], USER_ACCESS_ROLES, true)) {
         $sql .= ' AND u.role = ?';
         $params[] = clip($_GET['role'], 30);
     }
@@ -322,6 +322,9 @@ function route_admin_user_password(array $d): void
     $target = row('SELECT * FROM users WHERE id = ? OR email = ?', [$id, strtolower($id)]);
     if (!$target) {
         fail(404, 'User not found.');
+    }
+    if (!in_array($target['role'], USER_ACCESS_ROLES, true)) {
+        fail(422, 'Member accounts are managed from Relationship Desk.');
     }
     if ($target['id'] === $owner['id']) {
         fail(400, 'Use Security & Login to change your own password.');
