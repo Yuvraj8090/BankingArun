@@ -38,6 +38,18 @@ function BoosterCard({ booster }) {
             <p className="text-[11px] text-amber-900 mt-1">
               {next.qualifying_now} of {next.needs} counting right now
             </p>
+            {/* "0 of 4" to somebody who has plainly introduced four people reads
+                as a broken page. It is nearly always because they are a level
+                below, or one of them closed their deposit -- so say which. */}
+            {next.qualifying_now < next.needs && booster.introduced_count > 0 && (
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                You have introduced {booster.introduced_count}
+                {booster.min_deposit_each
+                  ? `, and ${booster.holding_deposit} of them ${booster.holding_deposit === 1 ? 'is' : 'are'} holding ${inr(booster.min_deposit_each)}`
+                  : ''}
+                {next.needs_level ? `, but this level counts only those who have reached ${next.needs_level}.` : '.'}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -55,9 +67,38 @@ function BoosterCard({ booster }) {
                 {t.direct_required} × {t.required_below === 0 ? 'member' : `Level ${t.required_below}`}
                 {t.min_deposit_each ? `, each holding ${inr(t.min_deposit_each)}` : ''}
               </span>
+              <span className="block text-[10px] font-normal opacity-70">
+                {t.your_members_here} of yours here
+              </span>
             </div>
           ))}
         </div>
+        {booster.introduced?.length > 0 && (
+          <div className="mt-3" data-testid="booster-introduced">
+            <p className="text-[11px] font-semibold text-slate-700 mb-1.5">
+              The members you introduced
+            </p>
+            <div className="rounded-md border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-[11px]">
+                <tbody className="divide-y divide-slate-100">
+                  {booster.introduced.map((m, i) => (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="px-2.5 py-1.5 text-slate-800">{m.name}</td>
+                      <td className="px-2.5 py-1.5 text-slate-600">
+                        {m.level_name || 'not yet on the ladder'}
+                      </td>
+                      <td className="px-2.5 py-1.5 text-right">
+                        {m.holds_deposit
+                          ? <span className="text-emerald-700 font-semibold">deposit held</span>
+                          : <span className="text-[#c8102e] font-semibold">no deposit</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         <p className="text-[11px] text-slate-500 mt-2.5">{booster.note}</p>
       </div>
     </div>

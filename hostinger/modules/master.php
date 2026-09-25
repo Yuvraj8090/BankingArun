@@ -1422,17 +1422,51 @@ function booster_standing(string $userId): array
         ];
     }
 
+    // Who the member actually introduced, what level each of them is on, and
+    // whether each is holding the deposit. Without this the card can say
+    // "0 of 4 counting right now" to somebody who has plainly introduced four
+    // people, and look broken rather than true. The answer is nearly always
+    // "they are a level below, or one of them closed their deposit", and the
+    // member can only act on it if they can see which.
+    $topNeed = 0.0;
+    foreach ($tiers as $tier) {
+        $topNeed = max($topNeed, (float)($tier['min_deposit_each'] ?? 0));
+    }
+    $holders = $topNeed > 0 ? members_with_deposits_over($topNeed) : [];
+    $directs = [];
+    $atLevel = [];
+    foreach (rows('SELECT r.referee_id, u.name FROM referrals r
+        JOIN users u ON u.id = r.referee_id
+        WHERE r.referrer_id = ? AND r.status = ? ORDER BY r.created_at', [$userId, 'paid']) as $r) {
+        $theirLevel = $map[$r['referee_id']] ?? 0;
+        $directs[] = [
+            'name' => $r['name'],
+            'level' => $theirLevel,
+            'level_name' => $theirLevel === 0 ? null : ($names[$theirLevel] ?? null),
+            'holds_deposit' => $topNeed <= 0 || isset($holders[$r['referee_id']]),
+        ];
+        $atLevel[$theirLevel] = ($atLevel[$theirLevel] ?? 0) + 1;
+    }
+
     return [
         'enabled' => true,
         'level' => $level,
         'name' => $level === 0 ? null : ($names[$level] ?? null),
         'next' => $next,
+        'introduced' => $directs,
+        'introduced_count' => count($directs),
+        'holding_deposit' => count(array_filter($directs, fn($d) => $d['holds_deposit'])),
+        'min_deposit_each' => $topNeed > 0 ? $topNeed : null,
         'ladder' => array_map(fn($t) => [
             'position' => (int)$t['position'], 'name' => $t['name'],
             'direct_required' => (int)$t['direct_required'],
             'required_below' => (int)$t['required_below'],
             'min_deposit_each' => $t['min_deposit_each'],
             'reward_label' => $t['reward_label'],
+            // How many of this member's own introductions sit on this rung, so
+            // every level on the card carries a real number rather than only
+            // the one being worked towards.
+            'your_members_here' => $atLevel[(int)$t['position']] ?? 0,
         ], $tiers),
         'note' => 'Reaching a booster level is automatic: it is worked out from who you have '
             . 'introduced and what they hold, and nothing has to be claimed. An introduction stops '
