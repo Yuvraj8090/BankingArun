@@ -190,10 +190,10 @@ export default function ReferralPage() {
           <div className="w-11 h-11 rounded-md bg-white/10 flex items-center justify-center"><Gift className="w-6 h-6 text-white" /></div>
           <div className="flex-1">
             <h1 className="text-2xl font-bold">Refer &amp; Earn</h1>
-            <p className="text-sm text-slate-900/85 mt-1">{data.reward_note}</p>
+            <p className="text-sm text-white/85 mt-1">{data.reward_note}</p>
           </div>
           <div className="text-right">
-            <div className="text-xs text-slate-900/70">Total earned</div>
+            <div className="text-xs text-white/70">Total earned</div>
             <div className="text-2xl font-bold">₹{(history?.total_earned || 0).toLocaleString('en-IN')}</div>
           </div>
         </div>
@@ -272,7 +272,7 @@ export default function ReferralPage() {
               <thead className="bg-slate-50 text-[11px] uppercase text-slate-600">
                 <tr>
                   <th className="p-3 font-semibold">Friend</th>
-                  <th className="p-3 font-semibold">Email</th>
+                  <th className="p-3 font-semibold">Contact</th>
                   <th className="p-3 font-semibold">Joined</th>
                   <th className="p-3 font-semibold">Status</th>
                   <th className="p-3 font-semibold text-right">Credit</th>
@@ -281,8 +281,17 @@ export default function ReferralPage() {
               <tbody className="divide-y divide-slate-100">
                 {history.referrals.map(r => (
                   <tr key={r.id} className="hover:bg-blue-50/40 transition-colors">
-                    <td className="p-3 font-semibold text-slate-900">{r.referee_name}</td>
-                    <td className="p-3 text-slate-600">{r.referee_email}</td>
+                    <td className="p-3 font-semibold text-slate-900">
+                      {r.referee_name || <span className="text-slate-400">name not recorded</span>}
+                    </td>
+                    {/* Phone first: an email is optional for a member and most
+                        do not have one, so an email column was usually blank. */}
+                    <td className="p-3 text-slate-600">
+                      {r.referee_phone || r.referee_email || <span className="text-slate-400">—</span>}
+                      {r.referee_phone && r.referee_email && (
+                        <span className="block text-[10px] text-slate-500">{r.referee_email}</span>
+                      )}
+                    </td>
                     <td className="p-3 text-slate-500">{new Date(r.created_at).toLocaleDateString('en-IN')}</td>
                     <td className="p-3">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">

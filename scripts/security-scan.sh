@@ -46,10 +46,20 @@ else ok "no debug output"; fi
 if grep -q "ini_set('display_errors', '0')" hostinger/db.php; then ok "errors not displayed"
 else bad "errors not displayed" "display_errors is not forced off in db.php"; fi
 
-# 6. An icon painted dark on a dark panel is invisible; this has shipped twice.
-if grep -rnE 'hover:bg-\[#0b3b8c\][^"]*hover:text-(slate-900|slate-800|black)' frontend/src --include='*.js' -q; then
-  bad "hover contrast" "dark text on a dark hover fill"
-else ok "hover contrast"; fi
+# 6. An icon painted dark on a dark panel is invisible; this has shipped three
+# times. The first check only covered the hover case, so the static one went
+# straight past it: the Refer & Earn hero and the face of every debit card were
+# carrying near-black text on a dark blue ground.
+#
+# text-slate-900/85 is the signature. Nobody writes a dark colour with an
+# opacity suffix on a light background -- it is always a text-white/85 that was
+# converted by a sweep, and the surface underneath it is dark.
+contrast=""
+grep -rnE 'hover:bg-\[#0b3b8c\][^"]*hover:text-(slate-900|slate-800|black)' frontend/src --include='*.js' -q \
+  && contrast="$contrast dark-text-on-dark-hover-fill"
+faded=$(grep -rnE 'text-(slate-900|slate-800|black)/[0-9]+' frontend/src --include='*.js' | head -3)
+[[ -n "$faded" ]] && contrast="$contrast $(echo "$faded" | cut -d: -f1-2 | tr '\n' ' ')"
+[[ -z "$contrast" ]] && ok "hover contrast" || bad "hover contrast" "dark text on a dark surface:$contrast"
 
 # 7. Dependencies with known high-severity advisories.
 if [[ -d frontend/node_modules ]]; then

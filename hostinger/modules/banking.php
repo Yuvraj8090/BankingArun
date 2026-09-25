@@ -402,8 +402,16 @@ function route_referral_code(array $d): void
 function route_referral_history(array $d): void
 {
     $user = current_user();
-    $items = out_all(rows('SELECT id, referee_name, code, credit_amount, status, created_at FROM referrals
-        WHERE referrer_id = ? ORDER BY created_at DESC LIMIT 100', [$user['id']]));
+    // referee_name is a snapshot taken when the referral was recorded. It goes
+    // stale when a member's name is corrected, and it is empty for referrals
+    // written by anything other than the bonus path. The live name wins where
+    // there is one; the snapshot is the fallback, so an account that has since
+    // been removed still shows who it was.
+    $items = out_all(rows("SELECT r.id, COALESCE(u.name, r.referee_name) AS referee_name,
+            u.phone AS referee_phone, COALESCE(u.email, r.referee_email) AS referee_email,
+            r.code, r.credit_amount, r.status, r.created_at
+        FROM referrals r LEFT JOIN users u ON u.id = r.referee_id
+        WHERE r.referrer_id = ? ORDER BY r.created_at DESC LIMIT 100", [$user['id']]));
     $paid = array_filter($items, fn($i) => $i['status'] === 'paid');
     respond(['referrals' => $items, 'total_earned' => (float)array_sum(array_column($paid, 'credit_amount')),
         'count' => count($items)]);

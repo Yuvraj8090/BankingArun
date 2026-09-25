@@ -190,12 +190,12 @@ export default function CardsChequesPage() {
                   <div className="relative flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-slate-900/70" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900/90">
+                        <Building2 className="w-4 h-4 text-white/70" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/90">
                           AJSPay
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-900/70 mt-0.5">A/C {card.account_number}</p>
+                      <p className="text-[10px] text-white/70 mt-0.5">A/C {card.account_number}</p>
                     </div>
                     <NetworkBadge network={card.network} />
                   </div>
@@ -204,7 +204,7 @@ export default function CardsChequesPage() {
                     <div className="w-8 h-6 rounded bg-gradient-to-br from-yellow-200 to-yellow-500/70 flex items-center justify-center">
                       <div className="w-5 h-4 rounded-sm border border-yellow-800/40" />
                     </div>
-                    <Wifi className="w-4 h-4 text-slate-900/80 -rotate-90" />
+                    <Wifi className="w-4 h-4 text-white/80 -rotate-90" />
                   </div>
 
                   {/* Card number */}
@@ -214,15 +214,15 @@ export default function CardsChequesPage() {
 
                   <div className="relative mt-3 flex justify-between items-end text-[11px]">
                     <div>
-                      <p className="text-[9px] text-slate-900/70 uppercase">Card Holder</p>
+                      <p className="text-[9px] text-white/70 uppercase">Card Holder</p>
                       <p className="font-semibold">{card.card_holder}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-slate-900/70 uppercase">Valid Thru</p>
+                      <p className="text-[9px] text-white/70 uppercase">Valid Thru</p>
                       <p className="font-mono font-semibold">{card.expiry_date}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-slate-900/70 uppercase">CVV</p>
+                      <p className="text-[9px] text-white/70 uppercase">CVV</p>
                       {/* Never stored, so never shown. PCI DSS forbids retaining the
                           verification value after authorisation. */}
                       <p className="font-mono font-semibold" title="Printed on your card; we do not keep it">•••</p>
