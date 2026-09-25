@@ -179,16 +179,23 @@ export default function AuthPage({ onSuccess, defaultIsRegister }) {
       <div className="lg:col-span-3 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-sm p-6 lg:p-8">
           {/* Tabs are real URLs: /login and /open-account */}
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-md mb-6 text-xs">
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-md mb-2 text-xs">
             <Link to="/login" data-testid="auth-tab-login"
               className={`flex-1 py-2 rounded font-semibold transition text-center ${!isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
-              Member Login
+              Customer / Retail Login
             </Link>
             <Link to="/open-account" data-testid="auth-tab-register"
               className={`flex-1 py-2 rounded font-semibold transition text-center ${isRegister ? 'bg-white shadow-sm text-[#0b3b8c]' : 'text-slate-600'}`}>
-              Open Account
+              Customer / Retail Signup
             </Link>
           </div>
+          {!isRegister && (
+            <p className="text-[11px] text-slate-500 mb-4 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 shrink-0" />
+              Corporate Login: sign in above with your registered corporate email — for a new corporate
+              account, call Relationship Desk on 9105015464.
+            </p>
+          )}
 
           {!isRegister ? (
             <form onSubmit={doLogin} className="space-y-4">
