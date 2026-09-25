@@ -158,7 +158,7 @@ function route_admin_overview(array $d): void
             ORDER BY timestamp DESC, seq DESC LIMIT 10')),
         'pending_kyc_users' => array_map('public_user',
             rows("SELECT * FROM users WHERE kyc_status = 'pending_approval' ORDER BY created_at DESC LIMIT 20")),
-        'audit_logs' => out_all(rows('SELECT * FROM audit_logs ORDER BY timestamp DESC, seq DESC LIMIT 15')),
+        'audit_logs' => out_all(rows('SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 15')),
     ]);
 }
 
