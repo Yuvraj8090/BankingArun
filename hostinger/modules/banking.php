@@ -3,33 +3,44 @@
 // investments, support, branches, chatbot, referrals and standing instructions.
 declare(strict_types=1);
 
-// Defaults only. The rates actually charged/paid are whatever the bank owner
-// has saved in system_config (route_admin_config_set) -- see loan_rate() and
-// deposit_tier_rate() -- so a rate change is a settings save, not a deploy.
+// Defaults only, read when a row in system_parameters has been deleted or was
+// never seeded. The rates actually charged/paid live in that table (see
+// modules/parameters.php and the Business Parameters screen), not here -- a
+// rate change is an admin-panel save, not a deploy.
 const LOAN_RATE_DEFAULTS = ['personal' => 10.50, 'home' => 8.40, 'vehicle' => 8.75, 'gold' => 7.90];
 const DEPOSIT_RATE_DEFAULTS = ['under_1y' => 6.50, '1y_to_2y' => 7.25, '2y_to_3y' => 7.50, 'over_3y' => 7.10];
 const REFERRAL_REWARD_DEFAULT = 500.0;
+const DEMAND_DRAFT_FEE_DEFAULT = 50.0;
+const CARD_LIMIT_MAX_DEFAULT = 1000000.0;
 const SI_FREQUENCIES = ['daily', 'weekly', 'monthly', 'quarterly'];
 const SI_CATEGORIES = ['rent', 'sip', 'emi', 'insurance', 'generic'];
 const SI_MAX_AMOUNT = 1000000.0;
 
 function loan_rate(string $type): float
 {
-    $saved = system_config()['loan_rates'] ?? [];
-    return (float)($saved[$type] ?? LOAN_RATE_DEFAULTS[$type] ?? 10.0);
+    return param_value("loan_rate_$type", LOAN_RATE_DEFAULTS[$type] ?? 10.0);
 }
 
 // Same four tenure tiers route_book_deposit has always used; only the source of
 // the number changed. Kept out of the schemes table on purpose -- this is the
 // generic self-service fixed/recurring path, not a named brochure plan -- but it
 // still has to clear the same Nidhi Rules cap a scheme would, which is enforced
-// where these are saved (route_admin_config_set), not here.
+// where these are saved (route_parameter_update/create), not here.
 function deposit_tier_rate(int $tenureMonths): float
 {
-    $saved = system_config()['deposit_rates'] ?? [];
     $tier = $tenureMonths < 12 ? 'under_1y' : ($tenureMonths <= 24 ? '1y_to_2y'
         : ($tenureMonths <= 36 ? '2y_to_3y' : 'over_3y'));
-    return (float)($saved[$tier] ?? DEPOSIT_RATE_DEFAULTS[$tier]);
+    return param_value("deposit_rate_$tier", DEPOSIT_RATE_DEFAULTS[$tier]);
+}
+
+function demand_draft_fee(): float
+{
+    return param_value('demand_draft_fee', DEMAND_DRAFT_FEE_DEFAULT);
+}
+
+function card_limit_max(): float
+{
+    return param_value('card_limit_max', CARD_LIMIT_MAX_DEFAULT);
 }
 
 // --- Cheques & demand drafts -----------------------------------------------------------
@@ -85,22 +96,24 @@ function route_demand_draft(array $d): void
     if ($amount <= 0 || $amount > 10000000) {
         fail(400, 'Demand draft amount must be between ₹1 and ₹1,00,00,000.');
     }
+    $fee = demand_draft_fee();
     $pdo->beginTransaction();
-    [$account, $newBalance] = debit_account($user, $d['account_number'], $amount + 50.0,
-        'Insufficient funds for Demand Draft + ₹50 issuing fee.');
+    [$account, $newBalance] = debit_account($user, $d['account_number'], $amount + $fee,
+        'Insufficient funds for Demand Draft + ' . rupees($fee) . ' issuing fee.');
     $number = 'DD-' . random_int(100000, 999999);
     $dd = ['id' => uuid4(), 'user_id' => $user['id'], 'dd_number' => $number,
         'account_number' => $account['account_number'], 'beneficiary_name' => clip($d['beneficiary_name'], 150),
-        'payable_at' => clip($d['payable_at'], 100), 'amount' => $amount, 'fee' => 50.0, 'status' => 'ISSUED',
+        'payable_at' => clip($d['payable_at'], 100), 'amount' => $amount, 'fee' => $fee, 'status' => 'ISSUED',
         'timestamp' => now_utc()];
     $pdo->prepare('INSERT INTO demand_drafts (id, user_id, dd_number, account_number, beneficiary_name, payable_at,
             amount, fee, status, timestamp)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute(array_values($dd));
     // Record the debit, so the statement explains where the money went.
     insert_txn(['user_id' => $user['id'], 'account_number' => $account['account_number'], 'type' => 'debit',
-        'mode' => 'DEMAND_DRAFT', 'amount' => $amount + 50.0, 'balance_after' => $newBalance,
+        'mode' => 'DEMAND_DRAFT', 'amount' => $amount + $fee, 'balance_after' => $newBalance,
         'counterparty_name' => $dd['beneficiary_name'], 'counterparty_acc' => $number, 'ref_number' => $number,
-        'description' => "Demand draft payable at {$dd['payable_at']} (incl. ₹50 fee)", 'timestamp' => $dd['timestamp']]);
+        'description' => "Demand draft payable at {$dd['payable_at']} (incl. " . rupees($fee) . ' fee)',
+        'timestamp' => $dd['timestamp']]);
     audit($user, 'DEMAND_DRAFT', "$number for " . rupees($amount));
     $pdo->commit();
     respond(['status' => 'SUCCESS',
@@ -332,7 +345,7 @@ function route_branches(array $d): void
 // --- Refer & earn ------------------------------------------------------------------------
 function referral_reward(): float
 {
-    return (float)(system_config()['referral_reward_amount'] ?? REFERRAL_REWARD_DEFAULT);
+    return param_value('referral_reward_amount', REFERRAL_REWARD_DEFAULT);
 }
 
 function ensure_referral_code(array $user): string

@@ -510,6 +510,55 @@ CREATE TABLE IF NOT EXISTS system_config (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Business rates and fees the bank owner manages from the Business Parameters
+-- screen (modules/parameters.php) -- a real, listable, searchable table rather
+-- than another key inside system_config's JSON blob. Every business-facing
+-- number that was previously a PHP constant (loan rates, self-service deposit
+-- rates, the DD fee, the card limit ceiling) now has a row here; the old
+-- constants remain in code only as the fallback a deleted row reverts to.
+CREATE TABLE IF NOT EXISTS system_parameters (
+    id VARCHAR(36) PRIMARY KEY,
+    param_key VARCHAR(60) NOT NULL UNIQUE,
+    label VARCHAR(150) NOT NULL,
+    category VARCHAR(40) NOT NULL,
+    value DECIMAL(15,4) NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT '',
+    min_value DECIMAL(15,4) DEFAULT NULL,
+    max_value DECIMAL(15,4) DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    updated_by VARCHAR(150) DEFAULT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_param_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO system_parameters
+    (id, param_key, label, category, value, unit, min_value, max_value, description) VALUES
+('param-loan-personal', 'loan_rate_personal', 'Personal loan rate', 'loan_rates', 10.50, '% p.a.', 0, 36,
+    'Rate quoted on a personal loan application.'),
+('param-loan-home', 'loan_rate_home', 'Home loan rate', 'loan_rates', 8.40, '% p.a.', 0, 36,
+    'Rate quoted on a home loan application.'),
+('param-loan-vehicle', 'loan_rate_vehicle', 'Vehicle loan rate', 'loan_rates', 8.75, '% p.a.', 0, 36,
+    'Rate quoted on a vehicle loan application.'),
+('param-loan-gold', 'loan_rate_gold', 'Gold loan rate', 'loan_rates', 7.90, '% p.a.', 0, 36,
+    'Rate quoted on a gold loan application.'),
+('param-dep-under-1y', 'deposit_rate_under_1y', 'Deposit rate, under 1 year', 'deposit_rates', 6.50, '% p.a.', 0, 12.5,
+    'Self-service fixed/recurring deposit, tenure under 12 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
+('param-dep-1-2y', 'deposit_rate_1y_to_2y', 'Deposit rate, 1-2 years', 'deposit_rates', 7.25, '% p.a.', 0, 12.5,
+    'Self-service fixed/recurring deposit, tenure 12-24 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
+('param-dep-2-3y', 'deposit_rate_2y_to_3y', 'Deposit rate, 2-3 years', 'deposit_rates', 7.50, '% p.a.', 0, 12.5,
+    'Self-service fixed/recurring deposit, tenure 25-36 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
+('param-dep-over-3y', 'deposit_rate_over_3y', 'Deposit rate, over 3 years', 'deposit_rates', 7.10, '% p.a.', 0, 12.5,
+    'Self-service fixed/recurring deposit, tenure over 36 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
+('param-referral-reward', 'referral_reward_amount', 'Refer & Earn reward', 'program', 500.00, '₹', 0, 10000,
+    'Paid to both the referrer and the new member when an account opens via a referral code.'),
+('param-face-threshold', 'face_match_auto_threshold', 'Face-match auto-approval threshold', 'program', 92.00, '%', 50, 100,
+    'Video KYC face-match score at or above which a review is auto-approved.'),
+('param-dd-fee', 'demand_draft_fee', 'Demand draft issuing fee', 'fees', 50.00, '₹', 0, 1000,
+    'Flat fee charged in addition to the draft amount when a demand draft is issued.'),
+('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
+    'The highest online/ATM limit a member can set on a debit card.');
+
 -- ---------------------------------------------------------------------------
 -- Demo data
 -- ---------------------------------------------------------------------------

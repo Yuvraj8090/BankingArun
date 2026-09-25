@@ -38,6 +38,7 @@ import AdminConfigPage from './pages/AdminConfigPage';
 import RailsPage from './pages/RailsPage';
 import MyStandingPage from './pages/MyStandingPage';
 import SchemesPage from './pages/SchemesPage';
+import ParametersPage from './pages/ParametersPage';
 import AgentsPage from './pages/AgentsPage';
 import BranchAdminPage from './pages/BranchAdminPage';
 import ProductAdminPage from './pages/ProductAdminPage';
@@ -173,6 +174,7 @@ function AppShell() {
     rails: <RailsPage />,
     'my-standing': <MyStandingPage />,
     schemes: <SchemesPage />,
+    parameters: <ParametersPage />,
     agents: <AgentsPage />,
     'branch-admin': <BranchAdminPage />,
     'public-pages': <ProductAdminPage />,

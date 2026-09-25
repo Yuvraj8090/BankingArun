@@ -11,6 +11,7 @@ require __DIR__ . '/modules/statements.php';
 require __DIR__ . '/modules/security.php';
 require __DIR__ . '/modules/staff.php';
 require __DIR__ . '/modules/master.php';
+require __DIR__ . '/modules/parameters.php';
 require __DIR__ . '/modules/defence.php';
 require __DIR__ . '/modules/compliance.php';
 require __DIR__ . '/modules/mfa.php';
@@ -26,7 +27,6 @@ require __DIR__ . '/modules/rails.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
 const TRANSFER_MODES = ['IMPS', 'NEFT', 'RTGS', 'UPI'];
-const CARD_LIMIT_MAX = 1000000.0;
 const IST = 'Asia/Kolkata';
 // Checked when an email is unknown, so response times don't reveal which emails exist.
 const DUMMY_HASH = '$2y$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -1080,11 +1080,12 @@ function route_manage_card(array $d): void
         $updates['status'] = 'hotlisted';
         $message = 'Card permanently hotlisted & blocked. A replacement card has been queued.';
     } elseif ($action === 'update_limits') {
+        $limitMax = card_limit_max();
         foreach (['online_limit', 'atm_limit'] as $key) {
             if (isset($d[$key])) {
                 $updates[$key] = money($d[$key]);
-                if ($updates[$key] < 0 || $updates[$key] > CARD_LIMIT_MAX) {
-                    fail(422, "$key must be between ₹0 and ₹10,00,000.");
+                if ($updates[$key] < 0 || $updates[$key] > $limitMax) {
+                    fail(422, "$key must be between ₹0 and " . rupees($limitMax) . '.');
                 }
             }
         }
@@ -1277,6 +1278,9 @@ $routes = [
     'POST /kyc/video/submit' => 'route_kyc_submit',
     'GET /kyc/video/queue' => 'route_kyc_queue',
     'POST /kyc/video/decision' => 'route_kyc_decision',
+    // Business parameters (modules/parameters.php) — back office only
+    'GET /parameters' => 'route_parameters_list',
+    'POST /parameters' => 'route_parameter_create',
     // Scheme master & field agents (modules/master.php) — back office only
     'GET /schemes' => 'route_schemes_list',
     'POST /schemes' => 'route_scheme_create',
@@ -1363,6 +1367,8 @@ $paramRoutes = [
     ['GET', '#^/kyc/video/([\w-]{1,64})$#', 'route_kyc_detail'],
     ['PATCH', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_update'],
     ['DELETE', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_delete'],
+    ['PATCH', '#^/parameters/([\w-]{1,64})$#', 'route_parameter_update'],
+    ['DELETE', '#^/parameters/([\w-]{1,64})$#', 'route_parameter_delete'],
     ['PATCH', '#^/agents/([\w-]{1,64})$#', 'route_agent_update'],
     ['DELETE', '#^/agents/([\w-]{1,64})$#', 'route_agent_delete'],
     ['DELETE', '#^/auth/sessions/([\w-]{1,64})$#', 'route_session_revoke'],

@@ -177,6 +177,12 @@ export const api = {
   adminConfigGet: async () => (await axios.get(`${API}/admin/config`, getAuthHeaders())).data,
   adminConfigSet: async (payload) => (await axios.put(`${API}/admin/config`, payload, getAuthHeaders())).data,
 
+  // Business parameters (back office only) — listable, searchable, paginated, full CRUD
+  parametersList: async (query = {}) => (await axios.get(`${API}/parameters`, { ...getAuthHeaders(), params: query })).data,
+  parameterCreate: async (payload) => (await axios.post(`${API}/parameters`, payload, getAuthHeaders())).data,
+  parameterUpdate: async (id, payload) => (await axios.patch(`${API}/parameters/${id}`, payload, getAuthHeaders())).data,
+  parameterDelete: async (id) => (await axios.delete(`${API}/parameters/${id}`, getAuthHeaders())).data,
+
   // Scheme master (back office only)
   schemesList: async () => (await axios.get(`${API}/schemes`, getAuthHeaders())).data,
   schemeCreate: async (payload) => (await axios.post(`${API}/schemes`, payload, getAuthHeaders())).data,
