@@ -363,6 +363,7 @@ function UserAccessPanel() {
               <tr>
                 <th className="p-3 font-semibold">User</th>
                 <th className="p-3 font-semibold">Login ID</th>
+                <th className="p-3 font-semibold">Staff ID</th>
                 <th className="p-3 font-semibold">Role</th>
                 <th className="p-3 font-semibold">Branch</th>
                 <th className="p-3 font-semibold text-right">Actions</th>
@@ -376,6 +377,7 @@ function UserAccessPanel() {
                     <div className="text-[11px] text-slate-500">{u.email || u.phone}</div>
                   </td>
                   <td className="p-3 font-mono font-semibold text-slate-900">{u.login_id}</td>
+                  <td className="p-3 font-mono text-slate-600">{u.staff_id || '-'}</td>
                   <td className="p-3 text-slate-600">{ROLE_LABELS[u.role] || u.role}</td>
                   <td className="p-3 text-slate-600">{u.branch || '-'}</td>
                   <td className="p-3 text-right">
@@ -395,7 +397,7 @@ function UserAccessPanel() {
                   </td>
                 </tr>
               ))}
-              {!filtered.length && <tr><td colSpan={5} className="p-8 text-center text-slate-500">No users found.</td></tr>}
+              {!filtered.length && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No users found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -413,6 +415,10 @@ function UserAccessPanel() {
         <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200">
           <p className="text-[11px] text-emerald-900">User ID for signing in</p>
           <p className="text-xl font-mono font-bold text-emerald-900 tracking-wide">{created.login_id}</p>
+        </div>
+        <div className="p-3 rounded-md bg-slate-50 border border-slate-200 mt-3">
+          <p className="text-[11px] text-slate-600">Staff ID (reference number)</p>
+          <p className="text-xl font-mono font-bold text-slate-900 tracking-wide">{created.staff_id}</p>
         </div>
       </Modal>}
     </div>

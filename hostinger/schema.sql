@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS users (
     nominee_name VARCHAR(150),
     nominee_relation VARCHAR(50),
     designation VARCHAR(100),
+    staff_id VARCHAR(20) UNIQUE,             -- unique reference ID for internal (non-member) logins, e.g. AJSS000001
     referral_code VARCHAR(12) UNIQUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

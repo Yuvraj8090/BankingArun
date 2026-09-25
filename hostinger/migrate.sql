@@ -1120,3 +1120,7 @@ UPDATE reward_programmes SET
     headline = 'A fixed sum every month for the next twelve months',
     payout_note = 'Paid monthly for the twelve months that follow.'
     WHERE code = 'fix_monthly_income';
+
+-- Internal (staff/back-office) logins created from Director user access get a
+-- reference ID of their own, separate from the email they sign in with.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_id VARCHAR(20) UNIQUE;

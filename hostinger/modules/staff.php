@@ -203,6 +203,12 @@ function route_rbi_reports(array $d): void
 }
 
 // --- Director user access ---------------------------------------------------------------
+function next_staff_id(): string
+{
+    $last = (int)scalar("SELECT COALESCE(MAX(CAST(SUBSTRING(staff_id, 5) AS UNSIGNED)), 0) FROM users WHERE staff_id LIKE 'AJSS%'");
+    return 'AJSS' . str_pad((string)($last + 1), 6, '0', STR_PAD_LEFT);
+}
+
 function admin_user_json(array $u, string $ownerId): array
 {
     $u = out($u);
@@ -217,7 +223,7 @@ function admin_user_json(array $u, string $ownerId): array
 function route_admin_users(array $d): void
 {
     $owner = staff_user(['bank_owner']);
-    $sql = "SELECT u.id, u.name, u.email, u.phone, u.role, u.branch, u.designation, u.kyc_status, u.created_at,
+    $sql = "SELECT u.id, u.name, u.email, u.phone, u.role, u.branch, u.designation, u.kyc_status, u.created_at, u.staff_id,
             (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at, a.id LIMIT 1) AS account_number,
             (SELECT m.folio_no FROM member_register m WHERE m.user_id = u.id ORDER BY m.admitted_on DESC LIMIT 1) AS folio_no
         FROM users u WHERE u.role IN (" . implode(',', array_fill(0, count(USER_ACCESS_ROLES), '?')) . ')';
@@ -260,17 +266,18 @@ function route_admin_user_create(array $d): void
     if (row('SELECT id FROM users WHERE phone = ?', [$phone])) {
         fail(400, 'A login with this phone number already exists.');
     }
+    $staffId = next_staff_id();
     $pdo->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash,
-            branch, kyc_status, designation)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            branch, kyc_status, designation, staff_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([uuid4(), $name, $email, $phone, $role,
             password_hash((string)$d['password'], PASSWORD_BCRYPT),
             password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT),
             clip($d['branch'] ?? 'Head Office - Nariman Point', 100), 'verified',
-            clip($d['designation'] ?? '', 100) ?: null]);
-    audit($owner, 'USER_LOGIN_CREATED', "$role $email");
-    respond(['status' => 'SUCCESS', 'login_id' => $email,
-        'message' => "Login created. User ID: $email."]);
+            clip($d['designation'] ?? '', 100) ?: null, $staffId]);
+    audit($owner, 'USER_LOGIN_CREATED', "$role $email ($staffId)");
+    respond(['status' => 'SUCCESS', 'login_id' => $email, 'staff_id' => $staffId,
+        'message' => "Login created. User ID: $email. Staff ID: $staffId."]);
 }
 
 function route_admin_user_update(array $d): void
