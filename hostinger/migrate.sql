@@ -978,3 +978,74 @@ INSERT IGNORE INTO rank_tiers
     'Four members who have each reached Booster Level 1', 'active'),
 (UUID(), 'booster', 3, 'Booster Level 3', 4, 2, 10000.00,
     'Four members who have each reached Booster Level 2', 'active');
+
+-- The two reward programmes the plan book numbers as parts 2 and 3. Part 1 is
+-- the twelve-level commission table, which is already shown on Refer & Earn.
+--
+-- Both are turnover programmes, not referral-count ones: they are earned on
+-- business volume across three legs in a 4:4:2 ratio, which is a different
+-- shape from the rank and booster ladders and so gets its own tables rather
+-- than being bent into rank_tiers.
+--
+-- Shown, never paid. The Nidhi Rules, 2014 do not permit a Nidhi to pay
+-- brokerage or incentive for mobilising deposits, and no code reads these
+-- figures to move money. They are held so the counter and the printed book
+-- quote the same numbers.
+CREATE TABLE IF NOT EXISTS reward_programmes (
+    id VARCHAR(36) PRIMARY KEY,
+    code VARCHAR(40) NOT NULL UNIQUE,
+    part_no INT,                              -- the number the book gives it
+    name VARCHAR(120) NOT NULL,
+    headline VARCHAR(255),
+    qualifying_note VARCHAR(500),
+    payout_note VARCHAR(255),
+    source_note VARCHAR(120),                 -- which brochure page it came off
+    status VARCHAR(10) NOT NULL DEFAULT 'active',
+    deleted_at DATETIME NULL,
+    deleted_by VARCHAR(36) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_prog_live (deleted_at, part_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS reward_slabs (
+    id VARCHAR(36) PRIMARY KEY,
+    programme_code VARCHAR(40) NOT NULL,
+    position INT NOT NULL,
+    label VARCHAR(80) NOT NULL,               -- as printed: "1 Crore"
+    qualifying_amount DECIMAL(18,2),          -- the same figure as a number
+    -- A slab pays either a flat amount or a percentage of the turnover; the
+    -- book uses both, so both columns exist and one is null.
+    payout_amount DECIMAL(15,2),
+    payout_percent DECIMAL(6,3),
+    payout_note VARCHAR(160),
+    deleted_at DATETIME NULL,
+    deleted_by VARCHAR(36) NULL,
+    UNIQUE KEY uniq_prog_position (programme_code, position),
+    INDEX idx_slab_live (programme_code, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO reward_programmes
+    (id, code, part_no, name, headline, qualifying_note, payout_note, source_note, status) VALUES
+(UUID(), 'turnover_incentive', 2, 'Turnover Incentive',
+    '3% of the first year''s business',
+    'Complete ₹1 crore of first-year business across three legs, holding a minimum ratio of 4:4:2 — ₹40 lakh left team, ₹40 lakh self team, ₹20 lakh right team.',
+    'Paid once on the first year''s total business.', 'Brochure p16', 'active'),
+(UUID(), 'fix_monthly_income', 3, 'Fix Monthly Income',
+    'A fixed sum every month for the next twelve months',
+    'Maintain the 4:4:2 business ratio across three legs for one full year at the turnover shown.',
+    'Paid monthly for the twelve months that follow.', 'Brochure p16', 'active');
+
+INSERT IGNORE INTO reward_slabs (id, programme_code, position, label, qualifying_amount, payout_percent, payout_note) VALUES
+(UUID(), 'turnover_incentive', 1, '1 Crore', 10000000.00, 3.000, 'of first-year business');
+
+INSERT IGNORE INTO reward_slabs (id, programme_code, position, label, qualifying_amount, payout_amount, payout_note) VALUES
+(UUID(), 'fix_monthly_income', 1, '1 Crore',    10000000.00,   10000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 2, '2 Crore',    20000000.00,   20000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 3, '3 Crore',    30000000.00,   30000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 4, '4 Crore',    40000000.00,   40000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 5, '5 Crore',    50000000.00,   50000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 6, '10 Crore',  100000000.00,  100000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 7, '25 Crore',  250000000.00,  250000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 8, '50 Crore',  500000000.00,  500000.00, 'a month for 12 months'),
+(UUID(), 'fix_monthly_income', 9, '100 Crore', 1000000000.00, 1000000.00, 'a month for 12 months');

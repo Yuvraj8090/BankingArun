@@ -46,7 +46,7 @@ function BrochureStructure() {
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="referral-structure">
       <div className="p-4 border-b border-slate-100">
         <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <Info className="w-4 h-4 text-[#0b3b8c]" /> The table printed in the plan book
+          <Info className="w-4 h-4 text-[#0b3b8c]" /> What the plan book states
         </h2>
       </div>
 
@@ -91,6 +91,11 @@ function BrochureStructure() {
 
         {busy && <p className="text-[11px] text-slate-500">Working it out…</p>}
 
+        <div className="flex items-baseline gap-2 mt-4">
+          <span className="text-[10px] font-bold text-slate-400">PART 1</span>
+          <h3 className="text-sm font-semibold text-slate-900">Commission Structure</h3>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[480px]">
             <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
@@ -130,6 +135,54 @@ function BrochureStructure() {
         {data.mis_note && (
           <p className="text-[11px] text-slate-500" data-testid="referral-mis-note">{data.mis_note}</p>
         )}
+
+        {/* Parts 2 and 3. The book numbers them as one structure, so showing
+            only the commission table showed a third of it. */}
+        {(data.programmes || []).map((prog) => (
+          <div key={prog.code} className="pt-4 mt-4 border-t border-slate-100"
+            data-testid={`programme-${prog.code}`}>
+            <div className="flex items-baseline gap-2">
+              {prog.part_no != null && (
+                <span className="text-[10px] font-bold text-slate-400">PART {prog.part_no}</span>
+              )}
+              <h3 className="text-sm font-semibold text-slate-900">{prog.name}</h3>
+            </div>
+            {prog.headline && <p className="text-[11px] text-slate-700 mt-0.5">{prog.headline}</p>}
+            {prog.qualifying_note && (
+              <p className="text-[11px] text-slate-500 mt-1">{prog.qualifying_note}</p>
+            )}
+            {prog.slabs.length > 0 && (
+              <div className="overflow-x-auto mt-2">
+                <table className="w-full text-left text-xs min-w-[320px]">
+                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
+                    <tr>
+                      <th className="p-2 font-semibold">Business in the year</th>
+                      <th className="p-2 font-semibold text-right">What the book states</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {prog.slabs.map((sl) => (
+                      <tr key={sl.position} className="hover:bg-slate-50">
+                        <td className="p-2 text-slate-800">{sl.label}</td>
+                        <td className="p-2 text-right text-slate-900 font-semibold">
+                          {sl.payout_percent != null
+                            ? `${sl.payout_percent}%`
+                            : inr(sl.payout_amount)}
+                          {sl.payout_note && (
+                            <span className="font-normal text-slate-500"> {sl.payout_note}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {prog.source_note && (
+              <p className="text-[10px] text-slate-400 mt-1">{prog.source_note}</p>
+            )}
+          </div>
+        ))}
 
         <p className="text-[11px] text-slate-500">
           {ill

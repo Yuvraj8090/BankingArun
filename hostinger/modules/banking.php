@@ -551,6 +551,43 @@ function referral_illustration(array $scheme, float $unit): array
         'unit' => $unit, 'total_paid_in' => $deposit];
 }
 
+// Parts 2 and 3 of the plan book: the turnover programmes. Read from the
+// database so the director maintains them, and returned beside part 1 so a
+// member sees the whole structure in one place rather than three.
+//
+// Nothing here pays. See the notice on route_referral_structure.
+function reward_programmes(): array
+{
+    $slabs = [];
+    foreach (rows('SELECT * FROM reward_slabs WHERE deleted_at IS NULL ORDER BY programme_code, position')
+        as $slab) {
+        $slabs[$slab['programme_code']][] = [
+            'position' => (int)$slab['position'],
+            'label' => $slab['label'],
+            'qualifying_amount' => $slab['qualifying_amount'] === null
+                ? null : (float)$slab['qualifying_amount'],
+            'payout_amount' => $slab['payout_amount'] === null ? null : (float)$slab['payout_amount'],
+            'payout_percent' => $slab['payout_percent'] === null ? null : (float)$slab['payout_percent'],
+            'payout_note' => $slab['payout_note'],
+        ];
+    }
+    $out = [];
+    foreach (rows("SELECT * FROM reward_programmes WHERE deleted_at IS NULL AND status = 'active'
+        ORDER BY part_no, name") as $p) {
+        $out[] = [
+            'code' => $p['code'],
+            'part_no' => $p['part_no'] === null ? null : (int)$p['part_no'],
+            'name' => $p['name'],
+            'headline' => $p['headline'],
+            'qualifying_note' => $p['qualifying_note'],
+            'payout_note' => $p['payout_note'],
+            'source_note' => $p['source_note'],
+            'slabs' => $slabs[$p['code']] ?? [],
+        ];
+    }
+    return $out;
+}
+
 function route_referral_structure(array $d): void
 {
     $user = current_user();
@@ -584,6 +621,10 @@ function route_referral_structure(array $d): void
         'instalment' => ['columns' => REFERRAL_STAGES, 'levels' => $instalment],
         'one_time' => ['columns' => array_column(REFERRAL_ONE_TIME_FAMILIES, 'label'), 'levels' => $oneTime],
         'chain' => referral_chain($user['id']),
+        // Parts 2 and 3 alongside part 1, because the book numbers them as one
+        // structure and a member reading only the commission table is reading
+        // a third of it.
+        'programmes' => reward_programmes(),
         // Asked often enough about the monthly-income plan specifically to be
         // worth stating rather than left to be inferred from a missing row.
         'mis_note' => 'The monthly-income plan has no referral row of its own in the book. '
