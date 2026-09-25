@@ -226,6 +226,16 @@ function route_admin_config_get(array $d): void
         'support_email' => $cfg['support_email'],
         'referral_reward_amount' => (float)($saved['referral_reward_amount'] ?? REFERRAL_REWARD_DEFAULT),
         'face_match_auto_threshold' => (float)($saved['face_match_auto_threshold'] ?? 92.0),
+        // Loan and self-service deposit rates. Whatever is not yet saved shows the
+        // code's own default, so the panel always displays what a member would
+        // actually be quoted right now, saved or not.
+        'loan_rates' => array_map(fn($type) => loan_rate($type), array_combine(
+            array_keys(LOAN_RATE_DEFAULTS), array_keys(LOAN_RATE_DEFAULTS))),
+        'deposit_rates' => [
+            'under_1y' => deposit_tier_rate(6), '1y_to_2y' => deposit_tier_rate(18),
+            '2y_to_3y' => deposit_tier_rate(30), 'over_3y' => deposit_tier_rate(48),
+        ],
+        'deposit_rate_cap' => NIDHI_MAX_DEPOSIT_RATE,
         'twilio_configured' => $cfg['twilio_account_sid'] !== '',
         'sendgrid_configured' => $cfg['sendgrid_api_key'] !== '',
         'smtp_configured' => $cfg['smtp_host'] !== '' && $cfg['smtp_user'] !== '' && $cfg['smtp_password'] !== '',
@@ -323,6 +333,45 @@ function route_admin_config_set(array $d): void
             fail(422, 'Face-match threshold must be between 50 and 100.');
         }
         $changed[] = 'face_match_auto_threshold';
+    }
+    // Loan rates are a business choice -- sanity-bounded, not capped by the Nidhi
+    // Rules (those govern what a Nidhi pays on deposits, not what it charges on
+    // loans it makes from its own funds).
+    if (isset($d['loan_rates']) && is_array($d['loan_rates'])) {
+        $rates = $data['loan_rates'] ?? [];
+        foreach (LOAN_RATE_DEFAULTS as $type => $default) {
+            if (!isset($d['loan_rates'][$type])) {
+                continue;
+            }
+            $rate = money($d['loan_rates'][$type]);
+            if ($rate < 0 || $rate > 36) {
+                fail(422, "$type loan rate must be between 0% and 36%.");
+            }
+            $rates[$type] = $rate;
+        }
+        $data['loan_rates'] = $rates;
+        $changed[] = 'loan_rates';
+    }
+    // Deposit rates *are* capped -- this is the same 12.5% Nidhi Rules ceiling the
+    // scheme editor enforces (master.php's NIDHI_MAX_DEPOSIT_RATE). The self-service
+    // book-a-deposit path used to hardcode its rate and skip that check entirely;
+    // enforcing it here, at the one place these numbers are ever set, closes that
+    // gap without needing every caller to re-check it.
+    if (isset($d['deposit_rates']) && is_array($d['deposit_rates'])) {
+        $rates = $data['deposit_rates'] ?? [];
+        foreach (DEPOSIT_RATE_DEFAULTS as $tier => $default) {
+            if (!isset($d['deposit_rates'][$tier])) {
+                continue;
+            }
+            $rate = money($d['deposit_rates'][$tier]);
+            if ($rate < 0 || $rate > NIDHI_MAX_DEPOSIT_RATE) {
+                fail(422, sprintf('%s deposit rate must be between 0%% and the %.1f%% Nidhi Rules cap.',
+                    $tier, NIDHI_MAX_DEPOSIT_RATE));
+            }
+            $rates[$tier] = $rate;
+        }
+        $data['deposit_rates'] = $rates;
+        $changed[] = 'deposit_rates';
     }
     if (!$changed) {
         fail(400, 'Nothing to update');

@@ -102,7 +102,7 @@ export default function AdminConfigPage() {
   const [showSecrets, setShowSecrets] = useState({});
 
   const load = async () => {
-    try { const r = await api.adminConfigGet(); setCfg(r); setForm({ live_otp: r.live_otp, twilio_from_number: r.twilio_from_number, sendgrid_from_email: r.sendgrid_from_email, smtp_host: r.smtp_host, smtp_port: r.smtp_port, smtp_user: r.smtp_user, support_email: r.support_email, referral_reward_amount: r.referral_reward_amount, face_match_auto_threshold: r.face_match_auto_threshold }); }
+    try { const r = await api.adminConfigGet(); setCfg(r); setForm({ live_otp: r.live_otp, twilio_from_number: r.twilio_from_number, sendgrid_from_email: r.sendgrid_from_email, smtp_host: r.smtp_host, smtp_port: r.smtp_port, smtp_user: r.smtp_user, support_email: r.support_email, referral_reward_amount: r.referral_reward_amount, face_match_auto_threshold: r.face_match_auto_threshold, loan_rates: r.loan_rates, deposit_rates: r.deposit_rates }); }
     catch { toast.error('Director access required'); }
   };
   useEffect(() => { load(); }, []);
@@ -275,6 +275,33 @@ export default function AdminConfigPage() {
             value={form.face_match_auto_threshold ?? 92}
             onChange={v => setForm(f => ({ ...f, face_match_auto_threshold: parseFloat(v) }))}
             testId="cfg-face-threshold" />
+        </div>
+      </Section>
+
+      <Section title="Loan rates (% p.a.)" icon={Percent}>
+        <p className="text-[11px] text-slate-500 mb-3">
+          What a member is quoted when applying. Saved here, not in code — a rate change no longer needs a deploy.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[['personal', 'Personal'], ['home', 'Home'], ['vehicle', 'Vehicle'], ['gold', 'Gold']].map(([key, label]) => (
+            <PlainInput key={key} label={label} type="number" testId={`cfg-loan-rate-${key}`}
+              value={form.loan_rates?.[key] ?? ''}
+              onChange={v => setForm(f => ({ ...f, loan_rates: { ...f.loan_rates, [key]: parseFloat(v) } }))} />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Self-service deposit rates (% p.a.)" icon={Percent}>
+        <p className="text-[11px] text-slate-500 mb-3">
+          What the fixed/recurring "book a deposit" flow pays, by tenure. Same {cfg.deposit_rate_cap ?? 12.5}% Nidhi
+          Rules ceiling the scheme editor enforces applies here — a rate above it is refused on save.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[['under_1y', 'Under 1 year'], ['1y_to_2y', '1–2 years'], ['2y_to_3y', '2–3 years'], ['over_3y', 'Over 3 years']].map(([key, label]) => (
+            <PlainInput key={key} label={label} type="number" testId={`cfg-deposit-rate-${key}`}
+              value={form.deposit_rates?.[key] ?? ''}
+              onChange={v => setForm(f => ({ ...f, deposit_rates: { ...f.deposit_rates, [key]: parseFloat(v) } }))} />
+          ))}
         </div>
       </Section>
 

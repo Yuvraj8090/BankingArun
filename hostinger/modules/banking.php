@@ -3,11 +3,34 @@
 // investments, support, branches, chatbot, referrals and standing instructions.
 declare(strict_types=1);
 
-const LOAN_RATES = ['personal' => 10.50, 'home' => 8.40, 'vehicle' => 8.75, 'gold' => 7.90];
+// Defaults only. The rates actually charged/paid are whatever the bank owner
+// has saved in system_config (route_admin_config_set) -- see loan_rate() and
+// deposit_tier_rate() -- so a rate change is a settings save, not a deploy.
+const LOAN_RATE_DEFAULTS = ['personal' => 10.50, 'home' => 8.40, 'vehicle' => 8.75, 'gold' => 7.90];
+const DEPOSIT_RATE_DEFAULTS = ['under_1y' => 6.50, '1y_to_2y' => 7.25, '2y_to_3y' => 7.50, 'over_3y' => 7.10];
 const REFERRAL_REWARD_DEFAULT = 500.0;
 const SI_FREQUENCIES = ['daily', 'weekly', 'monthly', 'quarterly'];
 const SI_CATEGORIES = ['rent', 'sip', 'emi', 'insurance', 'generic'];
 const SI_MAX_AMOUNT = 1000000.0;
+
+function loan_rate(string $type): float
+{
+    $saved = system_config()['loan_rates'] ?? [];
+    return (float)($saved[$type] ?? LOAN_RATE_DEFAULTS[$type] ?? 10.0);
+}
+
+// Same four tenure tiers route_book_deposit has always used; only the source of
+// the number changed. Kept out of the schemes table on purpose -- this is the
+// generic self-service fixed/recurring path, not a named brochure plan -- but it
+// still has to clear the same Nidhi Rules cap a scheme would, which is enforced
+// where these are saved (route_admin_config_set), not here.
+function deposit_tier_rate(int $tenureMonths): float
+{
+    $saved = system_config()['deposit_rates'] ?? [];
+    $tier = $tenureMonths < 12 ? 'under_1y' : ($tenureMonths <= 24 ? '1y_to_2y'
+        : ($tenureMonths <= 36 ? '2y_to_3y' : 'over_3y'));
+    return (float)($saved[$tier] ?? DEPOSIT_RATE_DEFAULTS[$tier]);
+}
 
 // --- Cheques & demand drafts -----------------------------------------------------------
 function route_cheque_book(array $d): void
@@ -104,7 +127,7 @@ function route_book_deposit(array $d): void
     if ($tenure < 1 || $tenure > 120) {
         fail(422, 'Tenure must be between 1 and 120 months.');
     }
-    $rate = $tenure < 12 ? 6.50 : ($tenure <= 24 ? 7.25 : ($tenure <= 36 ? 7.50 : 7.10));
+    $rate = deposit_tier_rate($tenure);
     $maturity = round($amount * (1 + $rate / 400) ** (4 * $tenure / 12), 2);
 
     $pdo->beginTransaction();
@@ -155,7 +178,7 @@ function route_apply_loan(array $d): void
     if ($income < 0) {
         fail(422, 'Monthly income cannot be negative.');
     }
-    $rate = LOAN_RATES[$type] ?? 10.0;
+    $rate = loan_rate($type);
     $r = $rate / 12 / 100;
     $emi = round($amount * $r * (1 + $r) ** $tenure / ((1 + $r) ** $tenure - 1), 2);
     $eligibility = $income * 0.5 >= $emi ? 'Pre-Approved' : 'Under Review';
