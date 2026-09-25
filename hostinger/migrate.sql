@@ -20,6 +20,12 @@
 -- --- Scheme master and field agents ---------------------------------------
 -- Back-office deposit plans, the agents who collect them, and each collection.
 -- Nothing here is exposed on the public site.
+-- The client charset is declared before anything is written. This file is
+-- UTF-8 and contains rupee signs and dashes; applied by a client that assumed
+-- latin1, every one of them was stored double-encoded and reached the page as
+-- mojibake. The seeded text below is re-stated as UPDATEs further down so an
+-- already-corrupted row is repaired rather than skipped by INSERT IGNORE.
+SET NAMES utf8mb4;
 CREATE TABLE IF NOT EXISTS schemes (
     id VARCHAR(36) PRIMARY KEY,
     code VARCHAR(20) NOT NULL UNIQUE,
@@ -1049,3 +1055,18 @@ INSERT IGNORE INTO reward_slabs (id, programme_code, position, label, qualifying
 (UUID(), 'fix_monthly_income', 7, '25 Crore',  250000000.00,  250000.00, 'a month for 12 months'),
 (UUID(), 'fix_monthly_income', 8, '50 Crore',  500000000.00,  500000.00, 'a month for 12 months'),
 (UUID(), 'fix_monthly_income', 9, '100 Crore', 1000000000.00, 1000000.00, 'a month for 12 months');
+
+-- Repairs the two rows above on a database where they were already written by
+-- a client that had not declared utf8mb4. INSERT IGNORE would skip them, so the
+-- mojibake would survive every future run of this file.
+UPDATE reward_programmes SET
+    qualifying_note = 'Complete ₹1 crore of first-year business across three legs, holding a minimum ratio of 4:4:2 — ₹40 lakh left team, ₹40 lakh self team, ₹20 lakh right team.',
+    headline = '3% of the first year''s business',
+    payout_note = 'Paid once on the first year''s total business.'
+    WHERE code = 'turnover_incentive';
+
+UPDATE reward_programmes SET
+    qualifying_note = 'Maintain the 4:4:2 business ratio across three legs for one full year at the turnover shown.',
+    headline = 'A fixed sum every month for the next twelve months',
+    payout_note = 'Paid monthly for the twelve months that follow.'
+    WHERE code = 'fix_monthly_income';

@@ -101,7 +101,22 @@ grep -q 'ajspay-cron' scripts/deploy-vps.sh || missing_schedule="$missing_schedu
 [[ -z "$missing_schedule" ]] && ok "cron has a scheduler" \
   || bad "cron has a scheduler" "cron.php would never run:$missing_schedule"
 
-# 10. The seed data must not be left syntactically broken.
+# 10. SQL that carries non-ASCII must declare its charset first.
+# migrate.sql is UTF-8 and holds rupee signs. Applied by a client that assumed
+# latin1, every one was stored double-encoded and reached the member's page as
+# mojibake -- and reading it back with the same wrong client made it look fine.
+charset=""
+for f in hostinger/migrate.sql hostinger/schema.sql; do
+  # grep -P is GNU-only and silently matches nothing on BSD, which made this
+  # check pass on macOS while the bug it looks for was sitting in the file.
+  if LC_ALL=C grep -q '[^ -~\t]' "$f" && ! grep -q 'SET NAMES utf8mb4' "$f"; then
+    charset="$charset $f"
+  fi
+done
+[[ -z "$charset" ]] && ok "sql declares utf8mb4" \
+  || bad "sql declares utf8mb4" "non-ASCII without SET NAMES, will be stored double-encoded:$charset"
+
+# 11. The seed data must not be left syntactically broken.
 # A commit that dropped the cvv column rewrote the cards seed into "(Issuer Only),
 # (), ..." and nobody noticed for months: production was already installed, so
 # only a fresh build would have hit it, and nothing built fresh. Everything after
@@ -110,7 +125,7 @@ empty_tuples=$(grep -nE '^\s*\(\s*\),?\s*$' hostinger/schema.sql hostinger/migra
 [[ -z "$empty_tuples" ]] && ok "seed rows intact" \
   || bad "seed rows intact" "empty VALUES tuple, seed data was mangled: $(echo "$empty_tuples" | tr '\n' ' ')"
 
-# 11. The disclosure contact must not silently expire.
+# 12. The disclosure contact must not silently expire.
 if [[ -f frontend/public/.well-known/security.txt ]]; then
   exp=$(grep -i '^Expires:' frontend/public/.well-known/security.txt | head -1 | cut -d' ' -f2)
   if python3 -c "
