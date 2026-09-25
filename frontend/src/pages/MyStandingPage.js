@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Award, RefreshCw, Copy, Check, Share2, MessageCircle, Mail, Users, ArrowRight, Info
+  Award, RefreshCw, Copy, Check, Share2, MessageCircle, Mail, Users, ArrowRight, Info, Zap
 } from 'lucide-react';
 import { api } from '../services/api';
+import BoosterCard from '../components/BoosterCard';
 import { toast } from 'sonner';
 
 // A member's own view of the ladder.
@@ -15,6 +16,7 @@ import { toast } from 'sonner';
 // omission: a standing is recognition. The Nidhi Rules, 2014 forbid paying
 // brokerage or incentive for bringing in deposits, so a figure printed beside a
 // rung would read as a promise to pay it.
+
 export default function MyStandingPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -103,6 +105,8 @@ export default function MyStandingPage() {
           )}
         </div>
       </div>
+
+      <BoosterCard booster={data.booster} />
 
       {/* How to actually do it */}
       {!atTop && (

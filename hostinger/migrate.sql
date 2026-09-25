@@ -950,3 +950,31 @@ INSERT IGNORE INTO rank_tiers (id, position, name, direct_required, required_bel
 -- AUTO_INCREMENT needs a key of its own; the primary key is the uuid and stays
 -- that way, so this is a second unique key rather than a replacement.
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS seq BIGINT NOT NULL AUTO_INCREMENT UNIQUE;
+
+-- The booster ladder. Same shape as the standing ladder -- a rung is reached by
+-- introducing N members who already hold the rung below -- with one condition
+-- the standing ladder does not have: each of those introductions must be
+-- holding a deposit of at least a stated amount.
+--
+-- Level 1: introduce four members who each hold 10,000 on deposit.
+-- Level 2: those four have each reached Level 1, and so on up.
+--
+-- It shares the tier table rather than getting one of its own, so the engine
+-- that settles the ladder, the admin screen that edits it, and the recycle bin
+-- that restores a deleted rung all serve both without being written twice.
+ALTER TABLE rank_tiers ADD COLUMN IF NOT EXISTS programme VARCHAR(20) NOT NULL DEFAULT 'standing';
+ALTER TABLE rank_tiers ADD COLUMN IF NOT EXISTS min_deposit_each DECIMAL(15,2) NULL;
+
+-- position was unique on its own, which would have stopped Booster Level 1
+-- existing alongside Silver. It is the pair that has to be unique.
+ALTER TABLE rank_tiers DROP INDEX IF EXISTS position;
+ALTER TABLE rank_tiers ADD UNIQUE KEY IF NOT EXISTS uniq_programme_position (programme, position);
+
+INSERT IGNORE INTO rank_tiers
+    (id, programme, position, name, direct_required, required_below, min_deposit_each, reward_label, status) VALUES
+(UUID(), 'booster', 1, 'Booster Level 1', 4, 0, 10000.00,
+    'Four members introduced, each holding 10,000 on deposit', 'active'),
+(UUID(), 'booster', 2, 'Booster Level 2', 4, 1, 10000.00,
+    'Four members who have each reached Booster Level 1', 'active'),
+(UUID(), 'booster', 3, 'Booster Level 3', 4, 2, 10000.00,
+    'Four members who have each reached Booster Level 2', 'active');

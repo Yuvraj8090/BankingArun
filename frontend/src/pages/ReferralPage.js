@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Gift, Share2, Copy, Users, Wallet, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info } from 'lucide-react';
+import { Gift, Share2, Copy, Users, Wallet, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info, Award } from 'lucide-react';
 import { api } from '../services/api';
+import BoosterCard from '../components/BoosterCard';
 import { toast } from 'sonner';
 
 const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
@@ -149,6 +150,7 @@ function BrochureStructure() {
 export default function ReferralPage() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState(null);
+  const [standing, setStanding] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -156,6 +158,9 @@ export default function ReferralPage() {
       .then(([c, h]) => { setData(c); setHistory(h); })
       .catch(() => toast.error('Failed to load referrals'))
       .finally(() => setLoading(false));
+    // Separate, and allowed to fail quietly: the ladders are worth showing here
+    // but nobody came to this page to be told they could not be loaded.
+    api.myStanding().then(setStanding).catch(() => setStanding(null));
   }, []);
 
   const copyLink = () => {
@@ -296,6 +301,23 @@ export default function ReferralPage() {
           )}
         </div>
       </div>
+
+      {standing && (
+        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-5" data-testid="referral-standing">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
+            <Award className="w-3.5 h-3.5 text-[#0b3b8c]" /> Your standing
+          </div>
+          <p className="text-xl font-bold text-slate-900 mt-1">
+            {standing.standing || 'Not yet on the ladder'}
+          </p>
+          {standing.next && (
+            <p className="text-[11px] text-slate-600 mt-1">{standing.next.step}</p>
+          )}
+          <p className="text-[11px] text-slate-500 mt-2">{standing.note}</p>
+        </div>
+      )}
+
+      <BoosterCard booster={standing?.booster} />
 
       <BrochureStructure />
     </div>

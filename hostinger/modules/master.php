@@ -1071,8 +1071,15 @@ function rank_tier_payload(array $d, array $existing = []): array
     if (!in_array($status, ['active', 'draft'], true)) {
         fail(422, 'status must be active or draft.');
     }
+    $programme = clip((string)$get('programme', 'standing'), 20);
+    if (!in_array($programme, RANK_PROGRAMMES, true)) {
+        fail(422, 'programme must be one of: ' . implode(', ', RANK_PROGRAMMES));
+    }
     $amount = $get('reward_amount', null);
+    $minDeposit = $get('min_deposit_each', null);
     return [
+        'programme' => $programme,
+        'min_deposit_each' => ($minDeposit === null || $minDeposit === '') ? null : money($minDeposit),
         'position' => $position,
         'name' => $name,
         'direct_required' => $direct,
@@ -1087,8 +1094,14 @@ function rank_tier_payload(array $d, array $existing = []): array
 function route_rank_tiers(array $d): void
 {
     staff_user(SCHEME_READ_ROLES);
-    respond(['tiers' => out_all(rows('SELECT * FROM rank_tiers WHERE deleted_at IS NULL
-        ORDER BY position')),
+    $programme = clip($_GET['programme'] ?? 'standing', 20);
+    if (!in_array($programme, RANK_PROGRAMMES, true)) {
+        fail(422, 'programme must be one of: ' . implode(', ', RANK_PROGRAMMES));
+    }
+    respond(['programme' => $programme,
+        'programmes' => RANK_PROGRAMMES,
+        'tiers' => out_all(rows('SELECT * FROM rank_tiers WHERE deleted_at IS NULL AND programme = ?
+            ORDER BY position', [$programme])),
         // Said on the screen that edits them, not only in the code.
         'pays_money' => false,
         'notice' => 'Ranks are recognition. Nothing here pays a member: the Nidhi Rules, 2014 do '
@@ -1101,15 +1114,21 @@ function route_rank_tier_create(array $d): void
     global $pdo;
     $owner = staff_user(SCHEME_WRITE_ROLES);
     $tier = rank_tier_payload($d);
-    if ($held = row('SELECT deleted_at FROM rank_tiers WHERE position = ?', [$tier['position']])) {
+    if ($held = row('SELECT deleted_at FROM rank_tiers WHERE programme = ? AND position = ?',
+        [$tier['programme'], $tier['position']])) {
         fail(400, $held['deleted_at'] === null
             ? 'Another rank already sits at that position.'
             : 'That position belongs to a deleted rank. Restore it from the recycle bin, '
                 . 'or use another position.');
     }
     $id = uuid4();
-    $pdo->prepare('INSERT INTO rank_tiers (id, position, name, direct_required, required_below,
-            reward_label, reward_amount, notes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    // Built from the payload's own keys rather than a hand-written column list.
+    // The two drifted apart the moment the payload grew a field, and a
+    // positional INSERT gives no hint that it has: it simply writes the wrong
+    // value into the wrong column, or fails on a count nobody expected.
+    $columns = array_keys($tier);
+    $pdo->prepare('INSERT INTO rank_tiers (id, ' . implode(', ', $columns) . ') VALUES ('
+        . implode(', ', array_fill(0, count($columns) + 1, '?')) . ')')
         ->execute(array_merge([$id], array_values($tier)));
     audit($owner, 'RANK_TIER_CREATED', "{$tier['position']} {$tier['name']}");
     respond(['status' => 'SUCCESS', 'id' => $id,
@@ -1125,12 +1144,13 @@ function route_rank_tier_update(array $d, string $id = ''): void
         fail(404, 'Rank not found.');
     }
     $tier = rank_tier_payload($d, $existing);
-    if ($tier['position'] !== (int)$existing['position']
-        && row('SELECT id FROM rank_tiers WHERE position = ? AND deleted_at IS NULL', [$tier['position']])) {
+    if (($tier['position'] !== (int)$existing['position'] || $tier['programme'] !== $existing['programme'])
+        && row('SELECT id FROM rank_tiers WHERE programme = ? AND position = ? AND deleted_at IS NULL',
+            [$tier['programme'], $tier['position']])) {
         fail(400, 'Another rank already sits at that position.');
     }
-    $pdo->prepare('UPDATE rank_tiers SET position = ?, name = ?, direct_required = ?, required_below = ?,
-            reward_label = ?, reward_amount = ?, notes = ?, status = ? WHERE id = ?')
+    $set = implode(', ', array_map(fn($column) => "$column = ?", array_keys($tier)));
+    $pdo->prepare("UPDATE rank_tiers SET $set WHERE id = ?")
         ->execute(array_merge(array_values($tier), [$id]));
     audit($owner, 'RANK_TIER_UPDATED', "{$existing['name']} -> {$tier['name']}");
     respond(['status' => 'SUCCESS', 'message' => "{$tier['name']} saved."]);
@@ -1147,8 +1167,8 @@ function route_rank_tier_delete(array $d, string $id = ''): void
     // Removing a rung from the middle would leave the tiers above it requiring a
     // standing that no longer exists, and every member holding it would silently
     // drop. Say so rather than let the ladder rearrange itself.
-    if (row('SELECT id FROM rank_tiers WHERE required_below = ? AND deleted_at IS NULL
-            AND status = ? AND id <> ?', [(int)$tier['position'], 'active', $id])) {
+    if (row('SELECT id FROM rank_tiers WHERE programme = ? AND required_below = ? AND deleted_at IS NULL
+            AND status = ? AND id <> ?', [$tier['programme'], (int)$tier['position'], 'active', $id])) {
         fail(400, "Other ranks are defined as needing members who hold {$tier['name']}. "
             . 'Point those at a different rank first, or set this one to draft instead.');
     }
@@ -1232,27 +1252,49 @@ function route_recycle_restore(array $d): void
 // Read once per request and kept, because the rank map walks it for every member
 // on every pass and re-querying inside that loop would turn one query into
 // thousands.
-function rank_tiers(): array
+// 'standing' is the recognition ladder; 'booster' adds a deposit condition to
+// every rung. Both live in one table so the engine, the admin screen and the
+// recycle bin serve them without being written twice.
+const RANK_PROGRAMMES = ['standing', 'booster'];
+
+function rank_tiers(string $programme = 'standing'): array
 {
-    static $tiers = null;
-    if ($tiers === null) {
-        $tiers = rows("SELECT * FROM rank_tiers WHERE deleted_at IS NULL AND status = 'active'
-            ORDER BY position");
+    static $byProgramme = [];
+    if (!isset($byProgramme[$programme])) {
+        $byProgramme[$programme] = rows("SELECT * FROM rank_tiers
+            WHERE deleted_at IS NULL AND status = 'active' AND programme = ?
+            ORDER BY position", [$programme]);
     }
-    return $tiers;
+    return $byProgramme[$programme];
+}
+
+// Members holding at least $amount across their live deposits. Read once for
+// the whole ladder rather than per member: the settle loop visits every member
+// on every pass, and a query in there would be thousands of round trips.
+function members_with_deposits_over(float $amount): array
+{
+    if ($amount <= 0) {
+        return [];
+    }
+    $held = [];
+    foreach (rows("SELECT user_id, SUM(principal_amount) AS total FROM deposits
+        WHERE status = 'active' GROUP BY user_id HAVING total >= ?", [$amount]) as $r) {
+        $held[$r['user_id']] = true;
+    }
+    return $held;
 }
 
 // position => name, which is the shape the rest of this file already expected.
-function rank_names(): array
+function rank_names(string $programme = 'standing'): array
 {
     $names = [];
-    foreach (rank_tiers() as $tier) {
+    foreach (rank_tiers($programme) as $tier) {
         $names[(int)$tier['position']] = $tier['name'];
     }
     return $names;
 }
 
-function member_rank_map(): array
+function member_rank_map(string $programme = 'standing'): array
 {
     // referrer -> the members they introduced. Only referrals that actually
     // completed count; a lead that never became a member is not an introduction.
@@ -1262,7 +1304,17 @@ function member_rank_map(): array
     }
 
     // Highest tier first, so the first one a member satisfies is the best one.
-    $tiers = array_reverse(rank_tiers());
+    $tiers = array_reverse(rank_tiers($programme));
+    // The deposit condition, where the ladder has one. Looked up once per
+    // amount, not once per member, and keyed by amount because different rungs
+    // may demand different sums.
+    $holders = [];
+    foreach ($tiers as $tier) {
+        $need = (float)($tier['min_deposit_each'] ?? 0);
+        if ($need > 0 && !isset($holders[(string)$need])) {
+            $holders[(string)$need] = members_with_deposits_over($need);
+        }
+    }
     $rank = [];
     // Settle by repetition rather than recursion: a rank can only rise when one
     // below it rises, so one pass per tier is the most the ladder can need.
@@ -1274,11 +1326,20 @@ function member_rank_map(): array
                 // Each tier states its own requirement now. required_below = 0
                 // means "any member", which is what the entry rank uses.
                 $needed = (int)$tier['required_below'];
+                $need = (float)($tier['min_deposit_each'] ?? 0);
                 $qualifying = 0;
                 foreach ($kids as $kid) {
-                    if (($rank[$kid] ?? 0) >= $needed) {
-                        $qualifying++;
+                    if (($rank[$kid] ?? 0) < $needed) {
+                        continue;
                     }
+                    // An introduction only counts towards a booster rung while
+                    // the member they introduced is actually holding the money.
+                    // A closed or matured deposit stops counting, which is the
+                    // point of checking it rather than recording it once.
+                    if ($need > 0 && !isset($holders[(string)$need][$kid])) {
+                        continue;
+                    }
+                    $qualifying++;
                 }
                 if ($qualifying >= (int)$tier['direct_required']) {
                     $best = (int)$tier['position'];
@@ -1307,6 +1368,78 @@ function member_rank_map(): array
 // the Nidhi Rules, 2014 forbid paying brokerage or incentive for bringing in
 // deposits, and a screen that showed a figure beside a rung would be read as a
 // promise to pay it.
+// Where a member stands on the booster ladder, and what is still missing. The
+// shortfall is counted the way the rung is judged -- an introduction only counts
+// while the member is holding the deposit -- so the number shown is the number
+// of people the member actually has to go and talk to.
+// A threshold, not a balance. rupees() prints two decimals, which is correct
+// for money that has moved and noise for a round qualifying figure.
+function threshold_amount(float $amount): string
+{
+    return '₹' . number_format($amount, fmod($amount, 1.0) === 0.0 ? 0 : 2);
+}
+
+function booster_standing(string $userId): array
+{
+    $tiers = rank_tiers('booster');
+    if ($tiers === []) {
+        return ['enabled' => false];
+    }
+    $map = member_rank_map('booster');
+    $level = $map[$userId] ?? 0;
+    $names = rank_names('booster');
+
+    $next = null;
+    foreach ($tiers as $tier) {
+        if ((int)$tier['position'] !== $level + 1) {
+            continue;
+        }
+        $need = (float)($tier['min_deposit_each'] ?? 0);
+        $holders = members_with_deposits_over($need);
+        $below = (int)$tier['required_below'];
+        $have = 0;
+        foreach (rows('SELECT referee_id FROM referrals WHERE referrer_id = ? AND status = ?',
+            [$userId, 'paid']) as $r) {
+            $kid = $r['referee_id'];
+            if (($map[$kid] ?? 0) >= $below && ($need <= 0 || isset($holders[$kid]))) {
+                $have++;
+            }
+        }
+        $short = max(0, (int)$tier['direct_required'] - $have);
+        $next = [
+            'name' => $tier['name'],
+            'needs' => (int)$tier['direct_required'],
+            'qualifying_now' => $have,
+            'short_by' => $short,
+            'min_deposit_each' => $need > 0 ? $need : null,
+            'needs_level' => $below === 0 ? null : ($names[$below] ?? null),
+            'how' => $short === 0
+                ? 'You have everything you need for ' . $tier['name'] . '.'
+                : sprintf('%d more %s %s%s.', $short, $short === 1 ? 'member' : 'members',
+                    $below === 0 ? 'who each hold ' . threshold_amount($need) . ' on deposit'
+                        : 'who have each reached ' . ($names[$below] ?? 'the level below'),
+                    $below === 0 ? '' : ' while holding ' . threshold_amount($need)),
+        ];
+    }
+
+    return [
+        'enabled' => true,
+        'level' => $level,
+        'name' => $level === 0 ? null : ($names[$level] ?? null),
+        'next' => $next,
+        'ladder' => array_map(fn($t) => [
+            'position' => (int)$t['position'], 'name' => $t['name'],
+            'direct_required' => (int)$t['direct_required'],
+            'required_below' => (int)$t['required_below'],
+            'min_deposit_each' => $t['min_deposit_each'],
+            'reward_label' => $t['reward_label'],
+        ], $tiers),
+        'note' => 'Reaching a booster level is automatic: it is worked out from who you have '
+            . 'introduced and what they hold, and nothing has to be claimed. An introduction stops '
+            . 'counting if that member closes their deposit.',
+    ];
+}
+
 function route_my_standing(array $d): void
 {
     global $config;
@@ -1377,6 +1510,7 @@ function route_my_standing(array $d): void
             'required_below' => (int)$t['required_below'],
             'reward_label' => $t['reward_label'], 'reward_amount' => $t['reward_amount'],
         ], rank_tiers()),
+        'booster' => booster_standing($user['id']),
         'referral_code' => $code,
         'referral_link' => rtrim((string)$config['public_app_url'], '/') . '/open-account?ref=' . rawurlencode($code),
         'note' => 'A standing is recognition only. No commission, brokerage or incentive is paid on it — '
