@@ -425,6 +425,31 @@ function UserAccessPanel() {
   );
 }
 
+// Avoids 0/O/1/l/I so a password handed over on paper or read aloud is not
+// ambiguous about which character it was.
+function generatePassword(length = 14) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  const bytes = new Uint32Array(length);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+}
+
+// Plain text rather than masked: the point of this field is for the operator
+// to read the password back and hand it to the user in person, not to hide it
+// from themselves.
+function PasswordGenField({ value, onChange, testId }) {
+  return (
+    <div className="flex gap-2">
+      <input type="text" data-testid={testId} className={`${inputClass} font-mono`} value={value}
+        onChange={(e) => onChange(e.target.value)} placeholder="Type one, or generate" />
+      <button type="button" onClick={() => onChange(generatePassword())} data-testid={`${testId}-generate`}
+        className="px-3 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 shrink-0 flex items-center gap-1.5">
+        <RefreshCw className="w-3.5 h-3.5" /> Generate
+      </button>
+    </div>
+  );
+}
+
 function CreateUserModal({ onClose, onDone }) {
   const [form, setForm] = useState({
     name: '', email: '', phone: '', role: 'staff', branch: 'Head Office - Nariman Point',
@@ -455,7 +480,10 @@ function CreateUserModal({ onClose, onDone }) {
       </select></Field>
       <Field label="Branch"><input className={inputClass} value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} /></Field>
       <Field label="Designation"><input className={inputClass} value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} /></Field>
-      <Field label="Temporary password"><input type="password" className={inputClass} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
+      <Field label="Temporary password">
+        <PasswordGenField testId="admin-create-user-password" value={form.password}
+          onChange={(v) => setForm({ ...form, password: v })} />
+      </Field>
     </Modal>
   );
 }
@@ -511,7 +539,9 @@ function ResetPasswordModal({ user, onClose, onDone }) {
           {busy ? 'Changing...' : 'Change password'}
         </button>
       </>}>
-      <Field label="New password"><input type="password" className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+      <Field label="New password">
+        <PasswordGenField testId="admin-reset-password-value" value={password} onChange={setPassword} />
+      </Field>
     </Modal>
   );
 }
