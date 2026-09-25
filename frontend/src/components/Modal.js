@@ -9,11 +9,17 @@ export default function Modal({ title, subtitle, onClose, children, footer, test
   const panel = useRef(null);
 
   useEffect(() => {
+    // preventScroll: focusing the first field otherwise scrolls the dialog's own
+    // scroll container, which drops the header out of view as it opens. Runs
+    // once on mount only — re-focusing on every render (e.g. because onClose is
+    // a fresh inline function each time) steals focus back from whatever field
+    // the user is currently typing in, after every keystroke.
+    panel.current?.querySelector('input, textarea, select, button')?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
-    // preventScroll: focusing the first field otherwise scrolls the dialog's own
-    // scroll container, which drops the header out of view as it opens.
-    panel.current?.querySelector('input, textarea, select, button')?.focus({ preventScroll: true });
     // Hold the page still underneath, so closing the dialog returns the reader
     // to where they were rather than to wherever the page drifted.
     const previous = document.body.style.overflow;
