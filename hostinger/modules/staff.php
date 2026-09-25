@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 const ADMIN_ROLES = ['admin', 'branch_manager', 'bank_owner'];
+const USER_ACCESS_ROLES = ['bank_owner', 'admin', 'branch_manager', 'staff', 'collection_agent', 'loan_officer'];
 const KYC_FRAME_MAX = 2000000;  // base64 characters per photo (~1.5 MB image)
 const KYC_FRAME_MAX_PX = 6000;  // guards against a small file describing a huge bitmap
 function staff_user(array $roles): array
@@ -199,6 +200,144 @@ function route_rbi_reports(array $d): void
             'member_only_deposits' => 'Compliant - deposits accepted from members only',
         ],
     ]);
+}
+
+// --- Director user access ---------------------------------------------------------------
+function admin_user_json(array $u, string $ownerId): array
+{
+    $u = out($u);
+    $memberLogin = $u['account_number'] ?? $u['folio_no'] ?? null;
+    $u['login_id'] = in_array($u['role'], ['retail', 'corporate'], true)
+        ? ($memberLogin ?: $u['email'])
+        : $u['email'];
+    $u['can_reset_password'] = $u['id'] !== $ownerId;
+    return $u;
+}
+
+function route_admin_users(array $d): void
+{
+    $owner = staff_user(['bank_owner']);
+    $sql = "SELECT u.id, u.name, u.email, u.phone, u.role, u.branch, u.designation, u.kyc_status, u.created_at,
+            (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at, a.id LIMIT 1) AS account_number,
+            (SELECT m.folio_no FROM member_register m WHERE m.user_id = u.id ORDER BY m.admitted_on DESC LIMIT 1) AS folio_no
+        FROM users u WHERE 1 = 1";
+    $params = [];
+    if (!empty($_GET['role'])) {
+        $sql .= ' AND u.role = ?';
+        $params[] = clip($_GET['role'], 30);
+    }
+    if (!empty($_GET['q'])) {
+        $sql .= ' AND (u.name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)';
+        $like = '%' . clip($_GET['q'], 80) . '%';
+        array_push($params, $like, $like, $like);
+    }
+    $sql .= " ORDER BY FIELD(u.role, 'bank_owner', 'admin', 'branch_manager', 'staff', 'collection_agent',
+        'loan_officer', 'corporate', 'retail'), u.name";
+    [$users, $meta] = paginate($sql, $params, 25, 100);
+    respond(['users' => array_map(fn($u) => admin_user_json($u, $owner['id']), $users),
+        'pagination' => $meta, 'create_roles' => USER_ACCESS_ROLES]);
+}
+
+function route_admin_user_create(array $d): void
+{
+    global $pdo;
+    $owner = staff_user(['bank_owner']);
+    need($d, 'name', 'email', 'phone', 'role', 'password');
+    $role = clip($d['role'], 30);
+    if (!in_array($role, USER_ACCESS_ROLES, true)) {
+        fail(422, 'This screen creates only internal staff and back-office logins.');
+    }
+    $name = clip($d['name'], 150);
+    $email = strtolower(clip($d['email'], 150));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        fail(422, 'That email address does not look right.');
+    }
+    assert_password_acceptable($d['password'] ?? null, [$name, strstr($email, '@', true)]);
+    if (row('SELECT id FROM users WHERE email = ?', [$email])) {
+        fail(400, 'A login with this email already exists.');
+    }
+    $phone = clip($d['phone'], 30);
+    if (row('SELECT id FROM users WHERE phone = ?', [$phone])) {
+        fail(400, 'A login with this phone number already exists.');
+    }
+    $pdo->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash,
+            branch, kyc_status, designation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([uuid4(), $name, $email, $phone, $role,
+            password_hash((string)$d['password'], PASSWORD_BCRYPT),
+            password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT),
+            clip($d['branch'] ?? 'Head Office - Nariman Point', 100), 'verified',
+            clip($d['designation'] ?? '', 100) ?: null]);
+    audit($owner, 'USER_LOGIN_CREATED', "$role $email");
+    respond(['status' => 'SUCCESS', 'login_id' => $email,
+        'message' => "Login created. User ID: $email."]);
+}
+
+function route_admin_user_update(array $d): void
+{
+    global $pdo;
+    $owner = staff_user(['bank_owner']);
+    need($d, 'user_id', 'name', 'email', 'phone', 'role');
+    $target = row('SELECT * FROM users WHERE id = ?', [clip($d['user_id'], 36)]);
+    if (!$target) {
+        fail(404, 'User not found.');
+    }
+    if (!in_array($target['role'], USER_ACCESS_ROLES, true)) {
+        fail(422, 'Member accounts are managed from Relationship Desk.');
+    }
+    $role = clip($d['role'], 30);
+    if (!in_array($role, USER_ACCESS_ROLES, true)) {
+        fail(422, 'Internal users must use an internal role.');
+    }
+    if ($target['role'] === 'bank_owner' && $role !== 'bank_owner'
+        && (int)scalar("SELECT COUNT(*) FROM users WHERE role = 'bank_owner'") < 2) {
+        fail(400, 'Create another Director before changing the last Director role.');
+    }
+    $name = clip($d['name'], 150);
+    $email = strtolower(clip($d['email'], 150));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        fail(422, 'That email address does not look right.');
+    }
+    $phone = clip($d['phone'], 30);
+    if (row('SELECT id FROM users WHERE email = ? AND id <> ?', [$email, $target['id']])) {
+        fail(400, 'A login with this email already exists.');
+    }
+    if (row('SELECT id FROM users WHERE phone = ? AND id <> ?', [$phone, $target['id']])) {
+        fail(400, 'A login with this phone number already exists.');
+    }
+    $pdo->prepare('UPDATE users SET name = ?, email = ?, phone = ?, role = ?, branch = ?, designation = ?,
+            session_version = session_version + 1 WHERE id = ?')
+        ->execute([$name, $email, $phone, $role, clip($d['branch'] ?? '', 100) ?: null,
+            clip($d['designation'] ?? '', 100) ?: null, $target['id']]);
+    audit($owner, 'USER_LOGIN_UPDATED', "{$target['email']} -> $email ($role)");
+    respond(['status' => 'SUCCESS', 'message' => "Login updated for $name."]);
+}
+
+function route_admin_user_password(array $d): void
+{
+    global $pdo;
+    $owner = staff_user(['bank_owner']);
+    need($d, 'user_id', 'password');
+    $id = clip($d['user_id'], 150);
+    $target = row('SELECT * FROM users WHERE id = ? OR email = ?', [$id, strtolower($id)]);
+    if (!$target) {
+        fail(404, 'User not found.');
+    }
+    if ($target['id'] === $owner['id']) {
+        fail(400, 'Use Security & Login to change your own password.');
+    }
+    assert_password_acceptable($d['password'] ?? null,
+        [$target['name'], $target['email'] ? strstr($target['email'], '@', true) : '']);
+    if (password_verify((string)$d['password'], $target['password_hash'])) {
+        fail(422, 'That is already this user\'s current password.');
+    }
+    $pdo->prepare('UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?')
+        ->execute([password_hash((string)$d['password'], PASSWORD_BCRYPT), $target['id']]);
+    audit($owner, 'USER_PASSWORD_RESET', "{$target['role']} {$target['email']}");
+    security_event('USER_PASSWORD_RESET', 'warning',
+        "Password reset by {$owner['email']} for {$target['email']}", $target);
+    respond(['status' => 'SUCCESS',
+        'message' => "Password changed for {$target['name']}. All their signed-in devices were logged out."]);
 }
 
 // --- Bank owner runtime config ----------------------------------------------------------

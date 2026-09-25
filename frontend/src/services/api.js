@@ -102,6 +102,10 @@ export const api = {
   getAdminOverview: async () => (await axios.get(`${API}/admin/overview`, getAuthHeaders())).data,
   adminKycAction: async (payload) => (await axios.post(`${API}/admin/kyc-action`, payload, getAuthHeaders())).data,
   getRbiReports: async () => (await axios.get(`${API}/admin/rbi-reports`, getAuthHeaders())).data,
+  adminUsers: async (params = {}) => (await axios.get(`${API}/admin/users`, { ...getAuthHeaders(), params })).data,
+  adminUserCreate: async (payload) => (await axios.post(`${API}/admin/users`, payload, getAuthHeaders())).data,
+  adminUserUpdate: async (payload) => (await axios.post(`${API}/admin/users/update`, payload, getAuthHeaders())).data,
+  adminUserPassword: async (payload) => (await axios.post(`${API}/admin/users/password`, payload, getAuthHeaders())).data,
 
   // Role Panels
   getBankOwnerPanel: async () => (await axios.get(`${API}/panel/bank-owner`, getAuthHeaders())).data,

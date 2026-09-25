@@ -1,17 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import {
   UserCheck, AlertTriangle, CheckCircle, XCircle, Download, RefreshCw,
-  BarChart3, Database, Lock, Users, Wallet, ShieldCheck, FileText, Search
+  BarChart3, Database, Lock, Users, Wallet, ShieldCheck, FileText, Search,
+  UserPlus, Key
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import Modal, { Field, inputClass } from '../components/Modal';
 import { toast } from 'sonner';
 
+const ACCESS_ROLES = [
+  ['bank_owner', 'Director'],
+  ['staff', 'Staff / Teller'],
+  ['collection_agent', 'Collection Agent'],
+  ['loan_officer', 'Loan Officer'],
+  ['branch_manager', 'Branch Manager'],
+  ['admin', 'Admin']
+];
+const ROLE_LABELS = Object.fromEntries([
+  ...ACCESS_ROLES,
+  ['retail', 'Retail Member'],
+  ['corporate', 'Corporate Member']
+]);
+
 export default function AdminPortal() {
+  const { user } = useAuth();
   const [overview, setOverview] = useState(null);
   const [rbiReports, setRbiReports] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const canManageUsers = user?.role === 'bank_owner';
 
   const fetchAdminData = async () => {
     try {
@@ -57,7 +76,8 @@ export default function AdminPortal() {
     { key: 'overview', label: 'Branch Overview', icon: BarChart3 },
     { key: 'kyc', label: `Pending KYC (${overview?.stats?.pending_kyc_count || 0})`, icon: UserCheck },
     { key: 'rbi', label: 'Regulatory Reports (CTR/STR)', icon: FileText },
-    { key: 'audits', label: 'Audit Trails', icon: ShieldCheck }
+    { key: 'audits', label: 'Audit Trails', icon: ShieldCheck },
+    ...(canManageUsers ? [{ key: 'users', label: 'User Access', icon: Users }] : [])
   ];
 
   return (
@@ -151,6 +171,9 @@ export default function AdminPortal() {
                       <td className="p-3 text-slate-500">{new Date(t.timestamp).toLocaleString('en-IN')}</td>
                     </tr>
                   ))}
+                  {!(overview?.high_value_transactions || []).length && (
+                    <tr><td colSpan={6} className="p-6 text-center text-slate-500">No high-value transactions found.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -269,6 +292,8 @@ export default function AdminPortal() {
           </div>
         </div>
       )}
+
+      {activeTab === 'users' && canManageUsers && <UserAccessPanel />}
     </div>
   );
 }
@@ -282,9 +307,207 @@ function StatCard({ icon: Icon, label, value, sub, color, small }) {
         </div>
         <p className="text-[11px] text-slate-600">{label}</p>
       </div>
-      <h2 className={`${small ? 'text-base' : 'text-2xl'} font-bold text-slate-900 mt-2`}>{value}</h2>
+      <h2 className={`${small ? 'text-base' : 'text-2xl'} font-bold text-slate-900 mt-2`}>{value ?? 0}</h2>
       <p className="text-[10px] text-slate-500 mt-1">{sub}</p>
     </div>
+  );
+}
+
+function UserAccessPanel() {
+  const [data, setData] = useState(null);
+  const [q, setQ] = useState('');
+  const [role, setRole] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [resetting, setResetting] = useState(null);
+  const [created, setCreated] = useState(null);
+
+  const load = async (next = {}) => {
+    const query = next.q ?? q;
+    const selectedRole = next.role ?? role;
+    try { setData(await api.adminUsers({ q: query || undefined, role: selectedRole || undefined })); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not load user access'); }
+  };
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = data?.users || [];
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+      <div className="p-5 border-b border-slate-100 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input value={q} onChange={(e) => setQ(e.target.value)}
+            onBlur={(e) => load({ q: e.target.value })}
+            onKeyDown={(e) => { if (e.key === 'Enter') load({ q: e.currentTarget.value }); }}
+            data-testid="admin-user-search" placeholder="Search users"
+            className={`${inputClass} pl-8`} />
+        </div>
+        <select value={role} onChange={(e) => { const nextRole = e.target.value; setRole(nextRole); load({ role: nextRole }); }}
+          data-testid="admin-user-role" className={`${inputClass} w-auto`}>
+          <option value="">All roles</option>
+          {['bank_owner', 'admin', 'branch_manager', 'staff', 'collection_agent', 'loan_officer', 'corporate', 'retail']
+            .map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+        </select>
+        <button onClick={load}
+          className="px-3 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </button>
+        <button data-testid="admin-create-user" onClick={() => setCreating(true)}
+          className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5">
+          <UserPlus className="w-3.5 h-3.5" /> Create login
+        </button>
+      </div>
+      {!data ? <p className="p-10 text-center text-xs text-slate-500">Loading users...</p> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-[11px] uppercase text-slate-600">
+              <tr>
+                <th className="p-3 font-semibold">User</th>
+                <th className="p-3 font-semibold">Login ID</th>
+                <th className="p-3 font-semibold">Role</th>
+                <th className="p-3 font-semibold">Branch</th>
+                <th className="p-3 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.map(u => (
+                <tr key={u.id} className="hover:bg-blue-50/40 transition-colors">
+                  <td className="p-3">
+                    <div className="font-semibold text-slate-900">{u.name}</div>
+                    <div className="text-[11px] text-slate-500">{u.email || u.phone}</div>
+                  </td>
+                  <td className="p-3 font-mono font-semibold text-slate-900">{u.login_id}</td>
+                  <td className="p-3 text-slate-600">{ROLE_LABELS[u.role] || u.role}</td>
+                  <td className="p-3 text-slate-600">{u.branch || '-'}</td>
+                  <td className="p-3 text-right">
+                    <div className="inline-flex items-center gap-2">
+                      {ACCESS_ROLES.some(([r]) => r === u.role) && (
+                        <button onClick={() => setEditing(u)} data-testid={`admin-edit-user-${u.id}`}
+                          className="px-3 py-1.5 rounded-md border border-slate-200 text-slate-700 text-[11px] font-semibold">
+                          Edit
+                        </button>
+                      )}
+                      <button disabled={!u.can_reset_password} onClick={() => setResetting(u)}
+                      data-testid={`admin-reset-password-${u.id}`}
+                      className="px-3 py-1.5 rounded-md border border-slate-200 text-[#0b3b8c] disabled:text-slate-400 disabled:bg-slate-50 text-[11px] font-semibold inline-flex items-center gap-1.5">
+                        <Key className="w-3.5 h-3.5" /> Password
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!filtered.length && <tr><td colSpan={5} className="p-8 text-center text-slate-500">No users found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {creating && <CreateUserModal onClose={() => setCreating(false)} onDone={(r) => {
+        setCreating(false); setCreated(r); load();
+      }} />}
+      {editing && <EditUserModal user={editing} onClose={() => setEditing(null)}
+        onDone={() => { setEditing(null); load(); }} />}
+      {resetting && <ResetPasswordModal user={resetting} onClose={() => setResetting(null)}
+        onDone={() => { setResetting(null); load(); }} />}
+      {created && <Modal title="Login created" subtitle="Give these details to the user in person." onClose={() => setCreated(null)}
+        footer={<button onClick={() => setCreated(null)}
+          className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold">Done</button>}>
+        <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200">
+          <p className="text-[11px] text-emerald-900">User ID for signing in</p>
+          <p className="text-xl font-mono font-bold text-emerald-900 tracking-wide">{created.login_id}</p>
+        </div>
+      </Modal>}
+    </div>
+  );
+}
+
+function CreateUserModal({ onClose, onDone }) {
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', role: 'staff', branch: 'Head Office - Nariman Point',
+    designation: '', password: ''
+  });
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try { onDone(await api.adminUserCreate(form)); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not create login'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal title="Create login" subtitle="Internal users sign in with their email address."
+      testId="admin-create-user-modal" onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+        <button data-testid="admin-create-user-save" disabled={busy || !form.name || !form.email || !form.phone || !form.password}
+          onClick={save} className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
+          {busy ? 'Creating...' : 'Create'}
+        </button>
+      </>}>
+      <Field label="Full name"><input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+      <Field label="Email / login ID"><input className={inputClass} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+      <Field label="Phone"><input className={inputClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+      <Field label="Role"><select className={inputClass} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+        {ACCESS_ROLES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select></Field>
+      <Field label="Branch"><input className={inputClass} value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} /></Field>
+      <Field label="Designation"><input className={inputClass} value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} /></Field>
+      <Field label="Temporary password"><input type="password" className={inputClass} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
+    </Modal>
+  );
+}
+
+function EditUserModal({ user, onClose, onDone }) {
+  const [form, setForm] = useState({
+    user_id: user.id, name: user.name || '', email: user.email || '', phone: user.phone || '',
+    role: user.role || 'staff', branch: user.branch || '', designation: user.designation || ''
+  });
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try { toast.success((await api.adminUserUpdate(form)).message); onDone(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not update login'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal title="Manage login" subtitle={user.login_id} testId="admin-edit-user-modal" onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+        <button data-testid="admin-edit-user-save" disabled={busy || !form.name || !form.email || !form.phone}
+          onClick={save} className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
+          {busy ? 'Saving...' : 'Save'}
+        </button>
+      </>}>
+      <Field label="Full name"><input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+      <Field label="Email / login ID"><input className={inputClass} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+      <Field label="Phone"><input className={inputClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+      <Field label="Role"><select className={inputClass} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+        {ACCESS_ROLES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select></Field>
+      <Field label="Branch"><input className={inputClass} value={form.branch} onChange={(e) => setForm({ ...form, branch: e.target.value })} /></Field>
+      <Field label="Designation"><input className={inputClass} value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} /></Field>
+    </Modal>
+  );
+}
+
+function ResetPasswordModal({ user, onClose, onDone }) {
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try { toast.success((await api.adminUserPassword({ user_id: user.id, password })).message); onDone(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not change password'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal title="Change password" subtitle={`${user.name} - ${user.login_id}`} testId="admin-reset-password-modal"
+      onClose={onClose} footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
+        <button data-testid="admin-reset-password-save" disabled={busy || !password} onClick={save}
+          className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
+          {busy ? 'Changing...' : 'Change password'}
+        </button>
+      </>}>
+      <Field label="New password"><input type="password" className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+    </Modal>
   );
 }
 
