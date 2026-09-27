@@ -239,7 +239,7 @@ export const api = {
   // documents have been seen.
   openAccount: async (payload) => (await axios.post(`${API}/register/account`, payload, getAuthHeaders())).data,
   // The ladder the director maintains -- see route_rank_tiers.
-  rankTiers: async () => (await axios.get(`${API}/rank-tiers`, getAuthHeaders())).data,
+  rankTiers: async (query = {}) => (await axios.get(`${API}/rank-tiers`, { ...getAuthHeaders(), params: query })).data,
   rankTierCreate: async (payload) => (await axios.post(`${API}/rank-tiers`, payload, getAuthHeaders())).data,
   rankTierUpdate: async (id, payload) =>
     (await axios.patch(`${API}/rank-tiers/${id}`, payload, getAuthHeaders())).data,

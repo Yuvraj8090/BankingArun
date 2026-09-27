@@ -21,6 +21,9 @@ function BoosterCard({ booster }) {
         <p className="text-xl font-bold text-slate-900 mt-1" data-testid="booster-level">
           {booster.name || 'Not yet on the booster ladder'}
         </p>
+        {booster.reward_label && (
+          <p className="text-xs text-amber-800 font-semibold mt-1">{booster.reward_label}</p>
+        )}
       </div>
 
       {next && (
@@ -31,6 +34,9 @@ function BoosterCard({ booster }) {
           <p className="text-sm font-semibold text-slate-900 mt-1.5 leading-snug" data-testid="booster-next">
             {next.how}
           </p>
+          {next.reward_label && (
+            <p className="text-xs text-amber-900 mt-1">{next.reward_label}</p>
+          )}
           <div className="mt-2.5">
             <div className="h-2 rounded-full bg-white border border-amber-200 overflow-hidden">
               <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
@@ -67,6 +73,11 @@ function BoosterCard({ booster }) {
                 {t.direct_required} × {t.required_below === 0 ? 'member' : `Level ${t.required_below}`}
                 {t.min_deposit_each ? `, each holding ${inr(t.min_deposit_each)}` : ''}
               </span>
+              {t.reward_label && (
+                <span className="block text-[10px] font-normal opacity-80">
+                  {t.reward_label}
+                </span>
+              )}
               <span className="block text-[10px] font-normal opacity-70">
                 {t.your_members_here} of yours here
               </span>

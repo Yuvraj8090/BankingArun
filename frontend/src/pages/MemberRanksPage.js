@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Award, RefreshCw, Search, Info, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
@@ -26,37 +26,70 @@ const rankName = (tiers, position) =>
   (tiers || []).find((t) => t.position === position)?.name || `rank ${position}`;
 
 
-const BLANK = {
-  position: '', name: '', direct_required: 2, required_below: 0,
+const inr = (n) => `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+
+const blankTier = (programme, position) => ({
+  programme, position, name: '', direct_required: 2, required_below: 0,
+  min_deposit_each: programme === 'booster' ? 1000 : '',
   reward_label: '', reward_amount: '', notes: '', status: 'active',
+});
+
+const LADDER_COPY = {
+  standing: {
+    title: 'Ranks and rewards',
+    description: 'Add a rank, change what it takes, or write what it is worth.',
+    add: 'Add a rank',
+    edit: 'Edit',
+    modal: 'Add a rank',
+    save: 'Save rank',
+    worth: 'What this rank is worth',
+    amount: 'Figure, if the book states one',
+    rewardHead: 'Reward (shown, never paid)',
+    any: 'Any member',
+  },
+  booster: {
+    title: 'MIS Booster Plan',
+    description: 'Admin-managed MIS ladder: 2 directs at ₹1,000 for 6%, 4 for 7%, 6 for pool / 2x.',
+    add: 'Add a MIS rung',
+    edit: 'Edit',
+    modal: 'Add MIS rung',
+    save: 'Save MIS rung',
+    worth: 'MIS benefit shown to member',
+    amount: 'Figure, if applicable',
+    rewardHead: 'MIS benefit',
+    any: 'Any qualifying member',
+  },
 };
 
 // The ladder, editable. Every rung was a line in a PHP constant until recently,
 // so adding Crown Ambassador or making Gold harder to reach meant a developer
 // and a deploy. The director does it here.
-function LadderEditor({ onChanged }) {
+function LadderEditor({ programme = 'standing', onChanged }) {
+  const copy = LADDER_COPY[programme] || LADDER_COPY.standing;
   const [tiers, setTiers] = useState(null);
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
-      const r = await api.rankTiers();
+      const r = await api.rankTiers({ programme });
       setTiers(r.tiers);
       setNotice(r.notice);
     } catch (e) { toast.error(e.response?.data?.detail || 'Could not load the ladder'); }
-  };
-  useEffect(() => { load(); }, []);
+  }, [programme]);
+  useEffect(() => { load(); }, [load]);
 
   const save = async () => {
     setSaving(true);
     try {
       const body = {
         ...editing,
+        programme,
         position: Number(editing.position),
         direct_required: Number(editing.direct_required),
         required_below: Number(editing.required_below),
+        min_deposit_each: editing.min_deposit_each === '' ? '' : Number(editing.min_deposit_each),
         // Sent as an empty string rather than 0 so "no figure" stays no figure.
         reward_amount: editing.reward_amount === '' ? '' : Number(editing.reward_amount),
       };
@@ -82,18 +115,18 @@ function LadderEditor({ onChanged }) {
   };
 
   if (!tiers) return null;
-  const below = [{ position: 0, name: 'Any member' }, ...tiers];
+  const below = [{ position: 0, name: copy.any }, ...tiers];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="ladder-editor">
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid={`${programme}-ladder-editor`}>
       <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Ranks and rewards</h2>
-          <p className="text-[11px] text-slate-500">Add a rank, change what it takes, or write what it is worth.</p>
+          <h2 className="text-sm font-semibold text-slate-900">{copy.title}</h2>
+          <p className="text-[11px] text-slate-500">{copy.description}</p>
         </div>
-        <button data-testid="rank-add" onClick={() => setEditing({ ...BLANK, position: tiers.length + 1 })}
+        <button data-testid={`${programme}-rank-add`} onClick={() => setEditing(blankTier(programme, tiers.length + 1))}
           className="px-3 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5">
-          <Plus className="w-3.5 h-3.5" /> Add a rank
+          <Plus className="w-3.5 h-3.5" /> {copy.add}
         </button>
       </div>
 
@@ -109,7 +142,7 @@ function LadderEditor({ onChanged }) {
               <th className="p-3 font-semibold">#</th>
               <th className="p-3 font-semibold">Rank</th>
               <th className="p-3 font-semibold">To reach it</th>
-              <th className="p-3 font-semibold">Reward (shown, never paid)</th>
+              <th className="p-3 font-semibold">{copy.rewardHead}</th>
               <th className="p-3 font-semibold">Status</th>
               <th className="p-3 font-semibold text-right">Actions</th>
             </tr>
@@ -122,6 +155,11 @@ function LadderEditor({ onChanged }) {
                 <td className="p-3 text-slate-600">
                   {t.direct_required} {t.direct_required === 1 ? 'member' : 'members'} introduced
                   {t.required_below > 0 && <>, each already {rankName(tiers, t.required_below)}</>}
+                  {t.min_deposit_each && (
+                    <span className="block text-[10px] text-slate-500">
+                      each holding {inr(t.min_deposit_each)} on deposit
+                    </span>
+                  )}
                 </td>
                 <td className="p-3 text-slate-600">
                   {t.reward_label || <span className="text-slate-400">—</span>}
@@ -138,12 +176,12 @@ function LadderEditor({ onChanged }) {
                       : 'bg-slate-100 text-slate-600 border-slate-300'}`}>{t.status}</span>
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
-                  <button data-testid={`rank-edit-${t.position}`}
-                    onClick={() => setEditing({ ...t, reward_amount: t.reward_amount ?? '' })}
+                  <button data-testid={`${programme}-rank-edit-${t.position}`}
+                    onClick={() => setEditing({ ...t, min_deposit_each: t.min_deposit_each ?? '', reward_amount: t.reward_amount ?? '' })}
                     className="text-[11px] font-semibold text-[#0b3b8c] hover:underline inline-flex items-center gap-1">
                     <Pencil className="w-3 h-3" /> edit
                   </button>
-                  <button data-testid={`rank-delete-${t.position}`} onClick={() => remove(t)}
+                  <button data-testid={`${programme}-rank-delete-${t.position}`} onClick={() => remove(t)}
                     className="ml-3 text-[11px] font-semibold text-[#c8102e] hover:underline inline-flex items-center gap-1">
                     <Trash2 className="w-3 h-3" /> remove
                   </button>
@@ -156,16 +194,16 @@ function LadderEditor({ onChanged }) {
 
       {editing && (
         <Modal
-          testId="rank-modal"
-          title={editing.id ? `Edit ${editing.name}` : 'Add a rank'}
+          testId={`${programme}-rank-modal`}
+          title={editing.id ? `${copy.edit} ${editing.name}` : copy.modal}
           subtitle="Position 1 is the entry rank. A rank may only require standings below its own."
           onClose={() => setEditing(null)}
           footer={<>
             <button onClick={() => setEditing(null)}
               className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
-            <button data-testid="rank-save" onClick={save} disabled={saving || !editing.name}
+            <button data-testid={`${programme}-rank-save`} onClick={save} disabled={saving || !editing.name}
               className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold disabled:opacity-50">
-              {saving ? 'Saving…' : 'Save rank'}
+              {saving ? 'Saving…' : copy.save}
             </button>
           </>}
         >
@@ -198,15 +236,21 @@ function LadderEditor({ onChanged }) {
                   .map((b) => <option key={b.position} value={b.position}>{b.name}</option>)}
               </select>
             </label>
+            <label className="block">
+              <span className="block text-[11px] text-slate-600 mb-1">Minimum deposit each introduced member holds</span>
+              <input type="number" min="0" data-testid={`${programme}-rank-min-deposit`} value={editing.min_deposit_each ?? ''}
+                onChange={(e) => setEditing({ ...editing, min_deposit_each: e.target.value })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
+            </label>
             <label className="block md:col-span-2">
-              <span className="block text-[11px] text-slate-600 mb-1">What this rank is worth</span>
+              <span className="block text-[11px] text-slate-600 mb-1">{copy.worth}</span>
               <input data-testid="rank-reward" value={editing.reward_label ?? ''}
-                placeholder="e.g. Recognised at the annual meet"
+                placeholder={programme === 'booster' ? 'e.g. 6% monthly after 2 directs' : 'e.g. Recognised at the annual meet'}
                 onChange={(e) => setEditing({ ...editing, reward_label: e.target.value })}
                 className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
             </label>
             <label className="block">
-              <span className="block text-[11px] text-slate-600 mb-1">Figure, if the book states one</span>
+              <span className="block text-[11px] text-slate-600 mb-1">{copy.amount}</span>
               <input type="number" min="0" data-testid="rank-reward-amount" value={editing.reward_amount ?? ''}
                 onChange={(e) => setEditing({ ...editing, reward_amount: e.target.value })}
                 className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
@@ -238,11 +282,11 @@ export default function MemberRanksPage() {
   const [data, setData] = useState(null);
   const [query, setQuery] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try { setData(await api.memberRanks()); }
     catch (e) { toast.error(e.response?.data?.detail || 'Could not load member standings'); }
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   if (!data) {
     return <div className="p-10 flex items-center gap-2 text-slate-600">
@@ -306,7 +350,12 @@ export default function MemberRanksPage() {
         </div>
       </div>
 
-      {canEdit && <LadderEditor onChanged={load} />}
+      {canEdit && (
+        <div className="space-y-6">
+          <LadderEditor programme="standing" onChanged={load} />
+          <LadderEditor programme="booster" onChanged={load} />
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         <div className="p-3 border-b border-slate-100">

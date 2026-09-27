@@ -1057,6 +1057,46 @@ CREATE TABLE IF NOT EXISTS sessions (
     INDEX idx_session_expiry (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS rank_tiers (
+    id VARCHAR(36) PRIMARY KEY,
+    programme VARCHAR(20) NOT NULL DEFAULT 'standing',
+    position INT NOT NULL,
+    name VARCHAR(60) NOT NULL,
+    direct_required INT NOT NULL DEFAULT 2,
+    required_below INT NOT NULL DEFAULT 0,
+    min_deposit_each DECIMAL(15,2) NULL,
+    reward_label VARCHAR(200),
+    reward_amount DECIMAL(15,2),
+    notes VARCHAR(500),
+    status VARCHAR(10) NOT NULL DEFAULT 'active',
+    deleted_at DATETIME NULL,
+    deleted_by VARCHAR(36) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_programme_position (programme, position),
+    INDEX idx_rank_live (deleted_at, programme, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO rank_tiers (id, programme, position, name, direct_required, required_below, status) VALUES
+(UUID(), 'standing', 1, 'Silver',           2, 0, 'active'),
+(UUID(), 'standing', 2, 'Gold',             2, 1, 'active'),
+(UUID(), 'standing', 3, 'Platinum',         2, 2, 'active'),
+(UUID(), 'standing', 4, 'Diamond',          2, 3, 'active'),
+(UUID(), 'standing', 5, 'Ruby',             2, 4, 'active'),
+(UUID(), 'standing', 6, 'Blue Diamond',     2, 5, 'active'),
+(UUID(), 'standing', 7, 'Emerald',          2, 6, 'active'),
+(UUID(), 'standing', 8, 'Ambassador',       2, 7, 'active'),
+(UUID(), 'standing', 9, 'Brand Ambassador', 2, 8, 'active');
+
+INSERT IGNORE INTO rank_tiers
+    (id, programme, position, name, direct_required, required_below, min_deposit_each, reward_label, status) VALUES
+(UUID(), 'booster', 1, 'MIS 6% Monthly', 2, 0, 1000.00,
+    '6% monthly after 2 direct members each hold 1,000', 'active'),
+(UUID(), 'booster', 2, 'MIS 7% Monthly', 4, 0, 1000.00,
+    '7% monthly after 4 direct members each hold 1,000', 'active'),
+(UUID(), 'booster', 3, 'MIS Pool 2x', 6, 0, 1000.00,
+    'Moves to booster pool; 2x payout then exits', 'active');
+
 -- The 3-year monthly plan was already seeded, deliberately held as a draft with
 -- a note that its printed maturity works out above the cap. Activating it is the
 -- owner's decision, taken knowingly; the slab table from the brochure goes in

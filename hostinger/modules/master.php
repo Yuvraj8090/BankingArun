@@ -1413,6 +1413,8 @@ function booster_standing(string $userId): array
             'short_by' => $short,
             'min_deposit_each' => $need > 0 ? $need : null,
             'needs_level' => $below === 0 ? null : ($names[$below] ?? null),
+            'reward_label' => $tier['reward_label'],
+            'reward_amount' => $tier['reward_amount'],
             'how' => $short === 0
                 ? 'You have everything you need for ' . $tier['name'] . '.'
                 : sprintf('%d more %s %s%s.', $short, $short === 1 ? 'member' : 'members',
@@ -1447,11 +1449,20 @@ function booster_standing(string $userId): array
         ];
         $atLevel[$theirLevel] = ($atLevel[$theirLevel] ?? 0) + 1;
     }
+    $current = null;
+    foreach ($tiers as $tier) {
+        if ((int)$tier['position'] === $level) {
+            $current = $tier;
+            break;
+        }
+    }
 
     return [
         'enabled' => true,
         'level' => $level,
         'name' => $level === 0 ? null : ($names[$level] ?? null),
+        'reward_label' => $current['reward_label'] ?? null,
+        'reward_amount' => $current['reward_amount'] ?? null,
         'next' => $next,
         'introduced' => $directs,
         'introduced_count' => count($directs),

@@ -1007,13 +1007,13 @@ INSERT IGNORE INTO rank_tiers (id, position, name, direct_required, required_bel
 -- that way, so this is a second unique key rather than a replacement.
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS seq BIGINT NOT NULL AUTO_INCREMENT UNIQUE;
 
--- The booster ladder. Same shape as the standing ladder -- a rung is reached by
--- introducing N members who already hold the rung below -- with one condition
--- the standing ladder does not have: each of those introductions must be
--- holding a deposit of at least a stated amount.
+-- The MIS booster ladder from the owner's audio note. It is still the same
+-- configurable rank_tiers engine: each rung is reached by direct introductions
+-- who are holding at least the stated deposit amount.
 --
--- Level 1: introduce four members who each hold 10,000 on deposit.
--- Level 2: those four have each reached Level 1, and so on up.
+-- 2 directs at 1,000 => 6% monthly.
+-- 4 directs at 1,000 => 7% monthly.
+-- 6 directs at 1,000 => booster pool / 2x exit.
 --
 -- It shares the tier table rather than getting one of its own, so the engine
 -- that settles the ladder, the admin screen that edits it, and the recycle bin
@@ -1028,12 +1028,25 @@ ALTER TABLE rank_tiers ADD UNIQUE KEY IF NOT EXISTS uniq_programme_position (pro
 
 INSERT IGNORE INTO rank_tiers
     (id, programme, position, name, direct_required, required_below, min_deposit_each, reward_label, status) VALUES
-(UUID(), 'booster', 1, 'Booster Level 1', 4, 0, 10000.00,
-    'Four members introduced, each holding 10,000 on deposit', 'active'),
-(UUID(), 'booster', 2, 'Booster Level 2', 4, 1, 10000.00,
-    'Four members who have each reached Booster Level 1', 'active'),
-(UUID(), 'booster', 3, 'Booster Level 3', 4, 2, 10000.00,
-    'Four members who have each reached Booster Level 2', 'active');
+(UUID(), 'booster', 1, 'MIS 6% Monthly', 2, 0, 1000.00,
+    '6% monthly after 2 direct members each hold 1,000', 'active'),
+(UUID(), 'booster', 2, 'MIS 7% Monthly', 4, 0, 1000.00,
+    '7% monthly after 4 direct members each hold 1,000', 'active'),
+(UUID(), 'booster', 3, 'MIS Pool 2x', 6, 0, 1000.00,
+    'Moves to booster pool; 2x payout then exits', 'active');
+
+UPDATE rank_tiers SET name = 'MIS 6% Monthly', direct_required = 2, required_below = 0,
+    min_deposit_each = 1000.00, reward_label = '6% monthly after 2 direct members each hold 1,000',
+    status = 'active'
+    WHERE programme = 'booster' AND position = 1;
+UPDATE rank_tiers SET name = 'MIS 7% Monthly', direct_required = 4, required_below = 0,
+    min_deposit_each = 1000.00, reward_label = '7% monthly after 4 direct members each hold 1,000',
+    status = 'active'
+    WHERE programme = 'booster' AND position = 2;
+UPDATE rank_tiers SET name = 'MIS Pool 2x', direct_required = 6, required_below = 0,
+    min_deposit_each = 1000.00, reward_label = 'Moves to booster pool; 2x payout then exits',
+    status = 'active'
+    WHERE programme = 'booster' AND position = 3;
 
 -- The two reward programmes the plan book numbers as parts 2 and 3. Part 1 is
 -- the twelve-level commission table, which is already shown on Refer & Earn.
