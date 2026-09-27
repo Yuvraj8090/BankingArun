@@ -177,6 +177,7 @@ function route_apply_loan(array $d): void
 {
     global $pdo;
     $user = current_user();
+    require_kyc_verified($user);
     need($d, 'loan_type', 'amount_requested', 'tenure_months', 'monthly_income', 'employment_type', 'purpose');
     $type = strtolower(clip($d['loan_type'], 30));
     $amount = money($d['amount_requested']);

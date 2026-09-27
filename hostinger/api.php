@@ -227,6 +227,23 @@ function clear_fails(string $identifier): void
     $pdo->prepare('DELETE FROM login_attempts WHERE identifier = ?')->execute([$identifier]);
 }
 
+// Self-registration (route_self_register) hands out a real, working login
+// before anyone has checked this person's documents. That is fine for looking
+// around; it is not fine for moving money — a Nidhi may only take deposits
+// from and lend to verified members. Every route that can move money calls
+// this first. Internal roles (staff, directors, ...) are not retail members
+// and are never subject to this.
+function require_kyc_verified(array $user): void
+{
+    if ($user['role'] !== 'retail') {
+        return;
+    }
+    if (($user['kyc_status'] ?? '') !== 'verified') {
+        fail(403, 'Please complete KYC verification before moving money. '
+            . 'Visit a branch or complete Video KYC from your dashboard.');
+    }
+}
+
 // Transaction passwords authorise money movement, so they get their own lockout.
 // Call before beginTransaction(): a rollback would otherwise erase the recorded failure.
 function check_txn_password(array $user, mixed $password, string $wrongMessage): void
@@ -717,6 +734,78 @@ function route_register(array $d): void
             . ($plan === null ? '' : " Plan: {$plan['name']}.")]);
 }
 
+// Public self-registration: no staff, no documents seen in person. A Nidhi
+// still cannot enrol a *verified* member this way (route_register is the real
+// enrolment, gated on KYC by staff), but there is nothing wrong with letting
+// somebody create their own login and look around before that happens. What
+// matters is that this account cannot move money until staff verify their
+// KYC — see require_kyc_verified(), called from every route that can.
+function route_self_register(array $d): void
+{
+    global $pdo;
+    // Unauthenticated and public, so it is rate limited by address like the
+    // enquiry form — otherwise it is free to flood the users table with junk.
+    rate_limit('self-register:' . client_ip(), 5, 3600,
+        'Too many sign-ups from this connection. Please try again later, or call us on 9105015464.');
+    captcha_verify($d);
+
+    need($d, 'name', 'phone');
+    $name = clip($d['name'], 150);
+    if (mb_strlen($name) < 2) {
+        fail(422, 'Please enter your full name.');
+    }
+    $phone = clip($d['phone'], 30);
+    $digits = preg_replace('/\D+/', '', $phone);
+    if (!preg_match('/^(91)?[6-9]\d{9}$/', $digits)) {
+        fail(422, 'Please enter a valid 10-digit Indian mobile number.');
+    }
+    $email = strtolower(clip($d['email'] ?? '', 150));
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        fail(422, 'That email address does not look right. Leave it blank if you have none.');
+    }
+    if ($email !== '' && row('SELECT id FROM users WHERE email = ?', [$email])) {
+        fail(400, 'An account with this email already exists. Please sign in instead.');
+    }
+    if (row('SELECT id FROM users WHERE phone = ?', [$phone])) {
+        fail(400, 'An account already exists for this phone number. Please sign in instead.');
+    }
+
+    $userId = uuid4();
+    $accountNumber = 'AJSP0' . digits(9);
+    $password = generate_password();
+    $transactionPassword = digits(6);
+
+    $pdo->beginTransaction();
+    $pdo->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash,
+            branch, kyc_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$userId, $name, $email === '' ? null : $email, $phone, 'retail',
+            password_hash($password, PASSWORD_BCRYPT), password_hash($transactionPassword, PASSWORD_BCRYPT),
+            'AJSP-MUM-042 (Nariman Point Main)', 'pending_approval']);
+    // Zero balance, on purpose: no money moves onto this account until a
+    // teller has seen this person's documents. See require_kyc_verified().
+    $pdo->prepare('INSERT INTO accounts (id, user_id, account_number, account_type, account_name, balance, upi_id,
+            branch, is_joint)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, 0)')
+        ->execute([uuid4(), $userId, $accountNumber, 'savings', 'Savings Account',
+            ($email === '' ? strtolower($accountNumber) : strstr($email, '@', true)) . '@ajspay',
+            'AJSP-MUM-042 (Nariman Point Main)']);
+
+    $user = row('SELECT * FROM users WHERE id = ?', [$userId]);
+    audit($user, 'SELF_REGISTERED', "$accountNumber self-registered online, awaiting KYC verification");
+    $pdo->commit();
+
+    // Signed in immediately -- the account exists and the credentials are
+    // real -- but require_kyc_verified() blocks every route that moves money
+    // until a teller verifies this person's documents.
+    respond(['status' => 'SUCCESS', 'user' => public_user($user),
+        'account_number' => $accountNumber, 'user_id' => $accountNumber,
+        'password' => $password, 'transaction_password' => $transactionPassword,
+        'token' => start_session($user),
+        'message' => "Account $accountNumber created. Visit a branch or complete Video KYC to start "
+            . "depositing, transferring or applying for a loan."]);
+}
+
 function route_login(array $d): void
 {
     captcha_verify($d);
@@ -848,6 +937,7 @@ function route_transfer(array $d): void
 {
     global $pdo;
     $user = current_user();
+    require_kyc_verified($user);
     need($d, 'from_account_number', 'to_account_number', 'beneficiary_name', 'transaction_password');
     $amount = money($d['amount'] ?? null);
     if ($amount <= 0) {
@@ -1327,6 +1417,7 @@ $routes = [
     'POST /auth/forgot-password' => 'route_forgot_password',
     'POST /auth/reset-password' => 'route_reset_password',
     'POST /public/enquiry' => 'route_public_enquiry',
+    'POST /register/self' => 'route_self_register',
     'GET /compliance/capabilities' => 'route_capabilities',
     'PUT /compliance/capability' => 'route_capability_set',
     // Support impersonation (modules/impersonation.php) — read only

@@ -248,6 +248,7 @@ export const api = {
   testSms: async (to) => (await axios.post(`${API}/admin/config/test-sms`, { to }, getAuthHeaders())).data,
   revokeSession: async (id) => (await axios.delete(`${API}/auth/sessions/${id}`, getAuthHeaders())).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
+  selfRegister: async (payload) => (await axios.post(`${API}/register/self`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
   productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,
   productUpdate: async (id, payload) => (await axios.patch(`${API}/products/${id}`, payload, getAuthHeaders())).data,

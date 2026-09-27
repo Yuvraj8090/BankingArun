@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import Modal, { Field, inputClass } from '../components/Modal';
+import Modal, { Field, inputClass, PasswordGenField } from '../components/Modal';
 import { toast } from 'sonner';
 
 const ACCESS_ROLES = [
@@ -421,31 +421,6 @@ function UserAccessPanel() {
           <p className="text-xl font-mono font-bold text-slate-900 tracking-wide">{created.staff_id}</p>
         </div>
       </Modal>}
-    </div>
-  );
-}
-
-// Avoids 0/O/1/l/I so a password handed over on paper or read aloud is not
-// ambiguous about which character it was.
-function generatePassword(length = 14) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-  const bytes = new Uint32Array(length);
-  window.crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
-}
-
-// Plain text rather than masked: the point of this field is for the operator
-// to read the password back and hand it to the user in person, not to hide it
-// from themselves.
-function PasswordGenField({ value, onChange, testId }) {
-  return (
-    <div className="flex gap-2">
-      <input type="text" data-testid={testId} className={`${inputClass} font-mono`} value={value}
-        onChange={(e) => onChange(e.target.value)} placeholder="Type one, or generate" />
-      <button type="button" onClick={() => onChange(generatePassword())} data-testid={`${testId}-generate`}
-        className="px-3 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 shrink-0 flex items-center gap-1.5">
-        <RefreshCw className="w-3.5 h-3.5" /> Generate
-      </button>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import Pagination from '../components/Pagination';
-import Modal from '../components/Modal';
+import Modal, { PasswordGenField } from '../components/Modal';
 import DocumentUpload from '../components/DocumentUpload';
 import { toast } from 'sonner';
 
@@ -657,7 +657,11 @@ function LeadsTab() {
               <Field label="Phone" value={account.phone} onChange={(v) => setAccount({ ...account, phone: v })} testId="open-phone" />
               <Field label="Email (optional)" value={account.email} onChange={(v) => setAccount({ ...account, email: v })} testId="open-email" />
               <Field label="PAN (optional)" value={account.pan_number} onChange={(v) => setAccount({ ...account, pan_number: v.toUpperCase() })} />
-              <Field label="Login password" value={account.password} onChange={(v) => setAccount({ ...account, password: v })} testId="open-password" />
+              <div>
+                <label className="block text-[11px] text-slate-600 mb-1">Login password</label>
+                <PasswordGenField testId="open-password" value={account.password}
+                  onChange={(v) => setAccount({ ...account, password: v })} />
+              </div>
               <Field label="Transaction password" value={account.transaction_password} onChange={(v) => setAccount({ ...account, transaction_password: v })} testId="open-txnpwd" />
               <Field label="Opening deposit" value={String(account.initial_deposit)} onChange={(v) => setAccount({ ...account, initial_deposit: Number(v.replace(/\D/g, '')) || 0 })} />
             </div>
