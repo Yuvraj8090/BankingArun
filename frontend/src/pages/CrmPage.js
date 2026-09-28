@@ -351,6 +351,10 @@ const FILE_KINDS = [
   { kind: 'pan', label: 'PAN card', hint: 'JPEG, PNG or PDF, up to 3 MB' },
   { kind: 'aadhaar', label: 'Aadhaar', hint: 'Mask all but the last four digits' },
   { kind: 'address', label: 'Proof of address', hint: 'A utility bill, passport or voter ID' },
+];
+// Shown only once "Show more" is expanded — neither blocks opening the account,
+// so they do not need to sit in the way of the two fields that do.
+const OPTIONAL_FILE_KINDS = [
   { kind: 'photo', label: 'Member photo (optional)', hint: 'A recent passport-size photo' },
   { kind: 'signature', label: 'Member signature (optional)', hint: 'Signed on plain paper and scanned' },
 ];
@@ -364,6 +368,9 @@ const DOC_STYLE = {
 function ApplicationFile({ leadId, onChange }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState('');
+  // Collapsed by default: neither photo nor signature blocks opening the
+  // account, so they do not need to add scrolling for every counter visit.
+  const [showOptional, setShowOptional] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -393,6 +400,37 @@ function ApplicationFile({ leadId, onChange }) {
   const byKind = {};
   (file?.documents || []).forEach((d) => { byKind[d.kind] = d; });
 
+  const slot = ({ kind, label, hint }) => {
+    const doc = byKind[kind];
+    return (
+      <div key={kind} className="space-y-1.5">
+        <DocumentUpload
+          kind={kind} label={label} hint={hint}
+          upload={(payload) => api.leadDocumentUpload(leadId, payload)}
+          onUploaded={load}
+        />
+        {doc && (
+          <div className={`p-1.5 rounded-md border text-[10px] ${DOC_STYLE[doc.status] || DOC_STYLE.pending_review}`}>
+            <div className="font-semibold">
+              {doc.status === 'pending_review' ? 'Waiting to be checked' : doc.status}
+            </div>
+            {doc.review_reason && <div className="mt-0.5">{doc.review_reason}</div>}
+            {doc.status === 'pending_review' && (
+              <div className="flex gap-2 mt-1">
+                <button disabled={busy === doc.id} data-testid={`open-verify-${kind}`}
+                  onClick={() => review(doc, 'verified')}
+                  className="font-semibold text-emerald-700 hover:underline disabled:opacity-50">verify</button>
+                <button disabled={busy === doc.id} data-testid={`open-reject-${kind}`}
+                  onClick={() => review(doc, 'rejected')}
+                  className="font-semibold text-[#c8102e] hover:underline disabled:opacity-50">reject</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="rounded-md border border-slate-200 bg-white p-3 space-y-3" data-testid="open-account-file">
       <div className="flex items-start justify-between gap-3">
@@ -414,37 +452,18 @@ function ApplicationFile({ leadId, onChange }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {FILE_KINDS.map(({ kind, label, hint }) => {
-          const doc = byKind[kind];
-          return (
-            <div key={kind} className="space-y-1.5">
-              <DocumentUpload
-                kind={kind} label={label} hint={hint}
-                upload={(payload) => api.leadDocumentUpload(leadId, payload)}
-                onUploaded={load}
-              />
-              {doc && (
-                <div className={`p-1.5 rounded-md border text-[10px] ${DOC_STYLE[doc.status] || DOC_STYLE.pending_review}`}>
-                  <div className="font-semibold">
-                    {doc.status === 'pending_review' ? 'Waiting to be checked' : doc.status}
-                  </div>
-                  {doc.review_reason && <div className="mt-0.5">{doc.review_reason}</div>}
-                  {doc.status === 'pending_review' && (
-                    <div className="flex gap-2 mt-1">
-                      <button disabled={busy === doc.id} data-testid={`open-verify-${kind}`}
-                        onClick={() => review(doc, 'verified')}
-                        className="font-semibold text-emerald-700 hover:underline disabled:opacity-50">verify</button>
-                      <button disabled={busy === doc.id} data-testid={`open-reject-${kind}`}
-                        onClick={() => review(doc, 'rejected')}
-                        className="font-semibold text-[#c8102e] hover:underline disabled:opacity-50">reject</button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {FILE_KINDS.map(slot)}
       </div>
+
+      <button type="button" onClick={() => setShowOptional((v) => !v)} data-testid="open-account-file-more"
+        className="text-[11px] font-semibold text-[#0b3b8c] hover:underline">
+        {showOptional ? 'Hide photo & signature' : 'Show more — photo & signature (optional)'}
+      </button>
+      {showOptional && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {OPTIONAL_FILE_KINDS.map(slot)}
+        </div>
+      )}
 
       {file && !file.ready_to_open && (
         <p className="text-[11px] text-amber-800">Still needed: {file.missing.join(' and ')}.</p>
@@ -557,6 +576,7 @@ function LeadsTab() {
   const [file, setFile] = useState(null);
   const [opened, setOpened] = useState(null);
   const [schemes, setSchemes] = useState([]);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', source: 'walk_in', interest: 'deposit', scheme_code: '', notes: '' });
 
   // Only the plans we actually publish, so the desk cannot record somebody as
@@ -585,6 +605,7 @@ function LeadsTab() {
   useEffect(() => {
     if (!opening) return;
     setFile(null);
+    setShowMoreDetails(false);
     setAccount({
       name: opening.name || '', email: opening.email || '', phone: opening.phone || '',
       password: '', transaction_password: '', pan_number: '', initial_deposit: 1000,
@@ -698,9 +719,17 @@ function LeadsTab() {
               </div>
               <Field label="Transaction password" value={account.transaction_password} onChange={(v) => setAccount({ ...account, transaction_password: v })} testId="open-txnpwd" />
               <Field label="Opening deposit" value={String(account.initial_deposit)} onChange={(v) => setAccount({ ...account, initial_deposit: Number(v.replace(/\D/g, '')) || 0 })} />
-              <Field label="Introducer code (optional)" value={account.introducer_code} onChange={(v) => setAccount({ ...account, introducer_code: v })} testId="open-introducer-code" />
-              <Field label="Introducer name (optional)" value={account.introducer_name} onChange={(v) => setAccount({ ...account, introducer_name: v })} testId="open-introducer-name" />
             </div>
+            <button type="button" onClick={() => setShowMoreDetails((v) => !v)} data-testid="open-account-more-details"
+              className="text-[11px] font-semibold text-[#0b3b8c] hover:underline">
+              {showMoreDetails ? 'Hide introducer details' : 'Show more — introducer (optional)'}
+            </button>
+            {showMoreDetails && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Introducer code (optional)" value={account.introducer_code} onChange={(v) => setAccount({ ...account, introducer_code: v })} testId="open-introducer-code" />
+                <Field label="Introducer name (optional)" value={account.introducer_name} onChange={(v) => setAccount({ ...account, introducer_name: v })} testId="open-introducer-name" />
+              </div>
+            )}
           </div>
         </Modal>
       )}

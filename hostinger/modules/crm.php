@@ -267,7 +267,8 @@ function route_crm_lead_update(array $d, string $id = ''): void
 // required to hold it, often no longer shows a legible address.
 const LEAD_FILE_IDENTITY = ['pan', 'aadhaar'];
 const LEAD_FILE_ADDRESS = 'address';
-const DOC_KIND_LABEL = ['pan' => 'PAN card', 'aadhaar' => 'Aadhaar', 'address' => 'Proof of address'];
+const DOC_KIND_LABEL = ['pan' => 'PAN card', 'aadhaar' => 'Aadhaar', 'address' => 'Proof of address',
+    'photo' => 'Member photo', 'signature' => 'Member signature'];
 
 function lead_file_status(string $leadId): array
 {
