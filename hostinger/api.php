@@ -6,10 +6,14 @@
 declare(strict_types=1);
 
 require __DIR__ . '/db.php';
+// staff.php must load before banking.php: banking.php's COUNTER_DEPOSIT_ROLES
+// const is built from staff.php's ADMIN_ROLES at file-load time, and a
+// top-level const referencing an undefined constant is a fatal error, not a
+// deferred lookup -- so the file that defines it has to load first.
+require __DIR__ . '/modules/staff.php';
 require __DIR__ . '/modules/banking.php';
 require __DIR__ . '/modules/statements.php';
 require __DIR__ . '/modules/security.php';
-require __DIR__ . '/modules/staff.php';
 require __DIR__ . '/modules/master.php';
 require __DIR__ . '/modules/parameters.php';
 require __DIR__ . '/modules/defence.php';
