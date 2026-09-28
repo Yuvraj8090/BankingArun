@@ -88,7 +88,9 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
 
   const continueToAccount = () => {
     if (!registered?.token) return;
-    localStorage.setItem('banking_token', registered.token);
+    // The server already set the session cookie in the self-register response;
+    // the reload below picks the session back up from that, not from anything
+    // stored here (see AuthContext.checkAuth).
     window.location.href = '/';
   };
 
@@ -114,7 +116,9 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
         }
       };
       const r = await api.passkeyLoginComplete(payload);
-      if (r.token) { localStorage.setItem('banking_token', r.token); window.location.reload(); }
+      // Same as above: the reload restores the session from the cookie the
+      // server just set, not from client-side storage.
+      if (r.token) { window.location.reload(); }
     } catch (e) {
       toast.error(e.response?.data?.detail || e.message || 'Passkey login failed');
     } finally { setLoading(false); }

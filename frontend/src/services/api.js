@@ -3,11 +3,19 @@ import axios from 'axios';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
 
+// The real session lives in the httpOnly cookie the server sets on login —
+// this in-memory copy exists only so a request can also carry it as a Bearer
+// header (needed when frontend and backend are on different origins, e.g.
+// local development). It is never persisted to localStorage/sessionStorage:
+// anything written there is readable by any script on the page, which would
+// let a single XSS bug hand over a live banking session.
+let authToken = null;
+export const setAuthToken = (token) => { authToken = token || null; };
+
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('banking_token');
   return {
     headers: {
-      Authorization: token ? `Bearer ${token}` : '',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       'Content-Type': 'application/json'
     },
     withCredentials: true

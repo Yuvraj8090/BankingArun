@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { setAuthToken } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -9,24 +10,18 @@ export const AuthProvider = ({ children }) => {
   // and route guard hide anything not in this list.
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('banking_token') || null);
+  const [token, setToken] = useState(null);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
   const API = `${BACKEND_URL}/api`;
 
   useEffect(() => {
+    // The session itself lives in the httpOnly cookie the server set on
+    // login, so a reload restores it from there — no token needs to sit in
+    // browser storage for this to work. (See services/api.js for why.)
     const checkAuth = async () => {
-      const savedToken = localStorage.getItem('banking_token');
-      if (!savedToken) {
-        setUser(false);
-        setLoading(false);
-        return;
-      }
       try {
-        const res = await axios.get(`${API}/auth/me`, {
-          headers: { Authorization: `Bearer ${savedToken}` },
-          withCredentials: true
-        });
+        const res = await axios.get(`${API}/auth/me`, { withCredentials: true });
         if (res.data?.user) {
           setUser(res.data.user);
           if (Array.isArray(res.data.features)) setFeatures(res.data.features);
@@ -34,7 +29,6 @@ export const AuthProvider = ({ children }) => {
           setUser(false);
         }
       } catch (err) {
-        localStorage.removeItem('banking_token');
         setUser(false);
       } finally {
         setLoading(false);
@@ -52,7 +46,7 @@ export const AuthProvider = ({ children }) => {
     }, { withCredentials: true });
 
     if (res.data?.token) {
-      localStorage.setItem('banking_token', res.data.token);
+      setAuthToken(res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
       if (Array.isArray(res.data.features)) setFeatures(res.data.features);
@@ -63,7 +57,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (formData) => {
     const res = await axios.post(`${API}/auth/register`, formData, { withCredentials: true });
     if (res.data?.token) {
-      localStorage.setItem('banking_token', res.data.token);
+      setAuthToken(res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
       if (Array.isArray(res.data.features)) setFeatures(res.data.features);
@@ -73,16 +67,14 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      if (token) {
-        await axios.post(`${API}/auth/logout`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true
-        });
-      }
+      await axios.post(`${API}/auth/logout`, {}, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        withCredentials: true
+      });
     } catch (e) {
       // ignore
     } finally {
-      localStorage.removeItem('banking_token');
+      setAuthToken(null);
       setToken(null);
       setUser(false);
     }

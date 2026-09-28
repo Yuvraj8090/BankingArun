@@ -22,6 +22,7 @@ export default function Dashboard({ onNavigate }) {
   const [showQuickTransfer, setShowQuickTransfer] = useState(false);
   const [quickAmount, setQuickAmount] = useState('');
   const [quickBeneficiary, setQuickBeneficiary] = useState('');
+  const [quickAccountNumber, setQuickAccountNumber] = useState('');
   const [quickTxnPwd, setQuickTxnPwd] = useState('');
   const [transferring, setTransferring] = useState(false);
 
@@ -48,7 +49,7 @@ export default function Dashboard({ onNavigate }) {
 
   const handleQuickTransfer = async (e) => {
     e.preventDefault();
-    if (!quickBeneficiary || !quickAmount || !quickTxnPwd || !selectedAcc) {
+    if (!quickBeneficiary || !quickAccountNumber || !quickAmount || !quickTxnPwd || !selectedAcc) {
       toast.error("Please fill all transfer fields");
       return;
     }
@@ -56,7 +57,7 @@ export default function Dashboard({ onNavigate }) {
     try {
       const res = await api.transferFunds({
         from_account_number: selectedAcc.account_number,
-        to_account_number: "AJSP0" + Math.floor(100000000 + Math.random() * 900000000),
+        to_account_number: quickAccountNumber.trim(),
         beneficiary_name: quickBeneficiary,
         transfer_type: "IMPS",
         amount: parseFloat(quickAmount),
@@ -67,6 +68,7 @@ export default function Dashboard({ onNavigate }) {
       setShowQuickTransfer(false);
       setQuickAmount('');
       setQuickBeneficiary('');
+      setQuickAccountNumber('');
       setQuickTxnPwd('');
       fetchDashboardData();
     } catch (err) {
@@ -355,6 +357,19 @@ export default function Dashboard({ onNavigate }) {
                   value={quickBeneficiary}
                   onChange={(e) => setQuickBeneficiary(e.target.value)}
                   placeholder="e.g. Ramesh Patel"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Beneficiary Account Number</label>
+                <input
+                  data-testid="quick-account-input"
+                  type="text"
+                  required
+                  value={quickAccountNumber}
+                  onChange={(e) => setQuickAccountNumber(e.target.value)}
+                  placeholder="e.g. AJSP0123456789"
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
                 />
               </div>
