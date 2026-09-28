@@ -135,36 +135,63 @@ function route_book_deposit(array $d): void
     // member must hold at least ten equity shares. This is the check that makes
     // the member register more than a list.
     require_membership($user);
-    $type = ($d['deposit_type'] ?? 'fixed') === 'recurring' ? 'recurring' : 'fixed';
-    $tenure = (int)($d['tenure_months'] ?? 12);
-    if ($tenure < 1 || $tenure > 120) {
-        fail(422, 'Tenure must be between 1 and 120 months.');
+
+    // A plan code (e.g. the Monthly Income Scheme) prices the deposit from the
+    // published scheme's own slabs instead of the generic tenure tiers below --
+    // same booking, same locking, same nominee field, just priced differently.
+    $planCode = strtoupper(clip($d['scheme_code'] ?? '', 20));
+    if ($planCode !== '') {
+        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active' AND deleted_at IS NULL",
+            [$planCode]);
+        if (!$scheme) {
+            fail(422, 'That plan is not one of our current schemes.');
+        }
+        $terms = scheme_deposit_terms($scheme, $amount);
+        $type = $terms['deposit_type'];
+        $tenure = $terms['tenure_months'];
+        $rate = $terms['interest_rate'];
+        $maturity = $terms['maturity_amount'];
+        $interestPayout = $terms['interest_payout'];
+        $dueToday = $terms['due_today'];
+        $principal = $terms['total_deposit'];
+    } else {
+        $type = ($d['deposit_type'] ?? 'fixed') === 'recurring' ? 'recurring' : 'fixed';
+        $tenure = (int)($d['tenure_months'] ?? 12);
+        if ($tenure < 1 || $tenure > 120) {
+            fail(422, 'Tenure must be between 1 and 120 months.');
+        }
+        $rate = deposit_tier_rate($tenure);
+        $maturity = round($amount * (1 + $rate / 400) ** (4 * $tenure / 12), 2);
+        $interestPayout = clip($d['interest_payout'] ?? '', 20) ?: 'on_maturity';
+        $dueToday = $amount;
+        $principal = $amount;
     }
-    $rate = deposit_tier_rate($tenure);
-    $maturity = round($amount * (1 + $rate / 400) ** (4 * $tenure / 12), 2);
 
     $pdo->beginTransaction();
-    [$account, $newBalance] = debit_account($user, $d['account_number'], $amount,
+    [$account, $newBalance] = debit_account($user, $d['account_number'], $dueToday,
         'Insufficient funds in selected savings account.');
     $number = 'DEP' . random_int(10000000, 99999999);
     $deposit = [
         'id' => uuid4(), 'user_id' => $user['id'], 'deposit_number' => $number, 'deposit_type' => $type,
-        'source_account' => $account['account_number'], 'principal_amount' => $amount, 'interest_rate' => $rate,
-        'tenure_months' => $tenure, 'interest_payout' => clip($d['interest_payout'] ?? '', 20) ?: 'on_maturity',
+        'scheme_code' => $planCode !== '' ? $planCode : null,
+        'source_account' => $account['account_number'], 'principal_amount' => $principal, 'interest_rate' => $rate,
+        'tenure_months' => $tenure, 'interest_payout' => $interestPayout,
         'maturity_amount' => $maturity,
         'maturity_date' => (new DateTimeImmutable('today', new DateTimeZone(IST)))
             ->modify('+' . (int)($tenure * 30.4) . ' days')->format('Y-m-d'),
         'nominee_name' => clip($d['nominee_name'] ?? '', 150) ?: ($user['nominee_name'] ?? 'Registered Nominee'),
         'status' => 'active', 'created_at' => now_utc(),
     ];
-    $pdo->prepare('INSERT INTO deposits (id, user_id, deposit_number, deposit_type, source_account, principal_amount,
-            interest_rate, tenure_months, interest_payout, maturity_amount, maturity_date, nominee_name, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute(array_values($deposit));
+    $pdo->prepare('INSERT INTO deposits (id, user_id, deposit_number, deposit_type, scheme_code, source_account,
+            principal_amount, interest_rate, tenure_months, interest_payout, maturity_amount, maturity_date,
+            nominee_name, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute(array_values($deposit));
     insert_txn(['user_id' => $user['id'], 'account_number' => $account['account_number'], 'type' => 'debit',
-        'mode' => 'DEPOSIT_BOOKING', 'amount' => $amount, 'balance_after' => $newBalance,
-        'counterparty_name' => 'AJSPay Term Deposit', 'counterparty_acc' => $number, 'ref_number' => $number,
-        'description' => ucfirst($type) . " deposit #$number booked"]);
-    audit($user, 'DEPOSIT_BOOKED', "$number " . rupees($amount));
+        'mode' => 'DEPOSIT_BOOKING', 'amount' => $dueToday, 'balance_after' => $newBalance,
+        'counterparty_name' => $planCode !== '' ? $terms['scheme_name'] : 'AJSPay Term Deposit',
+        'counterparty_acc' => $number, 'ref_number' => $number,
+        'description' => ($planCode !== '' ? $terms['scheme_name'] : ucfirst($type) . ' deposit') . " #$number booked"]);
+    audit($user, 'DEPOSIT_BOOKED', "$number " . rupees($dueToday));
     $pdo->commit();
     respond(['status' => 'SUCCESS',
         'message' => strtoupper($type) . " #$number booked successfully! Maturity value: " . rupees($maturity),
@@ -505,6 +532,54 @@ function referral_chain(string $userId): array
         $frontier = $next;
     }
     return $levels;
+}
+
+// Who, not just how many: every member below this one, with the referrer they
+// actually joined under, so a member's downline can be drawn as a tree instead
+// of the flat per-level counts referral_chain() gives. Same walk, same
+// cycle-guard, one level at a time.
+function referral_tree(string $userId, int $maxDepth = 8): array
+{
+    $seen = [$userId => true];
+    $frontier = [$userId];
+    $nodes = [];
+    for ($level = 1; $level <= $maxDepth && $frontier !== []; $level++) {
+        $in = implode(',', array_fill(0, count($frontier), '?'));
+        $next = [];
+        foreach (rows("SELECT r.referrer_id, r.referee_id, COALESCE(u.name, r.referee_name) AS name, r.created_at
+                FROM referrals r LEFT JOIN users u ON u.id = r.referee_id
+                WHERE r.referrer_id IN ($in) ORDER BY r.created_at", $frontier) as $r) {
+            if (isset($seen[$r['referee_id']])) {
+                continue;
+            }
+            $seen[$r['referee_id']] = true;
+            $nodes[] = ['id' => $r['referee_id'], 'parent_id' => $r['referrer_id'],
+                'name' => $r['name'] ?: 'Member', 'level' => $level, 'joined_at' => $r['created_at']];
+            $next[] = $r['referee_id'];
+        }
+        $frontier = $next;
+    }
+    return $nodes;
+}
+
+function route_referral_tree(array $d): void
+{
+    $user = current_user();
+    $nodes = referral_tree($user['id']);
+    // Direct-referral counts for the root and every node, so the page can show
+    // "2 members joined" at each name without a query per node.
+    $ids = array_merge([$user['id']], array_column($nodes, 'id'));
+    $counts = [];
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    foreach (rows("SELECT referrer_id, COUNT(*) AS n FROM referrals WHERE referrer_id IN ($in)
+            GROUP BY referrer_id", $ids) as $r) {
+        $counts[$r['referrer_id']] = (int)$r['n'];
+    }
+    respond([
+        'root' => ['id' => $user['id'], 'name' => $user['name'], 'direct_count' => $counts[$user['id']] ?? 0],
+        'nodes' => array_map(fn($n) => $n + ['direct_count' => $counts[$n['id']] ?? 0], $nodes),
+        'total_members' => count($nodes),
+    ]);
 }
 
 // What the printed table would pay on one plan at one denomination. Nothing is

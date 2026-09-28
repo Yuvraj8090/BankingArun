@@ -200,6 +200,126 @@ function BrochureStructure() {
   );
 }
 
+// A member-by-member view of who joined under whom, multiple levels deep --
+// unlike the flat "Level 1: N members" pills above, this shows the actual
+// names and how they connect, as an org-chart: circular nodes joined by
+// connector lines, shaded darker at the root and lighter with each level.
+// Visualisation only: no reward or commission is attached to it (see
+// route_referral_structure's notice on why not).
+function buildNetworkTree(root, nodes) {
+  const byParent = {};
+  nodes.forEach((n) => {
+    (byParent[n.parent_id] = byParent[n.parent_id] || []).push(n);
+  });
+  const attach = (node) => ({ ...node, children: (byParent[node.id] || []).map(attach) });
+  return attach(root);
+}
+
+const NODE_D = 44;
+const NODE_R = NODE_D / 2;
+const UNIT_W = 96;
+const LEVEL_H = 96;
+const LABEL_W = 92;
+const DEPTH_COLORS = ['#0b3b8c', '#1e56b3', '#2f6fd8', '#4a8ef0', '#7db3f7', '#a8cdfa'];
+const depthColor = (d) => DEPTH_COLORS[Math.min(d, DEPTH_COLORS.length - 1)];
+
+// Assigns each node an x slot (in leaf-width units, post-order) and a depth,
+// centering every parent over the midpoint of its own children -- the
+// standard tidy-tree layout, kept deliberately simple since a referral tree
+// here is small enough that it doesn't need collision-avoidance.
+function layoutTree(root) {
+  let cursor = 0;
+  const placed = [];
+  let maxDepth = 0;
+  const visit = (node, depth) => {
+    maxDepth = Math.max(maxDepth, depth);
+    if (!node.children || node.children.length === 0) {
+      const x = cursor;
+      cursor += 1;
+      placed.push({ node, depth, x });
+      return x;
+    }
+    const xs = node.children.map((c) => visit(c, depth + 1));
+    const x = (xs[0] + xs[xs.length - 1]) / 2;
+    placed.push({ node, depth, x });
+    return x;
+  };
+  visit(root, 0);
+  return { placed, leafCount: cursor, maxDepth };
+}
+
+function NetworkTree() {
+  const [tree, setTree] = useState(null);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    api.referralTree()
+      .then((data) => {
+        setTree(buildNetworkTree({ id: data.root.id, name: 'You', direct_count: data.root.direct_count }, data.nodes || []));
+        setTotal(data.total_members || 0);
+      })
+      .catch(() => setTree(null));
+  }, []);
+
+  if (!tree) return null;
+  const hasNetwork = tree.children?.length > 0;
+  const { placed, leafCount, maxDepth } = hasNetwork ? layoutTree(tree) : { placed: [], leafCount: 1, maxDepth: 0 };
+  const width = Math.max(leafCount, 1) * UNIT_W;
+  const height = (maxDepth + 1) * LEVEL_H + 30;
+  const byId = Object.fromEntries(placed.map((p) => [p.node.id, p]));
+  const px = (p) => p.x * UNIT_W + UNIT_W / 2;
+  const py = (p) => p.depth * LEVEL_H + NODE_R + 10;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-5" data-testid="referral-network-tree">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+          <Users className="w-4 h-4 text-[#0b3b8c]" /> Your Network
+        </h2>
+        <span className="text-[11px] text-slate-500">{total} member{total === 1 ? '' : 's'} in your tree</span>
+      </div>
+      {hasNetwork ? (
+        <div className="overflow-x-auto">
+          <div className="relative mx-auto" style={{ width, height }}>
+            <svg className="absolute inset-0" width={width} height={height}>
+              {placed.filter((p) => p.node.parent_id).map((p) => {
+                const parent = byId[p.node.parent_id];
+                if (!parent) return null;
+                const x1 = px(parent), y1 = py(parent) + NODE_R;
+                const x2 = px(p), y2 = py(p) - NODE_R;
+                const midY = (y1 + y2) / 2;
+                return (
+                  <path key={p.node.id} d={`M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`}
+                    fill="none" stroke="#cbd5e1" strokeWidth={2} />
+                );
+              })}
+            </svg>
+            {placed.map((p) => (
+              <div key={p.node.id} className="absolute flex flex-col items-center"
+                style={{ left: px(p) - LABEL_W / 2, top: py(p) - NODE_R, width: LABEL_W }}>
+                <div className="rounded-full flex items-center justify-center text-white shadow-md ring-2 ring-white"
+                  style={{ width: NODE_D, height: NODE_D, background: depthColor(p.depth) }}>
+                  <Users className="w-5 h-5" />
+                </div>
+                <div className="mt-1.5 text-center">
+                  <p className="text-[11px] font-semibold text-slate-900 truncate" style={{ maxWidth: LABEL_W }}>{p.node.name}</p>
+                  {!!p.node.direct_count && (
+                    <span className="inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                      {p.node.direct_count} joined
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">No one has joined under you yet — share your link to start your tree.</p>
+      )}
+    </div>
+  );
+}
+
 export default function ReferralPage() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState({ referrals: [], total_earned: 0, count: 0 });
@@ -387,6 +507,8 @@ export default function ReferralPage() {
           )}
         </div>
       </div>
+
+      <NetworkTree />
 
       {standing && (
         <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-5" data-testid="referral-standing">

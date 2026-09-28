@@ -22,6 +22,11 @@ export default function DepositsInvestmentsPage() {
   const [fdNominee, setFdNominee] = useState('Registered Nominee');
   const [selectedAcc, setSelectedAcc] = useState('');
   const [booking, setBooking] = useState(false);
+  // Monthly Income Scheme: a published plan, priced by its own printed slabs
+  // rather than the generic tenure tiers, so it books against a fixed
+  // denomination instead of a freeform amount.
+  const [misScheme, setMisScheme] = useState(null);
+  const [misUnit, setMisUnit] = useState('');
   // Which of the three things this page offers are actually authorised.
   const { features } = useAuth();
   const canInvest = !!features?.includes('mutual_funds');
@@ -39,6 +44,17 @@ export default function DepositsInvestmentsPage() {
         toast.error('Could not load your accounts');
         return;
       }
+      try {
+        const schemeRes = await api.publicSchemes();
+        const mis = (schemeRes.schemes || []).find(s => s.scheme_type === 'mis');
+        if (mis) {
+          setMisScheme(mis);
+          setMisUnit(String(mis.slabs?.[0]?.unit || ''));
+        }
+      } catch (err) {
+        // The plan-priced schemes are a bonus on this page, not the page's
+        // reason to exist — fixed/recurring booking still works without it.
+      }
       // Mutual funds need a SEBI/AMFI registration. When that capability is off
       // the endpoints refuse, which is correct — so don't call them, and don't
       // report a refusal as a failure.
@@ -54,8 +70,19 @@ export default function DepositsInvestmentsPage() {
     init();
   }, [canInvest]);
 
+  const misSlab = fdType === 'mis' ? (misScheme?.slabs || []).find(s => String(s.unit) === String(misUnit)) : null;
+
   // FD Maturity Calculator formula: A = P(1 + r/4)^(4*t)
   const calculateMaturity = () => {
+    if (fdType === 'mis') {
+      if (!misSlab) return { rate: 0, interest: 0, total: 0, monthlyPayout: 0 };
+      return {
+        rate: misSlab.effective_rate_pa ?? 0,
+        interest: Math.round(misSlab.maturity - misSlab.deposit),
+        total: Math.round(misSlab.maturity),
+        monthlyPayout: misSlab.monthly_payout ?? 0,
+      };
+    }
     const rate = fdTenure < 12 ? 6.50 : fdTenure <= 24 ? 7.25 : fdTenure <= 36 ? 7.50 : 7.10;
     const p = parseFloat(fdAmount) || 0;
     const t = fdTenure / 12.0;
@@ -72,19 +99,32 @@ export default function DepositsInvestmentsPage() {
 
   const handleBookDeposit = async (e) => {
     e.preventDefault();
-    if (!fdAmount || fdAmount < 5000 || !selectedAcc) {
+    if (!selectedAcc) {
+      toast.error("Select an account to debit");
+      return;
+    }
+    if (fdType === 'mis') {
+      if (!misScheme || !misSlab) {
+        toast.error("Choose an MIS amount");
+        return;
+      }
+    } else if (!fdAmount || fdAmount < 5000) {
       toast.error("Minimum deposit amount is ₹5,000");
       return;
     }
     setBooking(true);
     try {
-      const res = await api.bookDeposit({
-        account_number: selectedAcc,
-        deposit_type: fdType,
-        amount: parseFloat(fdAmount),
-        tenure_months: parseInt(fdTenure),
-        nominee_name: fdNominee
-      });
+      const res = await api.bookDeposit(
+        fdType === 'mis'
+          ? { account_number: selectedAcc, scheme_code: misScheme.code, amount: misSlab.unit, nominee_name: fdNominee }
+          : {
+              account_number: selectedAcc,
+              deposit_type: fdType,
+              amount: parseFloat(fdAmount),
+              tenure_months: parseInt(fdTenure),
+              nominee_name: fdNominee
+            }
+      );
       toast.success(res.message);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Booking failed");
@@ -199,42 +239,61 @@ export default function DepositsInvestmentsPage() {
                   >
                     <option value="fixed">Fixed Deposit (Lumpsum Principal)</option>
                     <option value="recurring">Recurring Deposit (Monthly Installment)</option>
+                    {misScheme && <option value="mis">Monthly Income Scheme ({misScheme.name})</option>}
                   </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {fdType === 'mis' ? (
                 <div>
-                  <label className="block text-slate-500 mb-1">Deposit Principal Amount (₹)</label>
-                  <input
-                    data-testid="fd-amount-input"
-                    type="number"
-                    min="5000"
-                    step="1000"
-                    required
-                    value={fdAmount}
-                    onChange={(e) => setFdAmount(e.target.value)}
-                    placeholder="e.g. 50000"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-500 mb-1">Tenure (Months)</label>
+                  <label className="block text-slate-500 mb-1">Amount to Lock (₹)</label>
                   <select
-                    data-testid="fd-tenure-select"
-                    value={fdTenure}
-                    onChange={(e) => setFdTenure(e.target.value)}
+                    data-testid="mis-unit-select"
+                    value={misUnit}
+                    onChange={(e) => setMisUnit(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
                   >
-                    <option value={6}>6 Months (6.50% p.a.)</option>
-                    <option value={12}>12 Months / 1 Year (7.25% p.a.)</option>
-                    <option value={24}>24 Months / 2 Years (7.25% p.a.)</option>
-                    <option value={36}>36 Months / 3 Years (7.50% p.a.)</option>
-                    <option value={60}>60 Months / 5 Years (7.10% Tax Saver)</option>
+                    {(misScheme?.slabs || []).map(sl => (
+                      <option key={sl.unit} value={sl.unit}>
+                        ₹{sl.unit.toLocaleString('en-IN')} → ₹{sl.monthly_payout?.toLocaleString('en-IN')}/month for {misScheme.tenure_months} months
+                      </option>
+                    ))}
                   </select>
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-500 mb-1">Deposit Principal Amount (₹)</label>
+                    <input
+                      data-testid="fd-amount-input"
+                      type="number"
+                      min="5000"
+                      step="1000"
+                      required
+                      value={fdAmount}
+                      onChange={(e) => setFdAmount(e.target.value)}
+                      placeholder="e.g. 50000"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-500 mb-1">Tenure (Months)</label>
+                    <select
+                      data-testid="fd-tenure-select"
+                      value={fdTenure}
+                      onChange={(e) => setFdTenure(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
+                    >
+                      <option value={6}>6 Months (6.50% p.a.)</option>
+                      <option value={12}>12 Months / 1 Year (7.25% p.a.)</option>
+                      <option value={24}>24 Months / 2 Years (7.25% p.a.)</option>
+                      <option value={36}>36 Months / 3 Years (7.50% p.a.)</option>
+                      <option value={60}>60 Months / 5 Years (7.10% Tax Saver)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-slate-500 mb-1">Nominee Details</label>
@@ -253,7 +312,11 @@ export default function DepositsInvestmentsPage() {
                 disabled={booking}
                 className={`w-full py-3 rounded-xl ${currentTheme.buttonTheme} font-bold text-sm shadow-xl`}
               >
-                {booking ? 'Issuing Deposit Certificate...' : `Instantly Book ${fdType.toUpperCase()} for ₹${parseFloat(fdAmount || 0).toLocaleString('en-IN')}`}
+                {booking
+                  ? 'Issuing Deposit Certificate...'
+                  : fdType === 'mis'
+                    ? `Instantly Book MIS for ₹${(misSlab?.unit || 0).toLocaleString('en-IN')}`
+                    : `Instantly Book ${fdType.toUpperCase()} for ₹${parseFloat(fdAmount || 0).toLocaleString('en-IN')}`}
               </button>
             </form>
           </div>
@@ -267,19 +330,28 @@ export default function DepositsInvestmentsPage() {
 
             <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
               <div className="flex justify-between text-slate-500">
-                <span>Principal Invested:</span>
-                <span className="font-semibold text-slate-900">₹{parseFloat(fdAmount || 0).toLocaleString('en-IN')}</span>
+                <span>Principal Locked:</span>
+                <span className="font-semibold text-slate-900">
+                  ₹{(fdType === 'mis' ? (misSlab?.unit || 0) : parseFloat(fdAmount || 0)).toLocaleString('en-IN')}
+                </span>
               </div>
               <div className="flex justify-between text-slate-500">
                 <span>Interest Rate:</span>
                 <span className="font-bold text-[#0b3b8c]">{maturityCalc.rate}% p.a.</span>
               </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Estimated Interest:</span>
-                <span className="font-semibold text-emerald-700">+ ₹{maturityCalc.interest.toLocaleString('en-IN')}</span>
-              </div>
+              {fdType === 'mis' ? (
+                <div className="flex justify-between text-slate-500">
+                  <span>Monthly Payout:</span>
+                  <span className="font-semibold text-emerald-700">₹{(maturityCalc.monthlyPayout || 0).toLocaleString('en-IN')}/mo</span>
+                </div>
+              ) : (
+                <div className="flex justify-between text-slate-500">
+                  <span>Estimated Interest:</span>
+                  <span className="font-semibold text-emerald-700">+ ₹{maturityCalc.interest.toLocaleString('en-IN')}</span>
+                </div>
+              )}
               <div className="pt-2 border-t border-slate-200 flex justify-between text-sm">
-                <span className="font-bold text-slate-900">Maturity Value:</span>
+                <span className="font-bold text-slate-900">{fdType === 'mis' ? 'Total Received Over Term:' : 'Maturity Value:'}</span>
                 <span data-testid="fd-maturity-value" className="font-extrabold text-emerald-700">
                   ₹{maturityCalc.total.toLocaleString('en-IN')}
                 </span>

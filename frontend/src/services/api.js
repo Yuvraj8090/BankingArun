@@ -159,6 +159,8 @@ export const api = {
   // route_referral_structure for why.
   referralStructure: async (params = {}) =>
     (await axios.get(`${API}/referrals/structure?${new URLSearchParams(params)}`, getAuthHeaders())).data,
+  // Who joined under whom, multiple levels deep — for the network tree view.
+  referralTree: async () => (await axios.get(`${API}/referrals/tree`, getAuthHeaders())).data,
 
   // Standing Instructions
   siList: async () => (await axios.get(`${API}/standing-instructions`, getAuthHeaders())).data,

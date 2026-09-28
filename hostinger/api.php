@@ -553,6 +553,8 @@ function route_register(array $d): void
     $branch = clip($d['branch'] ?? 'AJSP-MUM-042 (Nariman Point Main)', 100);
     $isJoint = !empty($d['is_joint']);
     $nominee = clip($d['nominee_name'] ?? '', 150);
+    $introducerCode = clip($d['introducer_code'] ?? '', 30);
+    $introducerName = clip($d['introducer_name'] ?? '', 150);
     $userId = uuid4();
     $accountNumber = 'AJSP0' . digits(9);
 
@@ -595,8 +597,9 @@ function route_register(array $d): void
 
     $pdo->beginTransaction();
     $pdo->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash,
-            branch, pan_number, aadhaar_number, kyc_status, is_joint, joint_holder_name, nominee_name, nominee_relation)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            branch, pan_number, aadhaar_number, kyc_status, is_joint, joint_holder_name, nominee_name, nominee_relation,
+            introducer_code, introducer_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([
             $userId, $name, $email === '' ? null : $email, clip($d['phone'], 30), 'retail',
             password_hash($d['password'], PASSWORD_BCRYPT), password_hash($d['transaction_password'], PASSWORD_BCRYPT),
@@ -606,6 +609,7 @@ function route_register(array $d): void
             // the same review a second time for the same papers.
             $file === null ? 'pending_approval' : 'verified', (int)$isJoint, $isJoint ? clip($d['joint_holder_name'] ?? '', 150) : null,
             $nominee === '' ? null : $nominee, $nominee === '' ? null : clip($d['nominee_relation'] ?? '', 50),
+            $introducerCode === '' ? null : $introducerCode, $introducerName === '' ? null : $introducerName,
         ]);
     $pdo->prepare('INSERT INTO accounts (id, user_id, account_number, account_type, account_name, balance, upi_id,
             branch, is_joint)
@@ -1340,6 +1344,7 @@ $routes = [
     'GET /referrals/my-code' => 'route_referral_code',
     'GET /referrals/history' => 'route_referral_history',
     'GET /referrals/structure' => 'route_referral_structure',
+    'GET /referrals/tree' => 'route_referral_tree',
     'GET /rank-tiers' => 'route_rank_tiers',
     'POST /rank-tiers' => 'route_rank_tier_create',
     'GET /admin/automation' => 'route_automation_status',
