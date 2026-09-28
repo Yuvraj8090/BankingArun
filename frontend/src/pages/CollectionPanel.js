@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Wallet, AlertTriangle, Bell, FileWarning, Handshake, Phone, RefreshCw, TrendingUp, Target } from 'lucide-react';
 import { api } from '../services/api';
+import Pagination from '../components/Pagination';
 import { toast } from 'sonner';
 
 const STATUS_STYLE = {
@@ -13,8 +14,11 @@ const STATUS_STYLE = {
 
 export default function CollectionPanel() {
   const [data, setData] = useState(null);
-  const load = () => api.getCollectionPanel().then(setData).catch(() => toast.error('Access denied'));
-  useEffect(() => { load(); }, []);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const load = useCallback(() => api.getCollectionPanel({ page, per_page: perPage })
+    .then(setData).catch(() => toast.error('Access denied')), [page, perPage]);
+  useEffect(() => { load(); }, [load]);
 
   const act = async (case_id, action, label) => {
     try {
@@ -103,6 +107,7 @@ export default function CollectionPanel() {
             </tbody>
           </table>
         </div>
+        <Pagination meta={data.pagination} onPage={setPage} onPerPage={(n) => { setPerPage(n); setPage(1); }} />
       </div>
     </div>
   );

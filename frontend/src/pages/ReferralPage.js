@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Gift, Share2, Copy, Users, Wallet, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info, Award } from 'lucide-react';
 import { api } from '../services/api';
 import BoosterCard from '../components/BoosterCard';
+import { inr } from '../utils/format';
 import { toast } from 'sonner';
-
-const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
 
 // The twelve-level table printed in the plan book, and what it would come to on
 // one plan at one amount. It is shown because members are asked about it and the

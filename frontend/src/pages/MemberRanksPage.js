@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Award, RefreshCw, Search, Info, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { api } from '../services/api';
+import { inr } from '../utils/format';
 import { toast } from 'sonner';
 
 // The colour carries no meaning beyond making the ladder readable at a glance;
@@ -281,12 +283,20 @@ export default function MemberRanksPage() {
   const canEdit = user?.role === 'bank_owner';
   const [data, setData] = useState(null);
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
 
+  // Ranking every member needs their whole referral chain, so the backend
+  // cannot answer this with a plain SQL LIMIT -- it still does the ranking
+  // in full, but only ships one page of the result (modules/master.php).
   const load = useCallback(async () => {
-    try { setData(await api.memberRanks()); }
+    try { setData(await api.memberRanks({ q: query.trim() || undefined, page, per_page: perPage })); }
     catch (e) { toast.error(e.response?.data?.detail || 'Could not load member standings'); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  }, [query, page, perPage]);
+  useEffect(() => { const t = setTimeout(load, query ? 300 : 0); return () => clearTimeout(t); }, [load, query]);
+  // A search that changes the result set belongs back on page 1, not wherever
+  // the previous search or listing happened to be scrolled to.
+  useEffect(() => { setPage(1); }, [query]);
 
   if (!data) {
     return <div className="p-10 flex items-center gap-2 text-slate-600">
@@ -294,12 +304,8 @@ export default function MemberRanksPage() {
     </div>;
   }
 
-  const q = query.trim().toLowerCase();
-  const shown = q
-    ? data.members.filter((m) => [m.name, m.email, m.phone, m.rank]
-        .some((v) => (v || '').toLowerCase().includes(q)))
-    : data.members;
-  const ranked = data.members.filter((m) => m.rank_level > 0).length;
+  const shown = data.members;
+  const ranked = data.total_members - data.unranked;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -311,7 +317,7 @@ export default function MemberRanksPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-900">Member Standings</h1>
             <p className="text-xs text-slate-500">
-              {ranked} of {data.members.length} members hold a standing
+              {ranked} of {data.total_members} members hold a standing
             </p>
           </div>
         </div>
@@ -402,12 +408,13 @@ export default function MemberRanksPage() {
               ))}
               {!shown.length && (
                 <tr><td colSpan={4} className="p-10 text-center text-slate-500">
-                  {data.members.length ? 'No member matches that search.' : 'No members yet.'}
+                  {data.total_members ? 'No member matches that search.' : 'No members yet.'}
                 </td></tr>
               )}
             </tbody>
           </table>
         </div>
+        <Pagination meta={data.pagination} onPage={setPage} onPerPage={(n) => { setPerPage(n); setPage(1); }} />
       </div>
     </div>
   );

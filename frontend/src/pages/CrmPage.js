@@ -7,6 +7,7 @@ import { api } from '../services/api';
 import Pagination from '../components/Pagination';
 import Modal, { PasswordGenField } from '../components/Modal';
 import DocumentUpload from '../components/DocumentUpload';
+import { inr } from '../utils/format';
 import { toast } from 'sonner';
 
 const TABS = [['members', 'Members'], ['leads', 'Leads'], ['tasks', 'My Tasks']];
@@ -471,8 +472,6 @@ function ApplicationFile({ leadId, onChange }) {
     </div>
   );
 }
-
-const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
 
 // Plan and denomination together, because on their own neither opens a deposit.
 // The figures shown are the brochure's own for that slab — the same ones the

@@ -100,6 +100,7 @@ export const api = {
   // Investments
   getInvestmentCatalog: async () => (await axios.get(`${API}/investments/catalog`, getAuthHeaders())).data,
   investMutualFund: async (payload) => (await axios.post(`${API}/investments/invest`, payload, getAuthHeaders())).data,
+  buyInsurance: async (payload) => (await axios.post(`${API}/investments/insure`, payload, getAuthHeaders())).data,
   getMyPortfolio: async () => (await axios.get(`${API}/investments/my-portfolio`, getAuthHeaders())).data,
 
   // Support & Branches
@@ -110,6 +111,7 @@ export const api = {
 
   // Admin / Compliance
   getAdminOverview: async () => (await axios.get(`${API}/admin/overview`, getAuthHeaders())).data,
+  adminKycPending: async (params = {}) => (await axios.get(`${API}/admin/kyc-pending`, { ...getAuthHeaders(), params })).data,
   adminKycAction: async (payload) => (await axios.post(`${API}/admin/kyc-action`, payload, getAuthHeaders())).data,
   // Approve KYC and, in the same step, fund + book a savings plan if one was picked.
   kycVerifyAndFund: async (payload) => (await axios.post(`${API}/admin/kyc-verify-and-fund`, payload, getAuthHeaders())).data,
@@ -122,7 +124,7 @@ export const api = {
   // Role Panels
   getBankOwnerPanel: async () => (await axios.get(`${API}/panel/bank-owner`, getAuthHeaders())).data,
   getStaffPanel: async () => (await axios.get(`${API}/panel/staff`, getAuthHeaders())).data,
-  getCollectionPanel: async () => (await axios.get(`${API}/panel/collection`, getAuthHeaders())).data,
+  getCollectionPanel: async (params = {}) => (await axios.get(`${API}/panel/collection`, { ...getAuthHeaders(), params })).data,
   collectionAction: async (payload) => (await axios.post(`${API}/panel/collection/action`, payload, getAuthHeaders())).data,
   getLoanDeptPanel: async () => (await axios.get(`${API}/panel/loan-dept`, getAuthHeaders())).data,
   loanDecision: async (payload) => (await axios.post(`${API}/panel/loan-dept/decision`, payload, getAuthHeaders())).data,
@@ -258,7 +260,7 @@ export const api = {
   rankTierUpdate: async (id, payload) =>
     (await axios.patch(`${API}/rank-tiers/${id}`, payload, getAuthHeaders())).data,
   rankTierDelete: async (id) => (await axios.delete(`${API}/rank-tiers/${id}`, getAuthHeaders())).data,
-  memberRanks: async () => (await axios.get(`${API}/member-ranks`, getAuthHeaders())).data,
+  memberRanks: async (params = {}) => (await axios.get(`${API}/member-ranks`, { ...getAuthHeaders(), params })).data,
   testSms: async (to) => (await axios.post(`${API}/admin/config/test-sms`, { to }, getAuthHeaders())).data,
   revokeSession: async (id) => (await axios.delete(`${API}/auth/sessions/${id}`, getAuthHeaders())).data,
   publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
@@ -270,7 +272,8 @@ export const api = {
   collectionCreate: async (payload) => (await axios.post(`${API}/collections`, payload, getAuthHeaders())).data,
 
   // AI module: fraud/AML, loan grading, collection anomalies
-  fraudQueue: async (status = 'open') => (await axios.get(`${API}/ai/fraud-queue?status=${status}`, getAuthHeaders())).data,
+  fraudQueue: async (status = 'open', params = {}) =>
+    (await axios.get(`${API}/ai/fraud-queue`, { ...getAuthHeaders(), params: { status, ...params } })).data,
   fraudAction: async (payload) => (await axios.post(`${API}/ai/fraud-action`, payload, getAuthHeaders())).data,
   loanRescore: async () => (await axios.post(`${API}/ai/loan-rescore`, {}, getAuthHeaders())).data,
   collectionAnomalies: async () => (await axios.get(`${API}/ai/collection-anomalies`, getAuthHeaders())).data,

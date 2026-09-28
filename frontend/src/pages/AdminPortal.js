@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   UserCheck, AlertTriangle, CheckCircle, XCircle, Download, RefreshCw,
   BarChart3, Database, Lock, Users, Wallet, ShieldCheck, FileText, Search,
@@ -7,6 +7,7 @@ import {
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal, { Field, inputClass, PasswordGenField } from '../components/Modal';
+import Pagination from '../components/Pagination';
 import { toast } from 'sonner';
 
 const ACCESS_ROLES = [
@@ -29,8 +30,6 @@ export default function AdminPortal() {
   const [rbiReports, setRbiReports] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [verifyingUser, setVerifyingUser] = useState(null);
   const canManageUsers = user?.role === 'bank_owner';
 
   const fetchAdminData = async () => {
@@ -48,19 +47,6 @@ export default function AdminPortal() {
   };
 
   useEffect(() => { fetchAdminData(); }, []);
-
-  const handleKycAction = async (userId, status) => {
-    try {
-      const res = await api.adminKycAction({
-        user_id: userId, status,
-        rejection_reason: status === 'rejected' ? 'Incomplete document signature' : null
-      });
-      toast.success(res.message);
-      fetchAdminData();
-    } catch {
-      toast.error("KYC decision failed");
-    }
-  };
 
   if (loading) {
     return (
@@ -183,53 +169,7 @@ export default function AdminPortal() {
       )}
 
       {/* KYC */}
-      {activeTab === 'kyc' && (
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Pending KYC Verification Desk</h2>
-            <div className="flex items-center gap-2 border border-slate-200 rounded px-2 h-8 w-full max-w-xs">
-              <Search className="w-3.5 h-3.5 text-slate-500" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)}
-                data-testid="admin-kyc-search"
-                className="flex-1 text-xs outline-none bg-transparent" placeholder="Search by name / PAN…" />
-            </div>
-          </div>
-
-          <div className="p-5">
-            {(!overview?.pending_kyc_users || overview.pending_kyc_users.length === 0) ? (
-              <p className="text-slate-500 text-xs py-10 text-center">No pending KYC submissions. All customer records are up to date.</p>
-            ) : (
-              <div className="space-y-3">
-                {overview.pending_kyc_users
-                  .filter(u => !search || (u.name + u.pan_number + u.email).toLowerCase().includes(search.toLowerCase()))
-                  .map(u => (
-                  <div key={u.id} className="p-4 rounded-md border border-slate-200 bg-white hover:border-[#0b3b8c] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
-                    <div>
-                      <h4 className="font-semibold text-slate-900 text-sm">{u.name}</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{u.email} · {u.phone}</p>
-                      <div className="flex flex-wrap gap-3 text-[11px] text-slate-600 mt-2">
-                        <span>PAN: <strong className="font-mono text-slate-800">{u.pan_number || 'N/A'}</strong></span>
-                        <span>Aadhaar: <strong className="font-mono text-slate-800">{u.aadhaar_number || 'N/A'}</strong></span>
-                        <span>Branch: {u.branch}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button data-testid={`approve-kyc-${u.id}`} onClick={() => setVerifyingUser(u)}
-                        className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5">
-                        <CheckCircle className="w-3.5 h-3.5" /> Approve
-                      </button>
-                      <button data-testid={`reject-kyc-${u.id}`} onClick={() => handleKycAction(u.id, 'rejected')}
-                        className="px-3 py-1.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {activeTab === 'kyc' && <PendingKycPanel onDecided={fetchAdminData} />}
 
       {/* RBI Reports */}
       {activeTab === 'rbi' && (
@@ -295,14 +235,6 @@ export default function AdminPortal() {
       )}
 
       {activeTab === 'users' && canManageUsers && <UserAccessPanel />}
-
-      {verifyingUser && (
-        <KycVerifyModal
-          customer={verifyingUser}
-          onClose={() => setVerifyingUser(null)}
-          onDone={() => { setVerifyingUser(null); fetchAdminData(); }}
-        />
-      )}
     </div>
   );
 }
@@ -441,10 +373,106 @@ function KycVerifyModal({ customer, onClose, onDone }) {
   );
 }
 
+// The tab's own paginated queue (GET /admin/kyc-pending), separate from the
+// capped preview route_admin_overview keeps for its dashboard widgets --
+// a queue staff work through end to end needs every row reachable, not
+// just the newest 20 (modules/staff.php).
+function PendingKycPanel({ onDecided }) {
+  const [data, setData] = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const [verifyingUser, setVerifyingUser] = useState(null);
+
+  const load = useCallback(async () => {
+    try { setData(await api.adminKycPending({ q: search.trim() || undefined, page, per_page: perPage })); }
+    catch { toast.error('Could not load the KYC queue'); }
+  }, [search, page, perPage]);
+  useEffect(() => { const t = setTimeout(load, search ? 300 : 0); return () => clearTimeout(t); }, [load, search]);
+  useEffect(() => { setPage(1); }, [search]);
+
+  const handleKycAction = async (userId, status) => {
+    try {
+      const res = await api.adminKycAction({
+        user_id: userId, status,
+        rejection_reason: status === 'rejected' ? 'Incomplete document signature' : null
+      });
+      toast.success(res.message);
+      load();
+      onDecided?.();
+    } catch {
+      toast.error("KYC decision failed");
+    }
+  };
+
+  const users = data?.users || [];
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+      <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-900">Pending KYC Verification Desk</h2>
+        <div className="flex items-center gap-2 border border-slate-200 rounded px-2 h-8 w-full max-w-xs">
+          <Search className="w-3.5 h-3.5 text-slate-500" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            data-testid="admin-kyc-search"
+            className="flex-1 text-xs outline-none bg-transparent" placeholder="Search by name / PAN…" />
+        </div>
+      </div>
+
+      <div className="p-5">
+        {!data ? (
+          <p className="text-slate-500 text-xs py-10 text-center">Loading…</p>
+        ) : users.length === 0 ? (
+          <p className="text-slate-500 text-xs py-10 text-center">
+            {search ? 'No pending KYC submissions match that search.'
+              : 'No pending KYC submissions. All customer records are up to date.'}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {users.map(u => (
+              <div key={u.id} className="p-4 rounded-md border border-slate-200 bg-white hover:border-[#0b3b8c] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+                <div>
+                  <h4 className="font-semibold text-slate-900 text-sm">{u.name}</h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{u.email} · {u.phone}</p>
+                  <div className="flex flex-wrap gap-3 text-[11px] text-slate-600 mt-2">
+                    <span>PAN: <strong className="font-mono text-slate-800">{u.pan_number || 'N/A'}</strong></span>
+                    <span>Aadhaar: <strong className="font-mono text-slate-800">{u.aadhaar_number || 'N/A'}</strong></span>
+                    <span>Branch: {u.branch}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button data-testid={`approve-kyc-${u.id}`} onClick={() => setVerifyingUser(u)}
+                    className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5">
+                    <CheckCircle className="w-3.5 h-3.5" /> Approve
+                  </button>
+                  <button data-testid={`reject-kyc-${u.id}`} onClick={() => handleKycAction(u.id, 'rejected')}
+                    className="px-3 py-1.5 rounded-md border border-[#c8102e] text-[#c8102e] hover:bg-[#c8102e] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                    <XCircle className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {data && <Pagination meta={data.pagination} onPage={setPage} onPerPage={(n) => { setPerPage(n); setPage(1); }} />}
+
+      {verifyingUser && (
+        <KycVerifyModal
+          customer={verifyingUser}
+          onClose={() => setVerifyingUser(null)}
+          onDone={() => { setVerifyingUser(null); load(); onDecided?.(); }}
+        />
+      )}
+    </div>
+  );
+}
+
 function UserAccessPanel() {
   const [data, setData] = useState(null);
   const [q, setQ] = useState('');
   const [role, setRole] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
   const [resetting, setResetting] = useState(null);
@@ -453,8 +481,14 @@ function UserAccessPanel() {
   const load = async (next = {}) => {
     const query = next.q ?? q;
     const selectedRole = next.role ?? role;
-    try { setData(await api.adminUsers({ q: query || undefined, role: selectedRole || undefined })); }
-    catch (e) { toast.error(e.response?.data?.detail || 'Could not load user access'); }
+    const nextPage = next.page ?? (('q' in next || 'role' in next) ? 1 : page);
+    const nextPerPage = next.per_page ?? perPage;
+    try {
+      setData(await api.adminUsers({ q: query || undefined, role: selectedRole || undefined,
+        page: nextPage, per_page: nextPerPage }));
+      setPage(nextPage);
+      setPerPage(nextPerPage);
+    } catch (e) { toast.error(e.response?.data?.detail || 'Could not load user access'); }
   };
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -530,6 +564,9 @@ function UserAccessPanel() {
           </table>
         </div>
       )}
+      {data && <Pagination meta={data.pagination}
+        onPage={(p) => load({ page: p })}
+        onPerPage={(n) => load({ page: 1, per_page: n })} />}
       {creating && <CreateUserModal onClose={() => setCreating(false)} onDone={(r) => {
         setCreating(false); setCreated(r); load();
       }} />}

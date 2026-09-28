@@ -65,13 +65,17 @@ function route_panel_staff(array $d): void
 function route_panel_collection(array $d): void
 {
     staff_user(['collection_agent', ...ADMIN_ROLES]);
-    $cases = out_all(rows('SELECT * FROM collection_cases ORDER BY dpd_days DESC'));
+    // The KPIs are over the whole book, not just the page shown below them --
+    // otherwise "Total Cases" would silently become "cases on this page".
+    [$cases, $meta] = paginate('SELECT * FROM collection_cases ORDER BY dpd_days DESC', [], 25, 100);
     respond([
-        'kpis' => ['total_cases' => count($cases),
-            'total_outstanding' => (float)array_sum(array_column($cases, 'outstanding')),
-            'npa_risk_count' => count(array_filter($cases, fn($c) => $c['status'] === 'npa_risk' || $c['dpd_days'] >= 90)),
+        'kpis' => ['total_cases' => (int)scalar('SELECT COUNT(*) FROM collection_cases'),
+            'total_outstanding' => (float)scalar('SELECT COALESCE(SUM(outstanding), 0) FROM collection_cases'),
+            'npa_risk_count' => (int)scalar("SELECT COUNT(*) FROM collection_cases
+                WHERE status = 'npa_risk' OR dpd_days >= 90"),
             'recovery_target_month' => 12500000, 'recovered_month' => 4820000],
-        'cases' => $cases,
+        'cases' => out_all($cases),
+        'pagination' => $meta,
     ]);
 }
 
@@ -156,10 +160,26 @@ function route_admin_overview(array $d): void
         ],
         'high_value_transactions' => out_all(rows('SELECT * FROM transactions WHERE amount >= 50000
             ORDER BY timestamp DESC, seq DESC LIMIT 10')),
-        'pending_kyc_users' => array_map('public_user',
-            rows("SELECT * FROM users WHERE kyc_status = 'pending_approval' ORDER BY created_at DESC LIMIT 20")),
         'audit_logs' => out_all(rows('SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 15')),
     ]);
+}
+
+// The Pending KYC tab's own list, paginated -- route_admin_overview's dashboard
+// widgets stay capped previews, but a queue staff work through needs every row
+// reachable, not just the newest 20.
+function route_admin_kyc_pending(array $d): void
+{
+    staff_user(ADMIN_ROLES);
+    $sql = "SELECT * FROM users WHERE kyc_status = 'pending_approval'";
+    $params = [];
+    if (!empty($_GET['q'])) {
+        $sql .= ' AND (name LIKE ? OR pan_number LIKE ? OR email LIKE ?)';
+        $like = '%' . clip($_GET['q'], 80) . '%';
+        array_push($params, $like, $like, $like);
+    }
+    $sql .= ' ORDER BY created_at DESC';
+    [$users, $meta] = paginate($sql, $params, 25, 100);
+    respond(['users' => array_map('public_user', $users), 'pagination' => $meta]);
 }
 
 function route_admin_kyc_action(array $d): void

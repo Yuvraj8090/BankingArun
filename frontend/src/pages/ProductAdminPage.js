@@ -74,6 +74,16 @@ function FactList({ values, onChange }) {
 
 // Every public product page, editable. A change here is live on the public site
 // as soon as it is saved.
+// Three sections instead of one long column: Basics is what most edits touch,
+// the other two grow without bound (a highlight/fact/document row at a time)
+// and would otherwise push Save further down every time a page picks up
+// another bullet point.
+const SECTIONS = [
+  { key: 'basics', label: 'Basics' },
+  { key: 'content', label: 'Highlights & Details' },
+  { key: 'documents', label: 'Documents & Settings' },
+];
+
 export default function ProductAdminPage() {
   const { user } = useAuth();
   const canEdit = user?.role === 'bank_owner';
@@ -81,6 +91,7 @@ export default function ProductAdminPage() {
   const [groups, setGroups] = useState(Object.keys(GROUP_LABEL));
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [section, setSection] = useState('basics');
 
   const load = async () => {
     try {
@@ -123,7 +134,7 @@ export default function ProductAdminPage() {
           </div>
         </div>
         {canEdit && (
-          <button data-testid="product-new-btn" onClick={() => setForm({ ...BLANK })}
+          <button data-testid="product-new-btn" onClick={() => { setForm({ ...BLANK }); setSection('basics'); }}
             className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> New page
           </button>
@@ -175,7 +186,7 @@ export default function ProductAdminPage() {
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                     {canEdit && <>
-                      <button data-testid={`product-edit-${p.slug}`} onClick={() => setForm({ ...BLANK, ...p })} title="Edit"
+                      <button data-testid={`product-edit-${p.slug}`} onClick={() => { setForm({ ...BLANK, ...p }); setSection('basics'); }} title="Edit"
                         className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:border-[#0b3b8c] hover:text-[#0b3b8c]">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
@@ -208,72 +219,96 @@ export default function ProductAdminPage() {
             </button>
           </>}
         >
-          <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="block">
-                <span className="block text-slate-500 mb-1">Section</span>
-                <select className={input} value={form.group} data-testid="product-group"
-                  onChange={(e) => setForm({ ...form, group: e.target.value })}>
-                  {groups.map((g) => <option key={g} value={g}>{GROUP_LABEL[g] || g}</option>)}
-                </select>
-              </label>
-              <label className="block">
-                <span className="block text-slate-500 mb-1">Address</span>
-                <input className={`${input} font-mono`} value={form.slug} data-testid="product-slug" placeholder="savings-account"
-                  onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} />
-              </label>
-              <label className="block">
-                <span className="block text-slate-500 mb-1">Visibility</span>
-                <select className={input} value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                  <option value="active">Live on the public site</option>
-                  <option value="draft">Draft — hidden</option>
-                </select>
-              </label>
+          <div className="text-xs">
+            <div className="flex gap-1 border-b border-slate-200 mb-4">
+              {SECTIONS.map((s) => (
+                <button key={s.key} type="button" data-testid={`product-section-${s.key}`}
+                  onClick={() => setSection(s.key)}
+                  className={`px-3 py-2 text-[11px] font-semibold border-b-2 -mb-px transition ${
+                    section === s.key ? 'border-[#0b3b8c] text-[#0b3b8c]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                  {s.label}
+                </button>
+              ))}
             </div>
 
-            <label className="block">
-              <span className="block text-slate-500 mb-1">Title</span>
-              <input className={input} value={form.title} data-testid="product-title-input"
-                onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="block text-slate-500 mb-1">Tagline</span>
-              <input className={input} value={form.tagline} placeholder="Everyday banking with interest paid quarterly."
-                onChange={(e) => setForm({ ...form, tagline: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="block text-slate-500 mb-1">Summary</span>
-              <textarea rows={4} className={input} value={form.summary}
-                onChange={(e) => setForm({ ...form, summary: e.target.value })} />
-            </label>
+            {section === 'basics' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="block">
+                    <span className="block text-slate-500 mb-1">Section</span>
+                    <select className={input} value={form.group} data-testid="product-group"
+                      onChange={(e) => setForm({ ...form, group: e.target.value })}>
+                      {groups.map((g) => <option key={g} value={g}>{GROUP_LABEL[g] || g}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="block text-slate-500 mb-1">Address</span>
+                    <input className={`${input} font-mono`} value={form.slug} data-testid="product-slug" placeholder="savings-account"
+                      onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} />
+                  </label>
+                  <label className="block">
+                    <span className="block text-slate-500 mb-1">Visibility</span>
+                    <select className={input} value={form.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                      <option value="active">Live on the public site</option>
+                      <option value="draft">Draft — hidden</option>
+                    </select>
+                  </label>
+                </div>
 
-            <StringList label="Highlights" placeholder="Interest credited every quarter"
-              values={form.highlights} onChange={(highlights) => setForm({ ...form, highlights })} />
-            <FactList values={form.facts} onChange={(facts) => setForm({ ...form, facts })} />
-            <StringList label="Documents to bring" placeholder="PAN card"
-              values={form.documents} onChange={(documents) => setForm({ ...form, documents })} />
+                <label className="block">
+                  <span className="block text-slate-500 mb-1">Title</span>
+                  <input className={input} value={form.title} data-testid="product-title-input"
+                    onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="block text-slate-500 mb-1">Tagline</span>
+                  <input className={input} value={form.tagline} placeholder="Everyday banking with interest paid quarterly."
+                    onChange={(e) => setForm({ ...form, tagline: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="block text-slate-500 mb-1">Summary</span>
+                  <textarea rows={4} className={input} value={form.summary}
+                    onChange={(e) => setForm({ ...form, summary: e.target.value })} />
+                </label>
+              </div>
+            )}
 
-            <label className="block">
-              <span className="block text-slate-500 mb-1">Footnote <span className="text-slate-500">(optional)</span></span>
-              <textarea rows={2} className={input} value={form.note || ''}
-                onChange={(e) => setForm({ ...form, note: e.target.value })} />
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className="block">
-                <span className="block text-slate-500 mb-1">Requires authorisation <span className="text-slate-500">(optional)</span></span>
-                <input className={`${input} font-mono`} value={form.requires || ''} placeholder="debit_cards"
-                  onChange={(e) => setForm({ ...form, requires: e.target.value })} />
-                <span className="block text-[10px] text-slate-500 mt-1">
-                  Shows a "not currently offered" notice unless the institution holds this authorisation.
-                </span>
-              </label>
-              <label className="block">
-                <span className="block text-slate-500 mb-1">Order within the section</span>
-                <input className={input} type="number" value={form.sort_order}
-                  onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
-              </label>
-            </div>
+            {section === 'content' && (
+              <div className="space-y-4">
+                <StringList label="Highlights" placeholder="Interest credited every quarter"
+                  values={form.highlights} onChange={(highlights) => setForm({ ...form, highlights })} />
+                <FactList values={form.facts} onChange={(facts) => setForm({ ...form, facts })} />
+              </div>
+            )}
+
+            {section === 'documents' && (
+              <div className="space-y-4">
+                <StringList label="Documents to bring" placeholder="PAN card"
+                  values={form.documents} onChange={(documents) => setForm({ ...form, documents })} />
+
+                <label className="block">
+                  <span className="block text-slate-500 mb-1">Footnote <span className="text-slate-500">(optional)</span></span>
+                  <textarea rows={2} className={input} value={form.note || ''}
+                    onChange={(e) => setForm({ ...form, note: e.target.value })} />
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="block text-slate-500 mb-1">Requires authorisation <span className="text-slate-500">(optional)</span></span>
+                    <input className={`${input} font-mono`} value={form.requires || ''} placeholder="debit_cards"
+                      onChange={(e) => setForm({ ...form, requires: e.target.value })} />
+                    <span className="block text-[10px] text-slate-500 mt-1">
+                      Shows a "not currently offered" notice unless the institution holds this authorisation.
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="block text-slate-500 mb-1">Order within the section</span>
+                    <input className={input} type="number" value={form.sort_order}
+                      onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}

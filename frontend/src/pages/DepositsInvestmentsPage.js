@@ -22,6 +22,7 @@ export default function DepositsInvestmentsPage() {
   const [fdNominee, setFdNominee] = useState('Registered Nominee');
   const [selectedAcc, setSelectedAcc] = useState('');
   const [booking, setBooking] = useState(false);
+  const [insuring, setInsuring] = useState('');
   // Monthly Income Scheme: a published plan, priced by its own printed slabs
   // rather than the generic tenure tiers, so it books against a fixed
   // denomination instead of a freeform amount.
@@ -148,6 +149,22 @@ export default function DepositsInvestmentsPage() {
       setMyInvestments(myRes.mutual_funds || []);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Investment order failed");
+    }
+  };
+
+  const handleApplyInsurance = async (plan) => {
+    if (!selectedAcc) {
+      toast.error('Select an account to debit, on the Deposits tab');
+      return;
+    }
+    setInsuring(plan.id);
+    try {
+      const res = await api.buyInsurance({ account_number: selectedAcc, plan_id: plan.id });
+      toast.success(res.message);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not apply for this policy');
+    } finally {
+      setInsuring('');
     }
   };
 
@@ -442,10 +459,11 @@ export default function DepositsInvestmentsPage() {
               </div>
 
               <button
-                onClick={() => toast.success(`Application initiated for ${ins.name}. Policy documents dispatched!`)}
-                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] font-semibold text-xs border border-slate-200"
+                onClick={() => handleApplyInsurance(ins)}
+                disabled={insuring === ins.id}
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] font-semibold text-xs border border-slate-200 disabled:opacity-50"
               >
-                Apply for Policy Cover
+                {insuring === ins.id ? 'Applying…' : 'Apply for Policy Cover'}
               </button>
             </div>
           ))}

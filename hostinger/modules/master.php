@@ -1592,15 +1592,41 @@ function route_member_ranks(array $d): void
     // Highest standing first, then by how many they have introduced.
     usort($members, fn($a, $b) => [$b['rank_level'], $b['introduced']] <=> [$a['rank_level'], $a['introduced']]);
 
+    // by_rank/unranked/total are counted before the search and the page slice
+    // below, so they stay true totals rather than describing one page's worth.
     $byRank = [];
     foreach (rank_names() as $level => $name) {
         $byRank[$name] = count(array_filter($members, fn($m) => $m['rank_level'] === $level));
     }
+    $totalMembers = count($members);
+    $unranked = count(array_filter($members, fn($m) => $m['rank_level'] === 0));
+
+    // The ranking itself needs every member's referral chain, so this list
+    // cannot be built with a SQL LIMIT/OFFSET the way paginate() (db.php)
+    // does -- but nothing says the whole thing has to cross the wire and
+    // render in the browser at once. Sliced by hand here, same meta shape
+    // the shared <Pagination> component already reads elsewhere.
+    if (!empty($_GET['q'])) {
+        $q = mb_strtolower(clip($_GET['q'], 80));
+        $members = array_values(array_filter($members,
+            fn($m) => str_contains(mb_strtolower(($m['name'] ?? '') . ($m['email'] ?? '')
+                . ($m['phone'] ?? '') . ($m['rank'] ?? '')), $q)));
+    }
+    $matched = count($members);
+    $perPage = max(1, min((int)($_GET['per_page'] ?? 25), 100));
+    $pages = max(1, (int)ceil($matched / $perPage));
+    $page = max(1, min((int)($_GET['page'] ?? 1), $pages));
+    $offset = ($page - 1) * $perPage;
+    $members = array_slice($members, $offset, $perPage);
 
     respond([
         'members' => $members,
+        'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $matched, 'pages' => $pages,
+            'has_prev' => $page > 1, 'has_next' => $page < $pages,
+            'from' => $matched === 0 ? 0 : $offset + 1, 'to' => min($offset + $perPage, $matched)],
+        'total_members' => $totalMembers,
         'by_rank' => $byRank,
-        'unranked' => count(array_filter($members, fn($m) => $m['rank_level'] === 0)),
+        'unranked' => $unranked,
         'ladder' => array_values(rank_names()),
         // Every tier's own rule, because the ladder no longer has one shared width.
         'tiers' => array_map(fn($t) => [

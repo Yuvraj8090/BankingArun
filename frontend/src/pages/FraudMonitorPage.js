@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert, RefreshCw, CheckCircle2, AlertTriangle, Flag, Undo2, Search } from 'lucide-react';
 import { api } from '../services/api';
+import Pagination from '../components/Pagination';
 import { toast } from 'sonner';
 
 const TABS = [['open', 'Open'], ['escalated', 'Escalated'], ['cleared', 'Cleared']];
@@ -13,21 +14,26 @@ const SEVERITY = {
 // Staff review queue for transfers the AI module scored as unusual.
 export default function FraudMonitorPage() {
   const [tab, setTab] = useState('open');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState('');
   const [anomalies, setAnomalies] = useState(null);
 
-  const load = useCallback(async (which) => {
+  const load = useCallback(async (which, p = page, pp = perPage) => {
     try {
       const [queue, anom] = await Promise.all([
-        api.fraudQueue(which),
+        api.fraudQueue(which, { page: p, per_page: pp }),
         api.collectionAnomalies().catch(() => null)
       ]);
       setData(queue);
       if (anom) setAnomalies(anom);
     } catch (e) { toast.error(e.response?.data?.detail || 'Could not load the review queue'); }
-  }, []);
+  }, [page, perPage]);
   useEffect(() => { load(tab); }, [load, tab]);
+  // Switching tabs starts back at page 1 of that queue, rather than page 4
+  // of "escalated" opening on whatever page "open" happened to be showing.
+  const changeTab = (next) => { setTab(next); setPage(1); };
 
   const act = async (alert, action) => {
     setBusy(alert.id);
@@ -64,7 +70,7 @@ export default function FraudMonitorPage() {
 
       <div className="flex gap-1.5">
         {TABS.map(([id, label]) => (
-          <button key={id} data-testid={`fraud-tab-${id}`} onClick={() => setTab(id)}
+          <button key={id} data-testid={`fraud-tab-${id}`} onClick={() => changeTab(id)}
             className={`px-4 py-1.5 rounded-md text-xs font-semibold border ${
               tab === id ? 'bg-[#0b3b8c] text-white border-[#0b3b8c]' : 'bg-white text-slate-600 border-slate-200'}`}>
             {label}
@@ -129,6 +135,11 @@ export default function FraudMonitorPage() {
           </div>
         )}
       </div>
+      {!!data.alerts.length && (
+        <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+          <Pagination meta={data.pagination} onPage={setPage} onPerPage={(n) => { setPerPage(n); setPage(1); }} />
+        </div>
+      )}
 
       <p className="text-[11px] text-slate-500 leading-relaxed">
         Escalating marks an alert for suspicious-transaction review. Members are never told that a payment was

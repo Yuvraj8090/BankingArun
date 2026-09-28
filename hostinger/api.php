@@ -1349,6 +1349,7 @@ $routes = [
     'GET /loans/my-applications' => 'route_my_loans',
     'GET /investments/catalog' => 'route_investment_catalog',
     'POST /investments/invest' => 'route_invest',
+    'POST /investments/insure' => 'route_insure',
     'GET /investments/my-portfolio' => 'route_portfolio',
     'POST /support/complaint' => 'route_complaint',
     'GET /support/my-tickets' => 'route_my_tickets',
@@ -1386,6 +1387,7 @@ $routes = [
     'GET /panel/loan-dept' => 'route_panel_loan_dept',
     'POST /panel/loan-dept/decision' => 'route_loan_decision',
     'GET /admin/overview' => 'route_admin_overview',
+    'GET /admin/kyc-pending' => 'route_admin_kyc_pending',
     'POST /admin/kyc-action' => 'route_admin_kyc_action',
     // Approve KYC and, if a plan was picked, fund + book it in the same step
     // (modules/staff.php).

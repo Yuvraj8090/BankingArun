@@ -6,6 +6,11 @@ import {
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import Pagination from '../components/Pagination';
+import { inr as inrShared } from '../utils/format';
+
+// Rail ledger figures are always shown to the paisa, unlike most of the app's
+// whole-rupee displays.
+const inr = (n) => inrShared(n, { decimals: 2 });
 
 // The director's view of the payment rail: how money leaves and enters the
 // institution, and what is in flight right now.
@@ -503,5 +508,3 @@ function Secret({ label, value, onChange, show, onToggle, placeholder, testId })
 
 const Th = ({ children }) => <th className="px-4 py-2.5 text-left font-semibold">{children}</th>;
 const Td = ({ children, className = '' }) => <td className={`px-4 py-2.5 text-slate-700 ${className}`}>{children}</td>;
-
-const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

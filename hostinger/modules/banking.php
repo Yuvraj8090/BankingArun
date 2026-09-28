@@ -320,10 +320,14 @@ function investment_catalog(): array
             ['id' => 'mf3', 'name' => 'AJSPay Balanced Advantage Hybrid Fund', 'category' => 'Dynamic Asset Hybrid', 'cagr_3yr' => '16.1%', 'risk' => 'Low-Mod', 'min_sip' => 500, 'nav' => 445.10],
             ['id' => 'mf4', 'name' => 'AJSPay Nifty 50 Index Fund Direct', 'category' => 'Passive Index', 'cagr_3yr' => '15.2%', 'risk' => 'Moderate', 'min_sip' => 500, 'nav' => 240.80],
         ],
+        // sum_assured is the number insurance_policies.sum_assured actually
+        // stores; "cover" stays the printed display string, which for motor
+        // is a variable IDV rather than a fixed figure -- sum_assured there
+        // is this printed plan's own representative insured value.
         'insurance_plans' => [
-            ['id' => 'ins1', 'name' => 'AJSPay Life Shield Plus Term Plan', 'type' => 'Life Term Cover', 'cover' => '₹1.00 Crore', 'annual_premium' => 8450, 'claim_ratio' => '98.5%'],
-            ['id' => 'ins2', 'name' => 'AJSPay Complete Health Shield', 'type' => 'Family Health Floater', 'cover' => '₹20.00 Lakhs', 'annual_premium' => 14200, 'claim_ratio' => '99.1%'],
-            ['id' => 'ins3', 'name' => 'AJSPay Comprehensive Motor Insurance', 'type' => 'Zero-Dep Auto Cover', 'cover' => 'IDV Market Value', 'annual_premium' => 7100, 'claim_ratio' => '97.8%'],
+            ['id' => 'ins1', 'name' => 'AJSPay Life Shield Plus Term Plan', 'type' => 'Life Term Cover', 'cover' => '₹1.00 Crore', 'sum_assured' => 10000000, 'annual_premium' => 8450, 'claim_ratio' => '98.5%'],
+            ['id' => 'ins2', 'name' => 'AJSPay Complete Health Shield', 'type' => 'Family Health Floater', 'cover' => '₹20.00 Lakhs', 'sum_assured' => 2000000, 'annual_premium' => 14200, 'claim_ratio' => '99.1%'],
+            ['id' => 'ins3', 'name' => 'AJSPay Comprehensive Motor Insurance', 'type' => 'Zero-Dep Auto Cover', 'cover' => 'IDV Market Value', 'sum_assured' => 800000, 'annual_premium' => 7100, 'claim_ratio' => '97.8%'],
         ],
     ];
 }
@@ -368,6 +372,44 @@ function route_invest(array $d): void
     respond(['status' => 'SUCCESS',
         'message' => 'Invested ' . rupees($amount) . " in {$investment['scheme_name']}. Folio Number: $folio",
         'portfolio' => out($investment)]);
+}
+
+// "Apply for Policy Cover" used to just show a toast -- no record was ever
+// written, so a member who thought they had bought a policy had nothing to
+// show for it and staff had no idea it happened. Mirrors route_invest: the
+// premium is debited like any other purchase and the policy is booked in
+// the same transaction.
+function route_insure(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    need($d, 'account_number', 'plan_id');
+    $plans = array_column(investment_catalog()['insurance_plans'], null, 'id');
+    $planId = clip($d['plan_id'], 20);
+    if (!isset($plans[$planId])) {
+        fail(404, 'Unknown insurance plan.');
+    }
+    $plan = $plans[$planId];
+    $pdo->beginTransaction();
+    [$account, $newBalance] = debit_account($user, $d['account_number'], (float)$plan['annual_premium'],
+        'Insufficient funds for the annual premium.');
+    $policy = ['id' => uuid4(), 'user_id' => $user['id'], 'plan_id' => $planId, 'plan_name' => $plan['name'],
+        'sum_assured' => $plan['sum_assured'], 'annual_premium' => $plan['annual_premium'],
+        'nominee_name' => clip($d['nominee_name'] ?? '', 150) ?: null, 'status' => 'ACTIVE', 'created_at' => now_utc()];
+    $pdo->prepare('INSERT INTO insurance_policies (id, user_id, plan_id, plan_name, sum_assured, annual_premium,
+            nominee_name, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute(array_values($policy));
+    insert_txn(['user_id' => $user['id'], 'account_number' => $account['account_number'], 'type' => 'debit',
+        'mode' => 'INSURANCE_PREMIUM', 'amount' => (float)$plan['annual_premium'], 'balance_after' => $newBalance,
+        'counterparty_name' => $plan['name'], 'counterparty_acc' => $policy['id'],
+        'ref_number' => 'POL-' . strtoupper(substr($policy['id'], 0, 8)),
+        'description' => "Annual premium for {$plan['name']}"]);
+    audit($user, 'INSURANCE_APPLIED', "{$plan['name']} " . rupees((float)$plan['annual_premium']));
+    $pdo->commit();
+    respond(['status' => 'SUCCESS',
+        'message' => "Applied for {$plan['name']}. Premium " . rupees((float)$plan['annual_premium'])
+            . ' debited. Our insurance desk will contact you to complete the policy.',
+        'policy' => out($policy)]);
 }
 
 function route_portfolio(array $d): void
