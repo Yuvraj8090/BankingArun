@@ -649,7 +649,7 @@ function route_kyc_face_match(array $d, string $id = ''): void
 // --- KYC documents ---------------------------------------------------------------------
 // What a member uploads for verification, as opposed to the live video capture. The
 // screen that collected these used to show a success message and send nothing.
-const KYC_DOC_KINDS = ['pan', 'aadhaar', 'address'];
+const KYC_DOC_KINDS = ['pan', 'aadhaar', 'address', 'photo', 'signature'];
 const KYC_DOC_MAX = 4000000;          // base64 characters, ~3 MB of file
 const KYC_DOC_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
 
@@ -657,7 +657,7 @@ function kyc_document_payload(array $d): array
 {
     $kind = clip($d['kind'] ?? '', 20);
     if (!in_array($kind, KYC_DOC_KINDS, true)) {
-        fail(422, 'kind must be pan, aadhaar or address.');
+        fail(422, 'kind must be pan, aadhaar, address, photo or signature.');
     }
     $value = $d['content'] ?? null;
     if (!is_string($value) || $value === '') {

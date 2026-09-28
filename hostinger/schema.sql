@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS users (
     joint_holder_name VARCHAR(150),
     nominee_name VARCHAR(150),
     nominee_relation VARCHAR(50),
+    introducer_code VARCHAR(30),
+    introducer_name VARCHAR(150),
     designation VARCHAR(100),
     staff_id VARCHAR(20) UNIQUE,             -- unique reference ID for internal (non-member) logins, e.g. AJSS000001
     referral_code VARCHAR(12) UNIQUE,
@@ -1025,7 +1027,7 @@ CREATE TABLE IF NOT EXISTS kyc_documents (
     -- account is still being opened, and is re-pointed at the member once it is.
     user_id VARCHAR(36),
     lead_id VARCHAR(36),
-    kind VARCHAR(20) NOT NULL,              -- pan | aadhaar | address
+    kind VARCHAR(20) NOT NULL,              -- pan | aadhaar | address | photo | signature
     file_name VARCHAR(200),
     mime VARCHAR(40) NOT NULL,
     byte_size INT NOT NULL,
@@ -1161,3 +1163,8 @@ CREATE INDEX IF NOT EXISTS idx_lead_referral ON crm_leads (referral_code);
 -- number of NULLs, so those members simply have none. They sign in with their
 -- account number instead.
 ALTER TABLE users MODIFY COLUMN email VARCHAR(150) NULL;
+
+-- Who introduced the member, kept at account opening the same way the nominee
+-- is: free text, optional, no separate table.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS introducer_code VARCHAR(30) NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS introducer_name VARCHAR(150) NULL;

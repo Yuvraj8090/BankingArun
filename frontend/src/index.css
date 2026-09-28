@@ -61,6 +61,20 @@ body {
   background: #94a3b8;
 }
 
+/* Print only the account-details preview a teller prints at account opening —
+   everything else on the page (including the rest of the modal) is hidden. */
+@media print {
+  body * { visibility: hidden; }
+  .print-account-preview, .print-account-preview * { visibility: visible; }
+  .print-account-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    border: none !important;
+  }
+}
+
 /* Ticker marquee for public home page */
 @keyframes ticker-scroll {
   0%   { transform: translateX(0); }

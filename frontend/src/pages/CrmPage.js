@@ -351,6 +351,8 @@ const FILE_KINDS = [
   { kind: 'pan', label: 'PAN card', hint: 'JPEG, PNG or PDF, up to 3 MB' },
   { kind: 'aadhaar', label: 'Aadhaar', hint: 'Mask all but the last four digits' },
   { kind: 'address', label: 'Proof of address', hint: 'A utility bill, passport or voter ID' },
+  { kind: 'photo', label: 'Member photo (optional)', hint: 'A recent passport-size photo' },
+  { kind: 'signature', label: 'Member signature (optional)', hint: 'Signed on plain paper and scanned' },
 ];
 
 const DOC_STYLE = {
@@ -514,6 +516,35 @@ function PlanChoice({ schemes, account, setAccount }) {
   );
 }
 
+// A staff-facing summary of the account just opened, laid out to be printed
+// and kept with the physical file — the same purpose as the printed preview
+// a teller hands a new member at the counter. Only .print-account-preview is
+// visible when the browser prints (see index.css); on screen it doubles as a
+// review of what was just recorded.
+function AccountDetailsPreview({ opened, account, file }) {
+  const docStatus = (kind) => (file?.documents || []).some((d) => d.kind === kind) ? 'Uploaded' : 'Not provided';
+  const today = new Date().toLocaleDateString('en-IN');
+  return (
+    <div className="print-account-preview p-3 rounded-md border border-slate-200 text-[11px]" data-testid="crm-opened-preview">
+      <p className="text-xs font-bold text-slate-900 mb-2">Account Details Preview</p>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+        <div><dt className="text-slate-500">A/c No.</dt><dd className="font-semibold text-slate-900 font-mono">{opened.user_id}</dd></div>
+        <div><dt className="text-slate-500">Opening Date</dt><dd className="font-semibold text-slate-900">{today}</dd></div>
+        <div><dt className="text-slate-500">Member Name</dt><dd className="font-semibold text-slate-900">{opened.user?.name}</dd></div>
+        <div><dt className="text-slate-500">Phone</dt><dd className="font-semibold text-slate-900">{opened.user?.phone}</dd></div>
+        <div><dt className="text-slate-500">Introducer Code</dt><dd className="font-semibold text-slate-900">{account.introducer_code || '—'}</dd></div>
+        <div><dt className="text-slate-500">Introducer Name</dt><dd className="font-semibold text-slate-900">{account.introducer_name || '—'}</dd></div>
+        <div><dt className="text-slate-500">Plan</dt><dd className="font-semibold text-slate-900">{opened.plan ? `${opened.plan.name} (${opened.plan.code})` : 'Not decided yet'}</dd></div>
+        <div><dt className="text-slate-500">Opening Deposit</dt><dd className="font-semibold text-slate-900">{inr(account.initial_deposit)}</dd></div>
+        <div><dt className="text-slate-500">Nominee</dt><dd className="font-semibold text-slate-900">{opened.user?.nominee ? `${opened.user.nominee.name} (${opened.user.nominee.relation})` : '—'}</dd></div>
+        <div><dt className="text-slate-500">KYC Status</dt><dd className="font-semibold text-slate-900">{opened.kyc_status}</dd></div>
+        <div><dt className="text-slate-500">Member Photo</dt><dd className="font-semibold text-slate-900">{docStatus('photo')}</dd></div>
+        <div><dt className="text-slate-500">Member Signature</dt><dd className="font-semibold text-slate-900">{docStatus('signature')}</dd></div>
+      </dl>
+    </div>
+  );
+}
+
 // --- Leads -------------------------------------------------------------------
 function LeadsTab() {
   const [data, setData] = useState(null);
@@ -558,6 +589,7 @@ function LeadsTab() {
       name: opening.name || '', email: opening.email || '', phone: opening.phone || '',
       password: '', transaction_password: '', pan_number: '', initial_deposit: 1000,
       scheme_code: opening.scheme_code || '', scheme_amount: '',
+      introducer_code: '', introducer_name: '',
     });
   }, [opening]);
 
@@ -575,7 +607,9 @@ function LeadsTab() {
         toast.success(`Referral bonus of ₹${r.referral_bonus} paid to both sides.`);
       }
       setOpening(null);
-      setAccount(null);
+      // account is kept (not cleared) until the "opened" modal is dismissed —
+      // the printable preview below reads introducer/opening-deposit fields
+      // back off it, since the backend does not echo every field it took in.
       // Shown rather than announced in a toast that disappears: this is the one
       // moment the user ID exists on screen for the teller to write down.
       setOpened(r);
@@ -664,6 +698,8 @@ function LeadsTab() {
               </div>
               <Field label="Transaction password" value={account.transaction_password} onChange={(v) => setAccount({ ...account, transaction_password: v })} testId="open-txnpwd" />
               <Field label="Opening deposit" value={String(account.initial_deposit)} onChange={(v) => setAccount({ ...account, initial_deposit: Number(v.replace(/\D/g, '')) || 0 })} />
+              <Field label="Introducer code (optional)" value={account.introducer_code} onChange={(v) => setAccount({ ...account, introducer_code: v })} testId="open-introducer-code" />
+              <Field label="Introducer name (optional)" value={account.introducer_name} onChange={(v) => setAccount({ ...account, introducer_name: v })} testId="open-introducer-name" />
             </div>
           </div>
         </Modal>
@@ -674,9 +710,13 @@ function LeadsTab() {
           testId="crm-account-opened-modal"
           title="Account opened"
           subtitle="Write these down and give them to the member in person."
-          onClose={() => setOpened(null)}
-          footer={<button onClick={() => setOpened(null)} data-testid="crm-opened-done"
-            className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold">Done</button>}
+          onClose={() => { setOpened(null); setAccount(null); }}
+          footer={<>
+            <button onClick={() => window.print()} data-testid="crm-opened-print"
+              className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">Print preview</button>
+            <button onClick={() => { setOpened(null); setAccount(null); }} data-testid="crm-opened-done"
+              className="px-5 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold">Done</button>
+          </>}
         >
           <div className="space-y-3">
             <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200">
@@ -713,6 +753,7 @@ function LeadsTab() {
                 <p className="text-slate-500">Matures {opened.deposit.maturity_date}. Visible to the member under Deposits.</p>
               </div>
             )}
+            <AccountDetailsPreview opened={opened} account={account} file={file} />
             <p className="text-[11px] text-slate-500">
               The documents you verified now sit on the member's own KYC record, so they will not be
               asked for them again.
