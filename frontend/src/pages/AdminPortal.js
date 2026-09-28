@@ -30,6 +30,7 @@ export default function AdminPortal() {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [verifyingUser, setVerifyingUser] = useState(null);
   const canManageUsers = user?.role === 'bank_owner';
 
   const fetchAdminData = async () => {
@@ -213,7 +214,7 @@ export default function AdminPortal() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button data-testid={`approve-kyc-${u.id}`} onClick={() => handleKycAction(u.id, 'verified')}
+                      <button data-testid={`approve-kyc-${u.id}`} onClick={() => setVerifyingUser(u)}
                         className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5">
                         <CheckCircle className="w-3.5 h-3.5" /> Approve
                       </button>
@@ -294,6 +295,14 @@ export default function AdminPortal() {
       )}
 
       {activeTab === 'users' && canManageUsers && <UserAccessPanel />}
+
+      {verifyingUser && (
+        <KycVerifyModal
+          customer={verifyingUser}
+          onClose={() => setVerifyingUser(null)}
+          onDone={() => { setVerifyingUser(null); fetchAdminData(); }}
+        />
+      )}
     </div>
   );
 }
@@ -310,6 +319,125 @@ function StatCard({ icon: Icon, label, value, sub, color, small }) {
       <h2 className={`${small ? 'text-base' : 'text-2xl'} font-bold text-slate-900 mt-2`}>{value ?? 0}</h2>
       <p className="text-[10px] text-slate-500 mt-1">{sub}</p>
     </div>
+  );
+}
+
+// Approving KYC and, optionally in the same step, funding + booking a
+// savings plan for the member (POST /admin/kyc-verify-and-fund). Leaving
+// "enrol in a plan" off just verifies KYC, same as the old plain Approve.
+function KycVerifyModal({ customer, onClose, onDone }) {
+  const [schemes, setSchemes] = useState([]);
+  const [enrol, setEnrol] = useState(false);
+  const [schemeCode, setSchemeCode] = useState('');
+  const [amount, setAmount] = useState('');
+  const [mode, setMode] = useState('cash');
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [nomineeName, setNomineeName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api.schemesList()
+      .then(r => setSchemes((r.schemes || []).filter(s => s.status === 'active')))
+      .catch(() => setSchemes([]));
+  }, []);
+
+  const selectedScheme = schemes.find(s => s.code === schemeCode) || null;
+
+  const handleSubmit = async () => {
+    if (enrol && (!schemeCode || !amount)) {
+      toast.error('Pick a plan and a deposit amount');
+      return;
+    }
+    if (enrol && mode === 'cheque' && !chequeNumber.trim()) {
+      toast.error('Enter the cheque number');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api.kycVerifyAndFund({
+        user_id: customer.id,
+        scheme_code: enrol ? schemeCode : undefined,
+        amount: enrol ? amount : undefined,
+        mode: enrol ? mode : undefined,
+        cheque_number: enrol && mode === 'cheque' ? chequeNumber.trim() : undefined,
+        nominee_name: enrol ? (nomineeName.trim() || undefined) : undefined,
+      });
+      toast.success(res.message);
+      onDone();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'KYC verification failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title={`Approve KYC — ${customer.name}`}
+      subtitle="Verifies the member's identity, and can fund + book a plan in the same step."
+      onClose={onClose} testId="kyc-verify-modal"
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-700">
+          Cancel
+        </button>
+        <button data-testid="kyc-verify-confirm-btn" onClick={handleSubmit} disabled={submitting}
+          className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold disabled:opacity-60">
+          {submitting ? 'Verifying…' : (enrol ? 'Verify & Book Plan' : 'Verify KYC')}
+        </button>
+      </>}>
+      <label className="flex items-center gap-2 text-xs text-slate-700">
+        <input type="checkbox" data-testid="kyc-enrol-toggle" checked={enrol}
+          onChange={e => setEnrol(e.target.checked)} />
+        Also enrol in a savings plan now (member is here with cash/cheque)
+      </label>
+
+      {enrol && (
+        <>
+          <Field label="Plan">
+            <select data-testid="kyc-scheme-select" className={inputClass} value={schemeCode}
+              onChange={e => { setSchemeCode(e.target.value); setAmount(''); }}>
+              <option value="">Select a plan…</option>
+              {schemes.map(s => (
+                <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+              ))}
+            </select>
+          </Field>
+
+          {selectedScheme && (
+            <Field label="Deposit amount" hint="Only the plan's own printed denominations are accepted.">
+              <select data-testid="kyc-amount-select" className={inputClass} value={amount}
+                onChange={e => setAmount(e.target.value)}>
+                <option value="">Select an amount…</option>
+                {(selectedScheme.slabs || []).map(slab => (
+                  <option key={slab.unit} value={slab.unit}>
+                    ₹{Number(slab.unit).toLocaleString('en-IN')} → matures ₹{Number(slab.maturity).toLocaleString('en-IN')}
+                    {slab.monthly_payout ? ` (₹${Number(slab.monthly_payout).toLocaleString('en-IN')}/mo)` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          <Field label="Mode">
+            <select data-testid="kyc-mode-select" className={inputClass} value={mode} onChange={e => setMode(e.target.value)}>
+              <option value="cash">Cash</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </Field>
+
+          {mode === 'cheque' && (
+            <Field label="Cheque number">
+              <input data-testid="kyc-cheque-input" className={inputClass} value={chequeNumber}
+                onChange={e => setChequeNumber(e.target.value)} placeholder="e.g. 000123" />
+            </Field>
+          )}
+
+          <Field label="Nominee (optional)">
+            <input data-testid="kyc-nominee-input" className={inputClass} value={nomineeName}
+              onChange={e => setNomineeName(e.target.value)} placeholder="Defaults to the member's registered nominee" />
+          </Field>
+        </>
+      )}
+    </Modal>
   );
 }
 

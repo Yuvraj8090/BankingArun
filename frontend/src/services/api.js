@@ -111,6 +111,8 @@ export const api = {
   // Admin / Compliance
   getAdminOverview: async () => (await axios.get(`${API}/admin/overview`, getAuthHeaders())).data,
   adminKycAction: async (payload) => (await axios.post(`${API}/admin/kyc-action`, payload, getAuthHeaders())).data,
+  // Approve KYC and, in the same step, fund + book a savings plan if one was picked.
+  kycVerifyAndFund: async (payload) => (await axios.post(`${API}/admin/kyc-verify-and-fund`, payload, getAuthHeaders())).data,
   getRbiReports: async () => (await axios.get(`${API}/admin/rbi-reports`, getAuthHeaders())).data,
   adminUsers: async (params = {}) => (await axios.get(`${API}/admin/users`, { ...getAuthHeaders(), params })).data,
   adminUserCreate: async (payload) => (await axios.post(`${API}/admin/users`, payload, getAuthHeaders())).data,

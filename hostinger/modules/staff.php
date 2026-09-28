@@ -180,6 +180,111 @@ function route_admin_kyc_action(array $d): void
     respond(['status' => 'SUCCESS', 'message' => 'Customer KYC status updated to ' . strtoupper($d['status'])]);
 }
 
+// A member who self-registered online (route_self_register, api.php) has a
+// real login and a zero-balance account, waiting on this desk. The common
+// case at the counter is not "verify today, come back another day to pay
+// in" -- they are standing there with cash or a cheque and a plan they want.
+// scheme_code is optional: leave it out and this behaves exactly like
+// route_admin_kyc_action's plain approve. Give it one, and the money is
+// credited and the deposit booked in the same transaction as the KYC flip,
+// the way a brand-new walk-in account is funded in route_register.
+function route_kyc_verify_and_fund(array $d): void
+{
+    global $pdo;
+    $admin = staff_user(ADMIN_ROLES);
+    need($d, 'user_id');
+    $customer = row('SELECT * FROM users WHERE id = ?', [clip($d['user_id'], 36)]);
+    if (!$customer) {
+        fail(404, 'Customer not found.');
+    }
+    $account = row('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at, id LIMIT 1', [$customer['id']]);
+    if (!$account) {
+        fail(404, 'This customer has no account to fund yet.');
+    }
+
+    $planCode = strtoupper(clip($d['scheme_code'] ?? '', 20));
+    $terms = null;
+    $mode = 'cash';
+    $chequeNumber = '';
+    if ($planCode !== '') {
+        need($d, 'amount');
+        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active' AND deleted_at IS NULL", [$planCode]);
+        if (!$scheme) {
+            fail(422, 'That plan is not one of our current schemes.');
+        }
+        $terms = scheme_deposit_terms($scheme, money($d['amount']));
+        $mode = strtolower(clip($d['mode'] ?? 'cash', 10));
+        if (!in_array($mode, COUNTER_DEPOSIT_MODES, true)) {
+            fail(422, 'mode must be cash or cheque.');
+        }
+        $chequeNumber = $mode === 'cheque' ? clip($d['cheque_number'] ?? '', 20) : '';
+        if ($mode === 'cheque' && $chequeNumber === '') {
+            fail(422, 'Cheque number is required for a cheque deposit.');
+        }
+        if ($account['status'] !== 'active') {
+            fail(403, 'This account is not active for deposits.');
+        }
+    }
+
+    $pdo->beginTransaction();
+    $pdo->prepare('UPDATE users SET kyc_status = ?, kyc_reason = NULL WHERE id = ?')
+        ->execute(['verified', $customer['id']]);
+
+    $deposit = null;
+    if ($terms !== null) {
+        $balanceOf = fn() => (float)scalar('SELECT balance FROM accounts WHERE account_number = ?',
+            [$account['account_number']]);
+        // A lump-sum plan is funded at the counter, same as route_register. An
+        // instalment plan is not funded here at all -- the first instalment is
+        // a collection, and booking it as paid today would be a lie on the
+        // statement (see route_register's identical comment, api.php).
+        if (!$terms['by_instalment']) {
+            $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE account_number = ?')
+                ->execute([$terms['due_today'], $account['account_number']]);
+            insert_txn(['user_id' => $customer['id'], 'account_number' => $account['account_number'],
+                'type' => 'credit', 'mode' => 'COUNTER_DEPOSIT', 'amount' => $terms['due_today'],
+                'balance_after' => $balanceOf(), 'counterparty_name' => $admin['name'],
+                'counterparty_acc' => 'BRANCH-CASH-DESK',
+                'ref_number' => 'CD-' . gmdate('YmdHis') . '-' . random_int(100, 999),
+                'description' => ($mode === 'cash' ? 'Cash' : "Cheque #$chequeNumber")
+                    . " paid in for {$terms['scheme_name']}"]);
+        }
+        $depositNumber = 'DEP' . random_int(10000000, 99999999);
+        $maturityDate = (new DateTimeImmutable('today', new DateTimeZone(IST)))
+            ->modify('+' . (int)($terms['tenure_months'] * 30.4) . ' days')->format('Y-m-d');
+        $pdo->prepare('INSERT INTO deposits (id, user_id, deposit_number, deposit_type, scheme_code,
+                source_account, principal_amount, interest_rate, tenure_months, interest_payout,
+                maturity_amount, maturity_date, nominee_name, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([uuid4(), $customer['id'], $depositNumber, $terms['deposit_type'], $terms['scheme_code'],
+                $account['account_number'], $terms['total_deposit'], $terms['interest_rate'],
+                $terms['tenure_months'], $terms['interest_payout'], $terms['maturity_amount'], $maturityDate,
+                clip($d['nominee_name'] ?? '', 150) ?: ($customer['nominee_name'] ?? null), 'active']);
+        if (!$terms['by_instalment']) {
+            $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE account_number = ?')
+                ->execute([$terms['due_today'], $account['account_number']]);
+            insert_txn(['user_id' => $customer['id'], 'account_number' => $account['account_number'],
+                'type' => 'debit', 'mode' => 'DEPOSIT_BOOKING', 'amount' => $terms['due_today'],
+                'balance_after' => $balanceOf(), 'counterparty_name' => $terms['scheme_name'],
+                'counterparty_acc' => $depositNumber, 'ref_number' => $depositNumber,
+                'description' => "{$terms['scheme_name']} #$depositNumber booked"]);
+        }
+        $deposit = ['deposit_number' => $depositNumber, 'maturity_date' => $maturityDate] + $terms;
+        audit($admin, 'DEPOSIT_BOOKED', "$depositNumber {$terms['scheme_code']} "
+            . rupees($terms['total_deposit']) . " for {$account['account_number']}"
+            . ($terms['exceeds_cap'] ? ' (above the 12.5% cap on its own printed figures)' : ''));
+    }
+
+    audit($admin, 'KYC_VERIFIED', ($customer['email'] ?: $customer['phone'])
+        . ($deposit === null ? '' : " + enrolled in {$terms['scheme_code']}"));
+    $pdo->commit();
+
+    respond(['status' => 'SUCCESS', 'deposit' => $deposit === null ? null : out($deposit),
+        'message' => $deposit === null
+            ? 'KYC verified.'
+            : "KYC verified and {$terms['scheme_name']} booked. Maturity value: " . rupees($terms['maturity_amount'])]);
+}
+
 function route_rbi_reports(array $d): void
 {
     staff_user(ADMIN_ROLES);

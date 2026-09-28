@@ -1387,6 +1387,9 @@ $routes = [
     'POST /panel/loan-dept/decision' => 'route_loan_decision',
     'GET /admin/overview' => 'route_admin_overview',
     'POST /admin/kyc-action' => 'route_admin_kyc_action',
+    // Approve KYC and, if a plan was picked, fund + book it in the same step
+    // (modules/staff.php).
+    'POST /admin/kyc-verify-and-fund' => 'route_kyc_verify_and_fund',
     'GET /admin/rbi-reports' => 'route_rbi_reports',
     'GET /admin/users' => 'route_admin_users',
     'POST /admin/users' => 'route_admin_user_create',
