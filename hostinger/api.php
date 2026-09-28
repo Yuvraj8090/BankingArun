@@ -1307,6 +1307,10 @@ $routes = [
     'GET /accounts/transactions' => 'route_transactions',
     'POST /accounts/transfer' => 'route_transfer',
     'POST /accounts/bulk-transfer' => 'route_bulk_transfer',
+    // Staff-only: crediting cash/cheque a member hands over at the counter
+    // (modules/banking.php). Not to be confused with /collections, which only
+    // logs what a field agent collected and never touches the ledger.
+    'POST /accounts/counter-deposit' => 'route_counter_deposit',
     // Cards & UPI
     'GET /cards' => 'route_cards',
     'POST /cards/manage' => 'route_manage_card',

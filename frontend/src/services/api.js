@@ -67,6 +67,8 @@ export const api = {
   },
   transferFunds: async (payload) => (await axios.post(`${API}/accounts/transfer`, payload, getAuthHeaders())).data,
   bulkTransfer: async (payload) => (await axios.post(`${API}/accounts/bulk-transfer`, payload, getAuthHeaders())).data,
+  // Staff-only: crediting a member's account for cash/cheque handed over at the counter.
+  counterDeposit: async (payload) => (await axios.post(`${API}/accounts/counter-deposit`, payload, getAuthHeaders())).data,
 
   // Cards
   getCards: async () => (await axios.get(`${API}/cards`, getAuthHeaders())).data,

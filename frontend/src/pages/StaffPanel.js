@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, UserCheck, FileText, RefreshCw, Phone, Mail, MessageSquare } from 'lucide-react';
+import { Users, UserCheck, FileText, RefreshCw, Phone, Mail, MessageSquare, Banknote } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
@@ -25,6 +25,8 @@ export default function StaffPanel() {
         <Kpi label="Transactions" value={data.kpis.transactions_processed} icon={FileText} color="text-emerald-700" />
         <Kpi label="Open tickets" value={data.kpis.open_tickets} icon={MessageSquare} color="text-[#c8102e]" />
       </div>
+
+      <CounterDepositCard />
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
@@ -76,6 +78,134 @@ export default function StaffPanel() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Crediting cash or a cheque a member hands over at the counter, after their
+// account already exists. This is separate from /collections (Collection
+// Panel), which only logs what a field agent collected and never touches the
+// ledger — this is the one place that actually moves the money in.
+function CounterDepositCard() {
+  const [accountNumber, setAccountNumber] = useState('');
+  const [amount, setAmount] = useState('');
+  const [mode, setMode] = useState('cash');
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const reset = () => {
+    setAccountNumber(''); setAmount(''); setMode('cash'); setChequeNumber(''); setRemarks('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!accountNumber.trim() || !amount) {
+      toast.error('Enter the account number and amount');
+      return;
+    }
+    if (mode === 'cheque' && !chequeNumber.trim()) {
+      toast.error('Enter the cheque number');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api.counterDeposit({
+        account_number: accountNumber.trim(),
+        amount: parseFloat(amount),
+        mode,
+        cheque_number: mode === 'cheque' ? chequeNumber.trim() : undefined,
+        remarks: remarks.trim() || undefined,
+      });
+      toast.success(res.message);
+      reset();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Counter deposit failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+      <div className="p-5 border-b border-slate-100 flex items-center gap-2">
+        <Banknote className="w-4 h-4 text-emerald-700" />
+        <h2 className="text-sm font-semibold text-slate-900">Accept a counter deposit</h2>
+      </div>
+      <form onSubmit={handleSubmit} className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div>
+          <label className="block text-slate-500 mb-1">Member Account Number</label>
+          <input
+            data-testid="counter-deposit-account-input"
+            type="text"
+            required
+            value={accountNumber}
+            onChange={(e) => setAccountNumber(e.target.value)}
+            placeholder="e.g. AJSP0123456789"
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
+          />
+        </div>
+        <div>
+          <label className="block text-slate-500 mb-1">Amount (₹)</label>
+          <input
+            data-testid="counter-deposit-amount-input"
+            type="number"
+            step="0.01"
+            required
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="e.g. 5000"
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
+          />
+        </div>
+        <div>
+          <label className="block text-slate-500 mb-1">Mode</label>
+          <select
+            data-testid="counter-deposit-mode-select"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
+          >
+            <option value="cash">Cash</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+        {mode === 'cheque' && (
+          <div>
+            <label className="block text-slate-500 mb-1">Cheque Number</label>
+            <input
+              data-testid="counter-deposit-cheque-input"
+              type="text"
+              required
+              value={chequeNumber}
+              onChange={(e) => setChequeNumber(e.target.value)}
+              placeholder="e.g. 000123"
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
+            />
+          </div>
+        )}
+        <div className="sm:col-span-2">
+          <label className="block text-slate-500 mb-1">Remarks (optional)</label>
+          <input
+            data-testid="counter-deposit-remarks-input"
+            type="text"
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="e.g. Passbook update requested"
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <button
+            data-testid="counter-deposit-submit-btn"
+            type="submit"
+            disabled={submitting}
+            className="w-full sm:w-auto px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-700/25 active:scale-[0.98] transition text-white font-semibold disabled:opacity-60"
+          >
+            {submitting ? 'Crediting…' : 'Credit Account'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

@@ -121,6 +121,64 @@ function route_demand_draft(array $d): void
         'dd' => out($dd)]);
 }
 
+// --- Counter deposits ----------------------------------------------------------------
+// The cash or cheque a member hands over at the counter after their account
+// already exists. Account opening funds itself (route_register, api.php); this
+// is everything after that. Staff-only -- a member cannot credit their own
+// account this way -- and every deposit is tied to the teller who took it.
+const COUNTER_DEPOSIT_ROLES = ['staff', ...ADMIN_ROLES];
+const COUNTER_DEPOSIT_MODES = ['cash', 'cheque'];
+const COUNTER_DEPOSIT_MAX = 1000000.0;
+
+function route_counter_deposit(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(COUNTER_DEPOSIT_ROLES);
+    need($d, 'account_number', 'amount');
+    $amount = money($d['amount']);
+    if ($amount <= 0 || $amount > COUNTER_DEPOSIT_MAX) {
+        fail(422, 'Counter deposit must be between ₹1 and ' . rupees(COUNTER_DEPOSIT_MAX) . '.');
+    }
+    $mode = strtolower(clip($d['mode'] ?? 'cash', 10));
+    if (!in_array($mode, COUNTER_DEPOSIT_MODES, true)) {
+        fail(422, 'mode must be cash or cheque.');
+    }
+    $chequeNumber = $mode === 'cheque' ? clip($d['cheque_number'] ?? '', 20) : '';
+    if ($mode === 'cheque' && $chequeNumber === '') {
+        fail(422, 'Cheque number is required for a cheque deposit.');
+    }
+    $accountNumber = clip($d['account_number'], 30);
+
+    $pdo->beginTransaction();
+    $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$accountNumber]);
+    if (!$account) {
+        fail(404, 'No member account with that number.');
+    }
+    if ($account['status'] !== 'active') {
+        fail(403, 'This account is not active for deposits.');
+    }
+    $owner = row('SELECT * FROM users WHERE id = ?', [$account['user_id']]);
+    // A cash-in-hand counter deposit still has to clear the same "is this
+    // person who they say they are" bar as any other route that moves money
+    // into or out of a retail account -- see require_kyc_verified() in api.php.
+    require_kyc_verified($owner);
+
+    $newBalance = round((float)$account['balance'] + $amount, 2);
+    $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?')->execute([$amount, $account['id']]);
+    $ref = 'CD-' . gmdate('YmdHis') . '-' . random_int(100, 999);
+    $remarks = clip($d['remarks'] ?? '', 150);
+    $description = ($mode === 'cash' ? 'Cash deposited at the counter' : "Cheque #$chequeNumber deposited at the counter")
+        . ($remarks !== '' ? " — $remarks" : '');
+    insert_txn(['user_id' => $account['user_id'], 'account_number' => $accountNumber, 'type' => 'credit',
+        'mode' => 'COUNTER_DEPOSIT', 'amount' => $amount, 'balance_after' => $newBalance,
+        'counterparty_name' => $staff['name'], 'counterparty_acc' => 'BRANCH-CASH-DESK',
+        'ref_number' => $ref, 'description' => $description]);
+    audit($staff, 'COUNTER_DEPOSIT', "$accountNumber " . rupees($amount) . " ($mode) for {$owner['name']}");
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'ref_number' => $ref, 'new_balance' => $newBalance,
+        'message' => rupees($amount) . " credited to $accountNumber ({$owner['name']}). New balance: " . rupees($newBalance)]);
+}
+
 // --- Deposits ----------------------------------------------------------------------------
 function route_book_deposit(array $d): void
 {
@@ -207,6 +265,9 @@ function route_apply_loan(array $d): void
     require_kyc_verified($user);
     need($d, 'loan_type', 'amount_requested', 'tenure_months', 'monthly_income', 'employment_type', 'purpose');
     $type = strtolower(clip($d['loan_type'], 30));
+    if (!array_key_exists($type, LOAN_RATE_DEFAULTS)) {
+        fail(422, 'loan_type must be personal, home, vehicle or gold.');
+    }
     $amount = money($d['amount_requested']);
     $tenure = (int)$d['tenure_months'];
     $income = money($d['monthly_income']);
