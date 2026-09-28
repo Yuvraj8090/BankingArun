@@ -757,7 +757,7 @@ function route_self_register(array $d): void
         'Too many sign-ups from this connection. Please try again later, or call us on 9105015464.');
     captcha_verify($d);
 
-    need($d, 'name', 'phone');
+    need($d, 'name', 'phone', 'password');
     $name = clip($d['name'], 150);
     if (mb_strlen($name) < 2) {
         fail(422, 'Please enter your full name.');
@@ -771,6 +771,10 @@ function route_self_register(array $d): void
     if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         fail(422, 'That email address does not look right. Leave it blank if you have none.');
     }
+    // Checked with what the applicant just typed, same rule route_register and
+    // every password change use: length, not a breached password, and not just
+    // their own name or email address.
+    assert_password_acceptable($d['password'], [$name, $email === '' ? '' : strstr($email, '@', true)]);
     if ($email !== '' && row('SELECT id FROM users WHERE email = ?', [$email])) {
         fail(400, 'An account with this email already exists. Please sign in instead.');
     }
@@ -780,7 +784,7 @@ function route_self_register(array $d): void
 
     $userId = uuid4();
     $accountNumber = 'AJSP0' . digits(9);
-    $password = generate_password();
+    $password = $d['password'];
     $transactionPassword = digits(6);
 
     $pdo->beginTransaction();
@@ -808,7 +812,10 @@ function route_self_register(array $d): void
     // until a teller verifies this person's documents.
     respond(['status' => 'SUCCESS', 'user' => public_user($user),
         'account_number' => $accountNumber, 'user_id' => $accountNumber,
-        'password' => $password, 'transaction_password' => $transactionPassword,
+        // The login password was chosen by the applicant, so there is nothing
+        // to hand back for it. The transaction password is ours, generated
+        // just now, and this is the only time it is ever shown.
+        'transaction_password' => $transactionPassword,
         'token' => start_session($user),
         'message' => "Account $accountNumber created. Visit a branch or complete Video KYC to start "
             . "depositing, transferring or applying for a loan."]);
