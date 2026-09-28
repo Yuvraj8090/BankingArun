@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Banknote, Calculator, CheckCircle2, FileCheck, ArrowRight } from 'lucide-react';
 import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
@@ -14,6 +14,18 @@ export default function LoansPage() {
   const [purpose, setPurpose] = useState('Home Renovation / Appliance Purchase');
   const [submitting, setSubmitting] = useState(false);
   const [applicationResult, setApplicationResult] = useState(null);
+  // Past and pending applications -- without this a member who reloads the
+  // page, or comes back to apply for a second loan, has no way to see what
+  // they already applied for; the success card above only lives in state.
+  const [myLoans, setMyLoans] = useState([]);
+
+  const loadMyLoans = () => {
+    api.getMyLoans().then((res) => setMyLoans(res.loans || [])).catch(() => {});
+  };
+
+  useEffect(() => {
+    loadMyLoans();
+  }, []);
 
   const interestRates = {
     personal: 10.50,
@@ -57,8 +69,9 @@ export default function LoansPage() {
       });
       setApplicationResult(res);
       toast.success(res.message);
+      loadMyLoans();
     } catch (err) {
-      toast.error("Loan application failed");
+      toast.error(err.response?.data?.detail || "Loan application failed");
     } finally {
       setSubmitting(false);
     }
@@ -66,7 +79,7 @@ export default function LoansPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      
+
       {/* Header */}
       <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -95,7 +108,7 @@ export default function LoansPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Interactive Loan Sliders & Application Form */}
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-5">
           <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex justify-between items-center">
@@ -104,7 +117,7 @@ export default function LoansPage() {
           </h2>
 
           <form onSubmit={handleApplyLoan} className="space-y-4 text-xs">
-            
+
             {/* Amount Slider */}
             <div>
               <div className="flex justify-between text-slate-600 mb-1">
@@ -247,6 +260,79 @@ export default function LoansPage() {
           </div>
         </div>
 
+      </div>
+
+      {/* Application History */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-xl">
+        <div className="p-5 border-b border-slate-200 flex items-center gap-2">
+          <FileCheck className="w-4 h-4 text-[#0b3b8c]" />
+          <h2 className="font-bold text-slate-900 text-sm">Your Loan Applications</h2>
+        </div>
+        <div className="overflow-x-auto">
+          {myLoans.length ? (
+            <table className="w-full text-left text-xs" data-testid="my-loans-table">
+              <thead className="bg-slate-50 text-[11px] uppercase text-slate-600">
+                <tr>
+                  <th className="p-3 font-semibold">Application No.</th>
+                  <th className="p-3 font-semibold">Type</th>
+                  <th className="p-3 font-semibold text-right">Amount</th>
+                  <th className="p-3 font-semibold text-right">EMI</th>
+                  <th className="p-3 font-semibold">Applied</th>
+                  <th className="p-3 font-semibold">Pre-Check</th>
+                  <th className="p-3 font-semibold">Application Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {myLoans.map((l) => {
+                  // eligibility_status is the instant EMI-vs-income pre-check shown
+                  // at the moment of applying; status is the loan desk's actual
+                  // decision (route_loan_decision) -- two different things, so they
+                  // get two badges instead of one conflating the two.
+                  const statusStyle = {
+                    approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    rejected: 'bg-red-50 text-red-700 border-red-200',
+                    documentation: 'bg-blue-50 text-blue-700 border-blue-200',
+                  }[l.status] || 'bg-amber-50 text-amber-700 border-amber-200';
+                  const statusLabel = { under_review: 'Under Review', approved: 'Approved',
+                    rejected: 'Rejected', documentation: 'Docs Requested' }[l.status] || l.status;
+                  return (
+                    <tr key={l.id} className="hover:bg-blue-50/40 transition-colors">
+                      <td className="p-3 font-mono text-slate-900">{l.loan_application_no || '—'}</td>
+                      <td className="p-3 capitalize text-slate-700">{l.loan_type}</td>
+                      <td className="p-3 text-right font-semibold text-slate-900">
+                        {l.amount_requested != null ? `₹${l.amount_requested.toLocaleString('en-IN')}` : '—'}
+                      </td>
+                      <td className="p-3 text-right text-slate-700">
+                        {l.calculated_emi != null ? `₹${l.calculated_emi.toLocaleString('en-IN')}` : '—'}
+                      </td>
+                      <td className="p-3 text-slate-500">{new Date(l.created_at).toLocaleDateString('en-IN')}</td>
+                      <td className="p-3">
+                        {l.eligibility_status && (
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            l.eligibility_status === 'Pre-Approved'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {l.eligibility_status}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusStyle}`}>
+                          {statusLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-10 text-center text-xs text-slate-500">
+              No loan applications yet — use the calculator above to apply.
+            </div>
+          )}
+        </div>
       </div>
 
     </div>
