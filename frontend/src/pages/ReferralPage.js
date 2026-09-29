@@ -475,28 +475,38 @@ export default function ReferralPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {history.referrals.map(r => (
-                  <tr key={r.id} className="hover:bg-blue-50/40 transition-colors">
-                    <td className="p-3 font-semibold text-slate-900">
-                      {r.referee_name || <span className="text-slate-400">name not recorded</span>}
-                    </td>
-                    {/* Phone first: an email is optional for a member and most
-                        do not have one, so an email column was usually blank. */}
-                    <td className="p-3 text-slate-600">
-                      {r.referee_phone || r.referee_email || <span className="text-slate-400">—</span>}
-                      {r.referee_phone && r.referee_email && (
-                        <span className="block text-[10px] text-slate-500">{r.referee_email}</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-slate-500">{new Date(r.created_at).toLocaleDateString('en-IN')}</td>
-                    <td className="p-3">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <CheckCircle2 className="w-2.5 h-2.5" /> {r.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right font-bold text-emerald-700">₹{r.credit_amount.toLocaleString('en-IN')}</td>
-                  </tr>
-                ))}
+                {history.referrals.map(r => {
+                  const paid = r.status === 'paid';
+                  return (
+                    <tr key={r.id} className="hover:bg-blue-50/40 transition-colors">
+                      <td className="p-3 font-semibold text-slate-900">
+                        {r.referee_name || <span className="text-slate-400">name not recorded</span>}
+                      </td>
+                      {/* Phone first: an email is optional for a member and most
+                          do not have one, so an email column was usually blank. */}
+                      <td className="p-3 text-slate-600">
+                        {r.referee_phone || r.referee_email || <span className="text-slate-400">—</span>}
+                        {r.referee_phone && r.referee_email && (
+                          <span className="block text-[10px] text-slate-500">{r.referee_email}</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-slate-500">{new Date(r.created_at).toLocaleDateString('en-IN')}</td>
+                      <td className="p-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                          paid
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {paid ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Info className="w-2.5 h-2.5" />}
+                          {paid ? 'paid' : 'pending KYC'}
+                        </span>
+                      </td>
+                      <td className={`p-3 text-right font-bold ${paid ? 'text-emerald-700' : 'text-slate-500'}`}>
+                        {paid ? `₹${r.credit_amount.toLocaleString('en-IN')}` : 'After KYC'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           ) : (

@@ -728,14 +728,25 @@ function route_referral_history(array $d): void
     // written by anything other than the bonus path. The live name wins where
     // there is one; the snapshot is the fallback, so an account that has since
     // been removed still shows who it was.
-    $items = out_all(rows("SELECT r.id, COALESCE(u.name, r.referee_name) AS referee_name,
+    $paidRows = rows("SELECT r.id, COALESCE(u.name, r.referee_name) AS referee_name,
             u.phone AS referee_phone, COALESCE(u.email, r.referee_email) AS referee_email,
             r.code, r.credit_amount, r.status, r.created_at
         FROM referrals r LEFT JOIN users u ON u.id = r.referee_id
-        WHERE r.referrer_id = ? ORDER BY r.created_at DESC LIMIT 100", [$user['id']]));
+        WHERE r.referrer_id = ? ORDER BY r.created_at DESC LIMIT 100", [$user['id']]);
+    $code = $user['referral_code'] ?? '';
+    $pendingRows = $code === '' ? [] : rows("SELECT CONCAT('pending-', u.id) AS id,
+            u.name AS referee_name, u.phone AS referee_phone, u.email AS referee_email,
+            u.referred_by_code AS code, 0 AS credit_amount, 'pending_kyc' AS status, u.created_at
+        FROM users u
+        WHERE u.referred_by_code = ? AND u.id <> ?
+            AND NOT EXISTS (SELECT 1 FROM referrals r WHERE r.referee_id = u.id)
+        ORDER BY u.created_at DESC LIMIT 100", [$code, $user['id']]);
+    $items = out_all(array_merge($paidRows, $pendingRows));
+    usort($items, fn($a, $b) => strcmp((string)$b['created_at'], (string)$a['created_at']));
+    $items = array_slice($items, 0, 100);
     $paid = array_filter($items, fn($i) => $i['status'] === 'paid');
     respond(['referrals' => $items, 'total_earned' => (float)array_sum(array_column($paid, 'credit_amount')),
-        'count' => count($items)]);
+        'count' => count($items), 'pending_count' => count($pendingRows)]);
 }
 
 // --- What the brochure's referral table actually says -------------------------------------

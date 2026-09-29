@@ -430,6 +430,20 @@ call PUT /admin/config "$OWNER" '{"live_otp":true}'
 ck "live OTP is refused with no way to deliver a code" 422 "$CODE"
 has "and says what is missing" "$BODY" "Twilio"
 
+print "\n-- referrals before KYC --"
+call GET /referrals/my-code "$RETAIL"
+REFCODE=$(print -r -- "$BODY" | jq_ 'print(d["referral_code"])')
+PENDING_HASH=$(php -r 'echo password_hash("Pending@123", PASSWORD_BCRYPT);')
+Q "DELETE FROM referrals WHERE referee_id='apitest-ref-pending';
+   DELETE FROM users WHERE id='apitest-ref-pending' OR email='apitest.pending.referral@example.com';
+   INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash, branch, kyc_status, referred_by_code)
+   VALUES ('apitest-ref-pending', 'APITEST Pending Referral', 'apitest.pending.referral@example.com',
+     '+91 90000 00123', 'retail', '$PENDING_HASH', '$PENDING_HASH',
+     'AJSP-MUM-042 (Nariman Point Main)', 'pending_approval', '$REFCODE');" >/dev/null
+call GET /referrals/history "$RETAIL"
+has "pending referred sign-up appears before KYC" "$BODY" "APITEST Pending Referral"
+has "pending referred sign-up is labelled pending" "$BODY" "pending_kyc"
+
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
    DELETE FROM fraud_alerts; DELETE FROM security_events; DELETE FROM login_attempts;
@@ -439,6 +453,8 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
      OR action='SUPPORT_TICKET' OR action LIKE 'CRM%' OR action='REPORT_EXPORTED';
    DELETE FROM kyc_documents WHERE lead_id IN (SELECT id FROM crm_leads WHERE phone='+91 90222 33444')
       OR user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
+   DELETE FROM referrals WHERE referee_id='apitest-ref-pending';
+   DELETE FROM users WHERE id='apitest-ref-pending' OR email='apitest.pending.referral@example.com';
    DELETE FROM cards WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
    DELETE FROM transactions WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
    DELETE FROM accounts WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
