@@ -1137,3 +1137,21 @@ UPDATE reward_programmes SET
 -- Internal (staff/back-office) logins created from Director user access get a
 -- reference ID of their own, separate from the email they sign in with.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_id VARCHAR(20) UNIQUE;
+
+-- --- Seeded demo names without a role baked in ----------------------------
+-- schema.sql used to seed these five accounts with the role/title folded into
+-- the name itself (e.g. "Vikram Kothari (Bank Owner)"). The title has its own
+-- column -- designation -- so it leaked wherever the bare name is shown, most
+-- visibly as the counterparty on a transaction that account touched. Each
+-- WHERE keys off the old polluted value, so this is safe to run again and
+-- never overwrites a name someone has since edited by hand.
+UPDATE users SET name = 'Arunabh Mukherjee', designation = 'Chief Branch Manager'
+    WHERE id = 'admin-001' AND name = 'Arunabh Mukherjee (Chief Branch Manager)';
+UPDATE users SET name = 'Vikram Kothari'
+    WHERE id = 'owner-001' AND name = 'Vikram Kothari (Bank Owner)';
+UPDATE users SET name = 'Meera Iyer'
+    WHERE id = 'staff-001' AND name = 'Meera Iyer (Customer Service Officer)';
+UPDATE users SET name = 'Rajesh Nair'
+    WHERE id = 'collect-001' AND name = 'Rajesh Nair (Collection Agent)';
+UPDATE users SET name = 'Aditi Verma'
+    WHERE id = 'loan-001' AND name = 'Aditi Verma (Loan Officer)';
