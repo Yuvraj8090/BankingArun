@@ -260,7 +260,7 @@ function admit_member(array $user, int $shares, array $extra, array $actor): arr
     $pdo->beginTransaction();
     $pdo->prepare('INSERT INTO member_register (id, user_id, folio_no, admitted_on, shares_held,
             share_face_value, certificate_no, address, occupation, introduced_by, is_pep)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$memberId, $user['id'], $folio, $today, $shares, SHARE_FACE_VALUE, $certificate,
             clip($extra['address'] ?? '', 500) ?: null, clip($extra['occupation'] ?? '', 100) ?: null,
             clip($extra['introduced_by'] ?? '', 36) ?: null, !empty($extra['is_pep']) ? 1 : 0]);
