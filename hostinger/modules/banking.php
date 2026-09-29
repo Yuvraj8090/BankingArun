@@ -171,7 +171,11 @@ function route_counter_deposit(array $d): void
         . ($remarks !== '' ? " — $remarks" : '');
     insert_txn(['user_id' => $account['user_id'], 'account_number' => $accountNumber, 'type' => 'credit',
         'mode' => 'COUNTER_DEPOSIT', 'amount' => $amount, 'balance_after' => $newBalance,
-        'counterparty_name' => $staff['name'], 'counterparty_acc' => 'BRANCH-CASH-DESK',
+        // The member's own passbook shows who they paid the money to (the branch
+        // counter), not which teller happened to key it in -- that belongs in the
+        // audit trail below, not in a line that reads like someone paid *them*.
+        'counterparty_name' => $mode === 'cash' ? 'Cash Deposit (Counter)' : 'Cheque Deposit (Counter)',
+        'counterparty_acc' => 'BRANCH-CASH-DESK',
         'ref_number' => $ref, 'description' => $description]);
     audit($staff, 'COUNTER_DEPOSIT', "$accountNumber " . rupees($amount) . " ($mode) for {$owner['name']}");
     $pdo->commit();

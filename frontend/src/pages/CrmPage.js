@@ -8,7 +8,7 @@ import Pagination from '../components/Pagination';
 import Modal, { PasswordGenField } from '../components/Modal';
 import { ValueField as Field } from '../components/FormField';
 import DocumentUpload from '../components/DocumentUpload';
-import { inr } from '../utils/format';
+import { inr, txnMode } from '../utils/format';
 import { toast } from 'sonner';
 
 const TABS = [['members', 'Members'], ['leads', 'Leads'], ['tasks', 'My Tasks']];
@@ -265,7 +265,7 @@ function Member360({ id, onBack }) {
         <Panel title="Recent activity">
           {data.recent_transactions.map((t, i) => (
             <Row key={i}
-              left={<>{t.counterparty_name || t.mode}<br /><span className="text-slate-500">{day(t.timestamp)}</span></>}
+              left={<>{t.counterparty_name || txnMode(t.mode)}<br /><span className="text-slate-500">{day(t.timestamp)}</span></>}
               right={<span className={t.type === 'credit' ? 'text-emerald-700 font-semibold' : 'text-slate-900 font-semibold'}>
                 {t.type === 'credit' ? '+' : '−'}{money(t.amount)}
               </span>} />

@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import Modal, { Field, inputClass, PasswordGenField } from '../components/Modal';
 import Pagination from '../components/Pagination';
 import { toast } from 'sonner';
+import { txnMode } from '../utils/format';
 
 const ACCESS_ROLES = [
   ['bank_owner', 'Director'],
@@ -151,7 +152,7 @@ export default function AdminPortal() {
                   {(overview?.high_value_transactions || []).map(t => (
                     <tr key={t.id} className="hover:bg-blue-50/40 transition-colors">
                       <td className="p-3 font-mono text-[#0b3b8c]">{t.ref_number}</td>
-                      <td className="p-3 font-semibold text-slate-800">{t.mode}</td>
+                      <td className="p-3 font-semibold text-slate-800">{txnMode(t.mode)}</td>
                       <td className="p-3 text-slate-700">{t.counterparty_name}</td>
                       <td className="p-3 font-mono text-slate-700">{t.account_number}</td>
                       <td className="p-3 font-bold text-[#c8102e]">₹{t.amount.toLocaleString('en-IN')}</td>

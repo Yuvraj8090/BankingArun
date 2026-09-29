@@ -263,7 +263,11 @@ function route_kyc_verify_and_fund(array $d): void
                 ->execute([$terms['due_today'], $account['account_number']]);
             insert_txn(['user_id' => $customer['id'], 'account_number' => $account['account_number'],
                 'type' => 'credit', 'mode' => 'COUNTER_DEPOSIT', 'amount' => $terms['due_today'],
-                'balance_after' => $balanceOf(), 'counterparty_name' => $admin['name'],
+                'balance_after' => $balanceOf(),
+                // Same reasoning as route_counter_deposit (banking.php): the member's
+                // own statement should read as a deposit to the branch counter, not
+                // as money received from whichever admin approved the KYC.
+                'counterparty_name' => $mode === 'cash' ? 'Cash Deposit (Counter)' : 'Cheque Deposit (Counter)',
                 'counterparty_acc' => 'BRANCH-CASH-DESK',
                 'ref_number' => 'CD-' . gmdate('YmdHis') . '-' . random_int(100, 999),
                 'description' => ($mode === 'cash' ? 'Cash' : "Cheque #$chequeNumber")
