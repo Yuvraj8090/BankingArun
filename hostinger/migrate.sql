@@ -123,6 +123,20 @@ ALTER TABLE users
 -- shown. Older databases did not have the column.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(12) UNIQUE;
 
+CREATE TABLE IF NOT EXISTS referrals (
+    id VARCHAR(36) PRIMARY KEY,
+    referrer_id VARCHAR(36) NOT NULL,
+    referrer_email VARCHAR(150),
+    referee_id VARCHAR(36) NOT NULL,
+    referee_name VARCHAR(150),
+    referee_email VARCHAR(150),
+    code VARCHAR(12) NOT NULL,
+    credit_amount DECIMAL(12,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'paid',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_referrer (referrer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ---------------------------------------------------------------------------
 -- CRM: what we know about a member beyond their balances
 -- ---------------------------------------------------------------------------
@@ -1171,3 +1185,13 @@ UPDATE users SET name = 'Rajesh Nair'
     WHERE id = 'collect-001' AND name = 'Rajesh Nair (Collection Agent)';
 UPDATE users SET name = 'Aditi Verma'
     WHERE id = 'loan-001' AND name = 'Aditi Verma (Loan Officer)';
+
+-- --- Simple daily-interest schemes -----------------------------------------
+-- A slab table is the wrong shape for "any amount earns X% a day": there is no
+-- finite list of denominations to price, so a scheme can carry a flat percent
+-- instead and skip slabs entirely (see scheme_deposit_terms, modules/master.php).
+-- withdrawal_threshold holds a deposit's daily credits back until they add up
+-- to something worth releasing (run_daily_interest_accrual, cron.php).
+ALTER TABLE schemes ADD COLUMN IF NOT EXISTS daily_rate_percent DECIMAL(6,3);
+ALTER TABLE schemes ADD COLUMN IF NOT EXISTS withdrawal_threshold DECIMAL(15,2);
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS accrued_interest DECIMAL(15,2) NOT NULL DEFAULT 0.00;

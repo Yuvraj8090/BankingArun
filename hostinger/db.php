@@ -158,7 +158,8 @@ function scalar(string $sql, array $params = []): mixed
 const FLOAT_COLUMNS = ['balance', 'amount', 'balance_after', 'online_limit', 'atm_limit', 'principal_amount',
     'interest_rate', 'maturity_amount', 'fee', 'invested_amount', 'current_value', 'units', 'outstanding', 'roi',
     'face_match_score', 'lat', 'lng', 'credit_amount', 'sum_assured', 'annual_premium', 'amount_requested',
-    'calculated_emi', 'monthly_income', 'total_deposit', 'contribution_amount', 'collected_total'];
+    'calculated_emi', 'monthly_income', 'total_deposit', 'contribution_amount', 'collected_total',
+    'daily_rate_percent', 'withdrawal_threshold', 'accrued_interest'];
 const BOOL_COLUMNS = ['is_virtual', 'international_enabled', 'contactless_enabled', 'ecom_enabled', 'upi_linked',
     'is_joint', 'mfa_enabled', 'has_atm', 'has_cdm', 'has_locker', 'verified'];
 const TIME_COLUMNS = ['created_at', 'timestamp', 'submitted_at', 'reviewed_at', 'verified_at'];

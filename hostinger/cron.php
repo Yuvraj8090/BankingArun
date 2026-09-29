@@ -210,6 +210,71 @@ function run_deposit_interest(string $today, bool $dryRun, bool $verbose): array
     return [$paid, $failed];
 }
 
+// A simple daily-interest deposit (scheme.daily_rate_percent set) earns
+// principal x rate every day, but the credit is not paid into the account
+// straight away -- it piles up in deposits.accrued_interest until it reaches
+// the scheme's withdrawal_threshold, then goes out in one credit. A scheme
+// with no threshold (or 0) pays out daily with nothing held back, the same
+// as run_deposit_interest above but daily instead of monthly.
+function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose): array
+{
+    global $pdo;
+    $accrued = $released = $failed = 0;
+    $due = rows("SELECT d.*, s.daily_rate_percent, s.withdrawal_threshold FROM deposits d
+        JOIN schemes s ON s.code = d.scheme_code
+        WHERE d.status = 'active' AND d.interest_payout = 'daily' AND d.source_account IS NOT NULL
+          AND d.maturity_date > ?
+          AND (d.last_payout_date IS NULL OR d.last_payout_date < ?)
+        ORDER BY d.created_at LIMIT " . CRON_BATCH, [$today, $today]);
+
+    foreach ($due as $deposit) {
+        $interest = round((float)$deposit['principal_amount'] * (float)$deposit['daily_rate_percent'] / 100, 2);
+        if ($interest <= 0) {
+            continue;
+        }
+        $label = "Deposit {$deposit['deposit_number']} daily interest " . rupees($interest);
+        if ($dryRun) {
+            say("  would accrue $label");
+            $accrued++;
+            continue;
+        }
+        $pdo->beginTransaction();
+        $locked = row("SELECT * FROM deposits WHERE id = ? AND status = 'active' FOR UPDATE", [$deposit['id']]);
+        if (!$locked || ($locked['last_payout_date'] !== null && $locked['last_payout_date'] >= $today)) {
+            $pdo->rollBack();
+            continue;
+        }
+        $total = round((float)$locked['accrued_interest'] + $interest, 2);
+        $threshold = (float)$deposit['withdrawal_threshold'];
+        if ($threshold <= 0 || $total >= $threshold) {
+            $ref = 'DINT-' . $locked['deposit_number'] . '-' . str_replace('-', '', $today);
+            [$ok, $result] = credit($locked['source_account'], $total, 'DEPOSIT_INTEREST',
+                'AJSPay Daily Interest', "Daily interest on deposit {$locked['deposit_number']}", $ref);
+            if (!$ok) {
+                $pdo->rollBack();
+                $failed++;
+                say("  FAILED     $label — $result");
+                continue;
+            }
+            $pdo->prepare('UPDATE deposits SET interest_paid = interest_paid + ?, accrued_interest = 0,
+                last_payout_date = ? WHERE id = ?')->execute([$total, $today, $locked['id']]);
+            $released++;
+            if ($verbose) {
+                say("  released   " . rupees($total) . " on {$locked['deposit_number']} to {$locked['source_account']}");
+            }
+        } else {
+            $pdo->prepare('UPDATE deposits SET accrued_interest = ?, last_payout_date = ? WHERE id = ?')
+                ->execute([$total, $today, $locked['id']]);
+            $accrued++;
+            if ($verbose) {
+                say("  accrued    $label (" . rupees($total) . " of " . rupees($threshold) . ")");
+            }
+        }
+        $pdo->commit();
+    }
+    return [$accrued, $released, $failed];
+}
+
 function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): array
 {
     global $pdo;
@@ -219,10 +284,15 @@ function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): arr
 
     foreach ($due as $deposit) {
         // A monthly-payout deposit has already had its interest paid out along the
-        // way, so only the principal is returned at the end.
-        $payout = $deposit['interest_payout'] === 'monthly'
-            ? (float)$deposit['principal_amount']
-            : (float)$deposit['maturity_amount'];
+        // way, so only the principal is returned at the end. A daily-payout
+        // deposit is the same, except whatever is still sitting in
+        // accrued_interest below the withdrawal threshold has nowhere else to
+        // go, so it rides along with the principal rather than being lost.
+        $payout = match ($deposit['interest_payout']) {
+            'monthly' => (float)$deposit['principal_amount'],
+            'daily' => (float)$deposit['principal_amount'] + (float)$deposit['accrued_interest'],
+            default => (float)$deposit['maturity_amount'],
+        };
         $label = "Deposit {$deposit['deposit_number']} matured, " . rupees($payout);
         if ($dryRun) {
             say("  would pay  $label");
@@ -245,8 +315,8 @@ function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): arr
             continue;
         }
         $interestPart = round($payout - (float)$locked['principal_amount'], 2);
-        $pdo->prepare("UPDATE deposits SET status = 'matured', matured_on = ?, interest_paid = interest_paid + ?
-            WHERE id = ?")->execute([now_utc(), max($interestPart, 0), $locked['id']]);
+        $pdo->prepare("UPDATE deposits SET status = 'matured', matured_on = ?, interest_paid = interest_paid + ?,
+            accrued_interest = 0 WHERE id = ?")->execute([now_utc(), max($interestPart, 0), $locked['id']]);
         $owner = row('SELECT * FROM users WHERE id = ?', [$locked['user_id']]);
         if ($owner) {
             audit($owner, 'DEPOSIT_MATURED', "{$locked['deposit_number']} paid " . rupees($payout));
@@ -434,6 +504,7 @@ try {
     [$siDone, $siFailed] = run_standing_instructions($today, $dryRun, $verbose);
     [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
     [$intDone, $intFailed] = run_deposit_interest($today, $dryRun, $verbose);
+    [$dailyAccrued, $dailyReleased, $dailyFailed] = run_daily_interest_accrual($today, $dryRun, $verbose);
     [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
     [$railSent, $railFailed, $railDone, $railStuck] = run_rail_reconciliation($dryRun, $verbose);
 } catch (Throwable $e) {
@@ -454,17 +525,19 @@ scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
 say("Standing instructions: $siDone run, $siFailed failed. "
     . "Scheduled transfers: $payDone run, $payFailed failed. "
     . "Deposit interest: $intDone paid, $intFailed failed. "
+    . "Daily interest: $dailyAccrued accrued, $dailyReleased released, $dailyFailed failed. "
     . "Maturities: $matDone paid, $matFailed failed. "
     . "Payment rail: $railSent dispatched, $railFailed failed, $railDone settled, $railStuck still pending.");
 $finished = true;
 // A rail transaction that is still pending is not a failure — the partner has
 // simply not answered yet — so it does not make the run report a problem.
-$problems = $siFailed + $payFailed + $intFailed + $matFailed + $railFailed;
+$problems = $siFailed + $payFailed + $intFailed + $dailyFailed + $matFailed + $railFailed;
 $pdo->prepare('UPDATE cron_runs SET finished_at = NOW(), status = ?, jobs = ? WHERE id = ?')
     ->execute([$problems > 0 ? 'attention' : 'ok', json_encode([
         'standing_instructions' => ['done' => $siDone, 'failed' => $siFailed],
         'scheduled_payments' => ['done' => $payDone, 'failed' => $payFailed],
         'deposit_interest' => ['done' => $intDone, 'failed' => $intFailed],
+        'daily_interest' => ['accrued' => $dailyAccrued, 'released' => $dailyReleased, 'failed' => $dailyFailed],
         'deposit_maturities' => ['done' => $matDone, 'failed' => $matFailed],
         'payment_rail' => ['done' => $railDone, 'failed' => $railFailed,
             'dispatched' => $railSent, 'pending' => $railStuck],

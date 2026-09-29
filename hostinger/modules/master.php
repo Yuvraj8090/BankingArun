@@ -129,11 +129,19 @@ function cap_compliant_maturity(array $scheme): ?array
 function scheme_public(array $scheme): array
 {
     $scheme = out($scheme);
-    $rate = effective_rate($scheme);
+    // A simple daily-interest plan's rate is the percent itself, not something
+    // to reverse-engineer from a deposit/maturity pair -- effective_rate() has
+    // nothing to work from here (there is no slab, and total_deposit/
+    // maturity_amount are only an illustrative example).
+    $rate = $scheme['daily_rate_percent'] !== null
+        ? round((float)$scheme['daily_rate_percent'] * 365, 2)
+        : effective_rate($scheme);
     $scheme['effective_rate_pa'] = $rate;
     $scheme['exceeds_cap'] = $rate !== null && $rate > NIDHI_MAX_DEPOSIT_RATE;
-    // Only worked out where it is needed: a plan inside the cap has nothing to fix.
-    $scheme['cap_compliant'] = $scheme['exceeds_cap'] ? cap_compliant_maturity($scheme) : null;
+    // Only worked out where it is needed: a plan inside the cap has nothing to fix,
+    // and there is no slab-priced form of a daily-percent plan to solve for.
+    $scheme['cap_compliant'] = $scheme['exceeds_cap'] && $scheme['daily_rate_percent'] === null
+        ? cap_compliant_maturity($scheme) : null;
     // Rate every denomination, not just the representative one. A slab whose own
     // figures imply a different return is either priced differently on purpose or
     // is a misprint, and either way somebody should be able to see it.
@@ -173,6 +181,26 @@ function scheme_public(array $scheme): array
 // so rather than the figure being quietly trimmed to fit.
 function scheme_deposit_terms(array $scheme, float $unit): array
 {
+    // A simple daily-interest plan has no slab table -- any amount at or above
+    // the minimum earns the same flat percent of itself, so there is nothing to
+    // look up. Interest is credited daily and held back until it crosses
+    // withdrawal_threshold (run_daily_interest_accrual, cron.php), not baked
+    // into the maturity figure, so the principal is what matures.
+    if ($scheme['daily_rate_percent'] !== null) {
+        $min = (float)$scheme['principal_amount'];
+        if ($unit < $min) {
+            fail(422, 'The minimum deposit for this plan is ' . rupees($min) . '.');
+        }
+        $rate = round((float)$scheme['daily_rate_percent'] * 365, 2);
+        return [
+            'scheme_code' => $scheme['code'], 'scheme_name' => $scheme['name'], 'unit' => $unit,
+            'by_instalment' => false, 'due_today' => $unit, 'total_deposit' => $unit, 'maturity_amount' => $unit,
+            'monthly_payout' => null, 'deposit_type' => 'fixed', 'interest_payout' => 'daily',
+            'interest_rate' => $rate, 'tenure_months' => (int)$scheme['tenure_months'],
+            'exceeds_cap' => $rate > NIDHI_MAX_DEPOSIT_RATE,
+        ];
+    }
+
     $slabs = json_decode((string)($scheme['slabs'] ?? ''), true);
     $slab = null;
     foreach (is_array($slabs) ? $slabs : [] as $row) {
@@ -245,9 +273,50 @@ function scheme_payload(array $d, array $existing = []): array
         fail(422, 'tenure_months must be between 1 and 360.');
     }
     $payout = $get('payout_type', 'maturity');
+    $code = strtoupper(clip($get('code', ''), 20));
+    $name = clip($get('name', ''), 120);
+    if ($code === '' || $name === '') {
+        fail(422, 'code and name are required.');
+    }
+
+    // A simple daily-interest plan (daily_rate_percent set): any amount at or
+    // above the minimum earns that percent of itself per day, so there is no
+    // finite slab table to price -- total_deposit/maturity_amount/slabs are
+    // filled in as an illustrative example instead of being typed by hand, and
+    // the whole slab-cap walk below does not apply (there is only one rate).
+    //
+    // Read directly off $d rather than through $get(): the editor always sends
+    // this key, including an explicit null to switch a plan away from daily
+    // pricing, and $get()'s ?? would otherwise treat that null the same as
+    // "not sent" and fall back to $existing -- silently undoing the switch.
+    $dailyRateRaw = array_key_exists('daily_rate_percent', $d) ? $d['daily_rate_percent'] : $get('daily_rate_percent');
+    $dailyRate = $dailyRateRaw === null || $dailyRateRaw === '' ? null : (float)$dailyRateRaw;
+    if ($dailyRate !== null) {
+        if ($dailyRate <= 0 || $dailyRate > 5) {
+            fail(422, 'daily_rate_percent must be greater than 0 and at most 5.');
+        }
+        $minDeposit = money($get('principal_amount') ?: 1000);
+        $threshold = $get('withdrawal_threshold') === null || $get('withdrawal_threshold') === ''
+            ? null : money($get('withdrawal_threshold'));
+        $example = round($minDeposit * (1 + $dailyRate / 100 * $months * 30), 2);
+        $annualRate = round($dailyRate * 365, 2);
+        if ($status === 'active' && $annualRate > NIDHI_MAX_DEPOSIT_RATE) {
+            fail(422, sprintf('%s%% a day works out to about %.2f%% a year, above the %.1f%% cap in the '
+                . 'Nidhi Rules, 2014. Save it as a draft or lower the rate.',
+                rtrim(rtrim(number_format($dailyRate, 3), '0'), '.'), $annualRate, NIDHI_MAX_DEPOSIT_RATE));
+        }
+        return [
+            'code' => $code, 'name' => $name, 'scheme_type' => $type, 'tenure_months' => $months,
+            'contribution_months' => null, 'contribution_amount' => null,
+            'principal_amount' => $minDeposit, 'total_deposit' => $minDeposit, 'maturity_amount' => $example,
+            'payout_type' => 'daily', 'daily_rate_percent' => $dailyRate, 'withdrawal_threshold' => $threshold,
+            'slabs' => null, 'status' => $status, 'notes' => clip($get('notes', ''), 255) ?: null,
+        ];
+    }
+
     $scheme = [
-        'code' => strtoupper(clip($get('code', ''), 20)),
-        'name' => clip($get('name', ''), 120),
+        'code' => $code,
+        'name' => $name,
         'scheme_type' => $type,
         'tenure_months' => $months,
         'contribution_months' => $get('contribution_months') === null || $get('contribution_months') === ''
@@ -259,13 +328,11 @@ function scheme_payload(array $d, array $existing = []): array
         'total_deposit' => money($get('total_deposit', 0)),
         'maturity_amount' => money($get('maturity_amount', 0)),
         'payout_type' => in_array($payout, ['maturity', 'monthly'], true) ? $payout : 'maturity',
+        'daily_rate_percent' => null, 'withdrawal_threshold' => null,
         'slabs' => scheme_slabs($get('slabs'), $payout === 'monthly'),
         'status' => $status,
         'notes' => clip($get('notes', ''), 255) ?: null,
     ];
-    if ($scheme['code'] === '' || $scheme['name'] === '') {
-        fail(422, 'code and name are required.');
-    }
     if ($scheme['total_deposit'] <= 0 || $scheme['maturity_amount'] <= 0) {
         fail(422, 'total_deposit and maturity_amount must both be greater than 0.');
     }

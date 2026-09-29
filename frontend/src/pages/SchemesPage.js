@@ -10,6 +10,7 @@ const BLANK = {
   code: '', name: '', scheme_type: 'recurring', tenure_months: 12, contribution_months: '',
   contribution_amount: '',
   principal_amount: '', total_deposit: '', maturity_amount: '', payout_type: 'maturity',
+  daily_rate_percent: '', withdrawal_threshold: '',
   status: 'draft', notes: '', slabs: []
 };
 
@@ -51,8 +52,20 @@ export default function SchemesPage() {
     setSaving(true);
     try {
       const payload = { ...form };
-      ['tenure_months', 'contribution_amount', 'principal_amount', 'total_deposit', 'maturity_amount']
+      ['tenure_months', 'contribution_amount', 'principal_amount', 'total_deposit', 'maturity_amount',
+        'daily_rate_percent', 'withdrawal_threshold']
         .forEach(k => { payload[k] = payload[k] === '' ? null : Number(payload[k]); });
+      // A simple daily-% plan has no slab table -- total_deposit/maturity_amount
+      // are filled in server-side as an illustrative example, and slabs stays
+      // empty so an old plan's leftover rows are not carried into it by mistake.
+      if (payload.payout_type === 'daily') {
+        payload.total_deposit = null;
+        payload.maturity_amount = null;
+        payload.slabs = [];
+      } else {
+        payload.daily_rate_percent = null;
+        payload.withdrawal_threshold = null;
+      }
       const r = form.id ? await api.schemeUpdate(form.id, payload) : await api.schemeCreate(payload);
       toast.success(r.message);
       setForm(null);
@@ -145,10 +158,14 @@ export default function SchemesPage() {
                   {s.contribution_months && s.contribution_months < s.tenure_months
                     && <span className="block text-[9px] text-slate-500">pay in {s.contribution_months} mo</span>}
                 </td>
-                <td className="p-3 text-right text-slate-700">₹{Number(s.total_deposit).toLocaleString('en-IN')}</td>
-                <td className="p-3 text-right text-slate-700">₹{Number(s.maturity_amount).toLocaleString('en-IN')}</td>
+                <td className="p-3 text-right text-slate-700">
+                  {s.daily_rate_percent != null ? `₹${Number(s.principal_amount).toLocaleString('en-IN')}+` : `₹${Number(s.total_deposit).toLocaleString('en-IN')}`}
+                </td>
+                <td className="p-3 text-right text-slate-700">
+                  {s.daily_rate_percent != null ? `${s.daily_rate_percent}%/day` : `₹${Number(s.maturity_amount).toLocaleString('en-IN')}`}
+                </td>
                 <td className="p-3 text-right text-slate-600">
-                  {s.slabs?.length || 0}
+                  {s.daily_rate_percent != null ? 'any amount' : (s.slabs?.length || 0)}
                   {s.slabs?.some(x => x.exceeds_cap) && (
                     <span className="block text-[9px] text-[#c8102e] font-semibold">
                       {s.slabs.filter(x => x.exceeds_cap).length} over cap
@@ -229,13 +246,32 @@ export default function SchemesPage() {
             <Field label="Pay-in months (blank = whole tenure)" type="number" value={form.contribution_months ?? ''}
               onChange={v => setForm(f => ({ ...f, contribution_months: v }))} testId="scheme-payin" />
             <Field label="Per instalment (₹)" type="number" value={form.contribution_amount ?? ''} onChange={v => setForm(f => ({ ...f, contribution_amount: v }))} />
-            <Field label="Lump sum principal (₹)" type="number" value={form.principal_amount ?? ''} onChange={v => setForm(f => ({ ...f, principal_amount: v }))} />
-            <Field label="Total deposit (₹)" type="number" value={form.total_deposit} onChange={v => setForm(f => ({ ...f, total_deposit: v }))} testId="scheme-deposit" />
-            <Field label="Maturity amount (₹)" type="number" value={form.maturity_amount} onChange={v => setForm(f => ({ ...f, maturity_amount: v }))} testId="scheme-maturity" />
-            <Select label="Payout" value={form.payout_type} options={[['maturity', 'On maturity'], ['monthly', 'Monthly']]}
-              onChange={v => setForm(f => ({ ...f, payout_type: v }))} />
+            <Field label={form.payout_type === 'daily' ? 'Minimum deposit (₹)' : 'Lump sum principal (₹)'}
+              type="number" value={form.principal_amount ?? ''} onChange={v => setForm(f => ({ ...f, principal_amount: v }))} />
+            {form.payout_type !== 'daily' && (<>
+              <Field label="Total deposit (₹)" type="number" value={form.total_deposit} onChange={v => setForm(f => ({ ...f, total_deposit: v }))} testId="scheme-deposit" />
+              <Field label="Maturity amount (₹)" type="number" value={form.maturity_amount} onChange={v => setForm(f => ({ ...f, maturity_amount: v }))} testId="scheme-maturity" />
+            </>)}
+            <Select label="Payout" value={form.payout_type}
+              options={[['maturity', 'On maturity'], ['monthly', 'Monthly (slab table)'], ['daily', 'Daily % (simple)']]}
+              onChange={v => setForm(f => ({ ...f, payout_type: v }))} testId="scheme-payout" />
+            {form.payout_type === 'daily' && (<>
+              <Field label="Daily rate (%)" type="number" value={form.daily_rate_percent ?? ''}
+                onChange={v => setForm(f => ({ ...f, daily_rate_percent: v }))} testId="scheme-daily-rate" />
+              <Field label="Withdrawal threshold (₹, blank = pay out daily)" type="number"
+                value={form.withdrawal_threshold ?? ''}
+                onChange={v => setForm(f => ({ ...f, withdrawal_threshold: v }))} testId="scheme-threshold" />
+            </>)}
             <Select label="Status" value={form.status} options={data.statuses.map(s => [s, s])}
               onChange={v => setForm(f => ({ ...f, status: v }))} testId="scheme-status" />
+            {form.payout_type === 'daily' ? (
+              <div className="md:col-span-2 p-3 rounded-md bg-blue-50 border border-blue-200 text-[11px] text-blue-900">
+                Any deposit at or above the minimum earns this percent of itself every day, credited
+                straight to the deposit. Once the earned-but-unpaid total reaches the withdrawal
+                threshold, it is paid into the member's account in one go and starts building up
+                again — leave the threshold blank to pay it out daily instead. No amount list needed.
+              </div>
+            ) : (
             <div className="md:col-span-2">
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                 The amounts this plan is sold in
@@ -266,6 +302,7 @@ export default function SchemesPage() {
                   : '500, 36000, 52500\n1000, 72000, 105000'}
               />
             </div>
+            )}
             <div className="md:col-span-2">
               <Field label="Notes" value={form.notes ?? ''} onChange={v => setForm(f => ({ ...f, notes: v }))} />
             </div>

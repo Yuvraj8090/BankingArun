@@ -16,11 +16,12 @@ pass=0; fail=0
 ck() { if [[ "$2" == "$3" ]]; then print "  ok   $1"; pass=$((pass+1)); else print "  FAIL $1: expected '$2' got '$3'"; fail=$((fail+1)); fi }
 
 cleanup() {
-  Q "DELETE FROM transactions WHERE description LIKE '%CRONTEST%' OR counterparty_name LIKE 'CRONTEST%' OR ref_number LIKE 'MAT-CRONTEST%' OR ref_number LIKE 'INT-CRONTEST%';
+  Q "DELETE FROM transactions WHERE description LIKE '%CRONTEST%' OR counterparty_name LIKE 'CRONTEST%' OR ref_number LIKE 'MAT-CRONTEST%' OR ref_number LIKE 'INT-CRONTEST%' OR ref_number LIKE 'DINT-CRONTEST%';
      DELETE FROM rail_transactions WHERE counterparty_name LIKE 'CRONTEST%' OR ref_number IN (SELECT ref_number FROM scheduled_payments WHERE id LIKE 'crontest-%' AND ref_number IS NOT NULL);
      DELETE FROM standing_instructions WHERE id LIKE 'crontest-%';
      DELETE FROM scheduled_payments WHERE id LIKE 'crontest-%';
      DELETE FROM deposits WHERE deposit_number LIKE 'CRONTEST%';
+     DELETE FROM schemes WHERE code LIKE 'CRONTEST%';
      DELETE FROM audit_logs WHERE action IN ('SI_EXECUTED','SI_FAILED','SI_PAUSED','DEPOSIT_MATURED','SCHEDULED_TRANSFER_EXECUTED','SCHEDULED_TRANSFER_FAILED');
      UPDATE accounts SET balance=137800.00 WHERE account_number='$RETAIL_ACC';
      UPDATE accounts SET balance=1285000.00 WHERE account_number='$CORP_ACC';" >/dev/null
@@ -55,6 +56,23 @@ INSERT INTO deposits (id,user_id,deposit_number,deposit_type,source_account,prin
 ('crontest-dep-mat','retail-001','CRONTEST-MAT','fixed','$RETAIL_ACC',10000.00,7.25,12,'on_maturity',10725.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'active',DATE_SUB(NOW(),INTERVAL 13 MONTH)),
 ('crontest-dep-mon','retail-001','CRONTEST-MON','fixed','$RETAIL_ACC',120000.00,6.00,24,'monthly',134400.00,DATE_ADD(CURDATE(),INTERVAL 22 MONTH),'active',DATE_SUB(NOW(),INTERVAL 2 MONTH)),
 ('crontest-dep-fut','retail-001','CRONTEST-FUT','fixed','$RETAIL_ACC',5000.00,7.00,12,'on_maturity',5350.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',NOW());
+-- Simple daily-% plan (1%/day, ₹150 withdrawal threshold). Deposit A's
+-- accrued total stays under the threshold today (₹100 + ₹10 = ₹110), so it
+-- should only accrue. Deposit B's crosses it (₹145 + ₹10 = ₹155), so it
+-- should release in full and reset to zero.
+INSERT INTO schemes (id,code,name,scheme_type,tenure_months,principal_amount,total_deposit,maturity_amount,
+    payout_type,daily_rate_percent,withdrawal_threshold,status) VALUES
+('crontest-scheme-daily','CRONTEST-DAILY','CRONTEST Daily Plan','fixed',12,1000.00,1000.00,1000.00,
+    'daily',1.000,150.00,'active');
+INSERT INTO deposits (id,user_id,deposit_number,deposit_type,scheme_code,source_account,principal_amount,
+    interest_rate,tenure_months,interest_payout,maturity_amount,maturity_date,status,created_at,
+    accrued_interest,last_payout_date) VALUES
+('crontest-dep-daily-a','retail-001','CRONTEST-DAILY-A','fixed','CRONTEST-DAILY','$RETAIL_ACC',1000.00,365.00,12,
+    'daily',1000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 1 MONTH),
+    100.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY)),
+('crontest-dep-daily-b','retail-001','CRONTEST-DAILY-B','fixed','CRONTEST-DAILY','$RETAIL_ACC',1000.00,365.00,12,
+    'daily',1000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 1 MONTH),
+    145.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY));
 SQL
 
 print "\n-- dry run changes nothing --"
@@ -91,15 +109,27 @@ ck "monthly interest = 120000 x 6%/12" "600.00" "$(Q "SELECT amount FROM transac
 ck "monthly deposit stays active" "active" "$(Q "SELECT status FROM deposits WHERE deposit_number='CRONTEST-MON'")"
 ck "undue deposit untouched" "active|0.00" "$(Q "SELECT CONCAT_WS('|',status,interest_paid) FROM deposits WHERE deposit_number='CRONTEST-FUT'")"
 
+print "\n-- daily interest accrual --"
+ck "under threshold: accrues, no payout" "110.00|active" \
+  "$(Q "SELECT CONCAT_WS('|',accrued_interest,status) FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"
+ck "under threshold: no transaction written" "0" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-A%'")"
+ck "over threshold: released and reset to zero" "0.00|155.00" \
+  "$(Q "SELECT CONCAT_WS('|',accrued_interest,interest_paid) FROM deposits WHERE deposit_number='CRONTEST-DAILY-B'")"
+ck "over threshold: full accrued total credited" "155.00" \
+  "$(Q "SELECT amount FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-B%'")"
+
 print "\n-- balance reconciles --"
-# out: 100 daily + 300 clamp + 250 scheduled + 400 external scheduled = 1050;  in: 10725 maturity + 600 interest = 11325
-ck "balance = 137800 - 1050 + 11325" "148075.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+# out: 100 daily + 300 clamp + 250 scheduled + 400 external scheduled = 1050
+# in: 10725 maturity + 600 interest + 155 daily interest released = 11480
+ck "balance = 137800 - 1050 + 11480" "148230.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 
 print "\n-- a second run the same day is a no-op --"
 CRON >/dev/null 2>&1
-ck "nothing paid twice" "148075.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "nothing paid twice" "148230.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 ck "maturity credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number='MAT-CRONTEST-MAT'")"
 ck "interest credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='DEPOSIT_INTEREST' AND ref_number LIKE 'INT-CRONTEST-MON%'")"
+ck "daily interest not accrued twice" "110.00" "$(Q "SELECT accrued_interest FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"
+ck "daily interest not released twice" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-B%'")"
 
 print "\n-- repeated failure pauses the instruction --"
 for day in 1 2; do

@@ -179,6 +179,10 @@ CREATE TABLE IF NOT EXISTS deposits (
     -- Written by cron.php when interest is paid or the deposit matures.
     interest_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     last_payout_date DATE,
+    -- A daily-interest deposit's earnings pile up here, unpaid, until they
+    -- cross the scheme's withdrawal_threshold -- see run_daily_interest_accrual
+    -- in cron.php. Always 0 for every other kind of deposit.
+    accrued_interest DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     matured_on DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
@@ -900,11 +904,22 @@ CREATE TABLE IF NOT EXISTS schemes (
     principal_amount DECIMAL(15,2),                        -- lump sum, for FD / MIS
     total_deposit DECIMAL(15,2) NOT NULL,
     maturity_amount DECIMAL(15,2) NOT NULL,
-    payout_type VARCHAR(10) NOT NULL DEFAULT 'maturity',   -- maturity | monthly
+    payout_type VARCHAR(10) NOT NULL DEFAULT 'maturity',   -- maturity | monthly | daily
     -- Every denomination the plan is sold in, as published in the brochure:
     -- [{"unit":100,"deposit":108000,"maturity":125900}, ...]. The columns above
     -- hold the representative slab the effective rate is worked out from.
     slabs LONGTEXT,
+    -- A "simple" daily-interest plan needs none of the above: any deposit at or
+    -- above principal_amount earns this percentage of itself every day, so
+    -- there is no slab table to type in at all. NULL means this is an
+    -- ordinary slab-priced scheme; set, it means the opposite -- slabs is
+    -- ignored and scheme_deposit_terms() takes the percent branch instead.
+    daily_rate_percent DECIMAL(6,3),
+    -- The accrued daily interest on one deposit is held back, not paid into the
+    -- account daily, until it reaches this amount (see accrued_interest on
+    -- deposits, and run_daily_interest_accrual in cron.php). NULL/0 means pay
+    -- out daily with no minimum.
+    withdrawal_threshold DECIMAL(15,2),
     status VARCHAR(10) NOT NULL DEFAULT 'draft',           -- active | draft | inactive
     notes VARCHAR(255),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
