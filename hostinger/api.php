@@ -781,6 +781,14 @@ function route_self_register(array $d): void
     if (row('SELECT id FROM users WHERE phone = ?', [$phone])) {
         fail(400, 'An account already exists for this phone number. Please sign in instead.');
     }
+    // The reward is not paid here -- an unverified account moves no money, same
+    // as everything else on this route -- just held until KYC is verified (see
+    // apply_referral_bonus and its callers in modules/staff.php). An unknown
+    // code is dropped rather than blocking the sign-up over a typo.
+    $referredBy = strtoupper(clip($d['referral_code'] ?? '', 12));
+    if ($referredBy !== '' && !row('SELECT id FROM users WHERE referral_code = ?', [$referredBy])) {
+        $referredBy = '';
+    }
 
     $userId = uuid4();
     $accountNumber = 'AJSP0' . digits(9);
@@ -789,11 +797,11 @@ function route_self_register(array $d): void
 
     $pdo->beginTransaction();
     $pdo->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash,
-            branch, kyc_status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            branch, kyc_status, referred_by_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$userId, $name, $email === '' ? null : $email, $phone, 'retail',
             password_hash($password, PASSWORD_BCRYPT), password_hash($transactionPassword, PASSWORD_BCRYPT),
-            'AJSP-MUM-042 (Nariman Point Main)', 'pending_approval']);
+            'AJSP-MUM-042 (Nariman Point Main)', 'pending_approval', $referredBy === '' ? null : $referredBy]);
     // Zero balance, on purpose: no money moves onto this account until a
     // teller has seen this person's documents. See require_kyc_verified().
     $pdo->prepare('INSERT INTO accounts (id, user_id, account_number, account_type, account_name, balance, upi_id,

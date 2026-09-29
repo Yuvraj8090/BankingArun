@@ -100,6 +100,7 @@ function AuthRoute({ isRegister, portal }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [params] = useSearchParams();
   if (loading) return <Loading />;
   if (user) return <Navigate to={homeFor(user.role)} replace />;
   const from = location.state?.from;
@@ -116,6 +117,11 @@ function AuthRoute({ isRegister, portal }) {
       <AuthPage
         defaultIsRegister={isRegister}
         portal={portal}
+        // A referral link lands here with ?ref=CODE (HomeRoute forwards it from
+        // "/"). Threaded through as a prop rather than read again inside
+        // AuthPage, so it survives a tab switch to Login and back without a
+        // second parse of the URL.
+        referralCode={params.get('ref') || ''}
         onSuccess={(role) => navigate(from || homeFor(role), { replace: true })}
       />
       <Toaster position="top-right" richColors theme="light" />

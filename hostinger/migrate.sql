@@ -616,6 +616,17 @@ UPDATE schemes SET status = 'active',
     notes = 'Brochure p9. Monthly payout for sixty months; the maturity column is the total received.'
     WHERE code = 'AJS-MIS-5Y';
 
+-- AJS-MIS-5Y repriced a second time, to sit at/under the 12.5% Nidhi cap (the
+-- printed ₹250/month figure above works out to 18.71% effective). schema.sql
+-- carries this correction for a fresh install; an already-upgraded database
+-- only had the block above, so it needs applying here too. Safe to run more
+-- than once -- same UPDATE ... WHERE code as everything else in this file.
+UPDATE schemes SET status = 'active',
+    total_deposit = 200000.00, maturity_amount = 265920.00,
+    slabs = '[{"unit":10000,"deposit":10000,"maturity":13260,"monthly_payout":221},{"unit":20000,"deposit":20000,"maturity":26580,"monthly_payout":443},{"unit":30000,"deposit":30000,"maturity":39840,"monthly_payout":664},{"unit":40000,"deposit":40000,"maturity":53160,"monthly_payout":886},{"unit":50000,"deposit":50000,"maturity":66480,"monthly_payout":1108},{"unit":60000,"deposit":60000,"maturity":79740,"monthly_payout":1329},{"unit":70000,"deposit":70000,"maturity":93060,"monthly_payout":1551},{"unit":80000,"deposit":80000,"maturity":106320,"monthly_payout":1772},{"unit":100000,"deposit":100000,"maturity":132960,"monthly_payout":2216},{"unit":200000,"deposit":200000,"maturity":265920,"monthly_payout":4432}]',
+    notes = 'Brochure p9, repriced to sit at/under the 12.5% Nidhi cap (was 18.71% effective on the printed ₹250/month figure). Monthly payout for sixty months; the maturity column is the total received.'
+    WHERE code = 'AJS-MIS-5Y';
+
 -- The referral code an enquiry arrived with, kept as its own column rather than
 -- buried in the notes. It was free text before, which meant nothing could read
 -- it back and the chain from a shared link to a paid bonus was broken.
@@ -1137,6 +1148,11 @@ UPDATE reward_programmes SET
 -- Internal (staff/back-office) logins created from Director user access get a
 -- reference ID of their own, separate from the email they sign in with.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_id VARCHAR(20) UNIQUE;
+
+-- The referral code a self-registered member signed up with. Held here,
+-- unpaid, until their KYC is verified -- see apply_referral_bonus /
+-- route_admin_kyc_action / route_kyc_verify_and_fund.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_code VARCHAR(12);
 
 -- --- Seeded demo names without a role baked in ----------------------------
 -- schema.sql used to seed these five accounts with the role/title folded into

@@ -190,13 +190,20 @@ function route_admin_kyc_action(array $d): void
     if (!in_array($d['status'], ['verified', 'rejected', 'pending_approval'], true)) {
         fail(422, 'status must be verified, rejected or pending_approval.');
     }
-    $customer = row('SELECT id, email FROM users WHERE id = ?', [clip($d['user_id'], 36)]);
+    $customer = row('SELECT * FROM users WHERE id = ?', [clip($d['user_id'], 36)]);
     if (!$customer) {
         fail(404, 'Customer not found.');
     }
+    $pdo->beginTransaction();
     $pdo->prepare('UPDATE users SET kyc_status = ?, kyc_reason = ? WHERE id = ?')
         ->execute([$d['status'], clip($d['rejection_reason'] ?? '', 255) ?: null, $customer['id']]);
+    // Newly verified is the earliest point a self-registered sign-up is allowed
+    // to hold a referral credit -- see pay_pending_referral (modules/banking.php).
+    if ($d['status'] === 'verified') {
+        pay_pending_referral($customer);
+    }
     audit($admin, 'KYC_' . strtoupper($d['status']), $customer['email']);
+    $pdo->commit();
     respond(['status' => 'SUCCESS', 'message' => 'Customer KYC status updated to ' . strtoupper($d['status'])]);
 }
 
@@ -249,6 +256,9 @@ function route_kyc_verify_and_fund(array $d): void
     $pdo->beginTransaction();
     $pdo->prepare('UPDATE users SET kyc_status = ?, kyc_reason = NULL WHERE id = ?')
         ->execute(['verified', $customer['id']]);
+    // Newly verified is the earliest point a self-registered sign-up is allowed
+    // to hold a referral credit -- see pay_pending_referral (modules/banking.php).
+    pay_pending_referral($customer);
 
     $deposit = null;
     if ($terms !== null) {

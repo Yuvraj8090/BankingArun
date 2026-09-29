@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS users (
     designation VARCHAR(100),
     staff_id VARCHAR(20) UNIQUE,             -- unique reference ID for internal (non-member) logins, e.g. AJSS000001
     referral_code VARCHAR(12) UNIQUE,
+    -- The code THIS person signed up with (self-register only). The reward is
+    -- not paid at sign-up -- an unverified account moves no money -- so this
+    -- just holds the code until KYC is verified, when it is paid once and
+    -- turned into a row in `referrals` (see apply_referral_bonus).
+    referred_by_code VARCHAR(12),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

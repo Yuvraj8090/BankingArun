@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Building2, Lock, User, Mail, Phone,
-  ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, RefreshCw
+  ArrowRight, Eye, EyeOff, CheckCircle2, Fingerprint, RefreshCw, Gift
 } from 'lucide-react';
 import Brand from '../components/Brand';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { b64uToBuf, bufToB64u } from '../utils/webauthn';
 
-export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'member' }) {
+export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'member', referralCode = '' }) {
   const { login } = useAuth();
   // The two tabs are real URLs, so the route decides which form shows. Holding
   // this in state meant switching tabs changed the address bar while the form
@@ -80,6 +80,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
         phone: phone.trim(),
         email: email.trim() || undefined,
         password: regPassword,
+        referral_code: referralCode || undefined,
         captcha_id: captcha?.captcha_id,
         captcha_answer: captchaAnswer.trim(),
       });
@@ -282,6 +283,13 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
               </div>
             ) : (
             <form onSubmit={doSelfRegister} className="space-y-3" data-testid="register-form">
+              {referralCode && (
+                <div data-testid="register-referral-banner"
+                  className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">
+                  <Gift className="w-3.5 h-3.5 shrink-0" />
+                  Referral code <b className="font-mono">{referralCode}</b> applied — you and your friend each get ₹500 once your KYC is verified.
+                </div>
+              )}
               <Field icon={User} label="Full name">
                 <input data-testid="register-name-input" required value={name} onChange={e => setName(e.target.value)}
                   placeholder="Rahul Sharma" autoComplete="name"

@@ -681,6 +681,32 @@ function apply_referral_bonus(string $userId, string $name, string $email, strin
     return $reward;
 }
 
+// A self-registered member's referral is on hold in users.referred_by_code
+// until this moment: KYC verification is the point route_self_register's own
+// message promised the bonus for ("as soon as they open an account and
+// complete KYC"), and the first point this account is allowed to hold a
+// referral credit at all. Called from inside the caller's own KYC-approval
+// transaction, so it never runs outside one. Safe to call on every KYC
+// approval, verified-to-verified included: the referrals row it checks for
+// is the guard against paying the same referee twice.
+function pay_pending_referral(array $user): void
+{
+    $code = $user['referred_by_code'] ?? '';
+    if ($code === '' || $code === null) {
+        return;
+    }
+    if (row('SELECT id FROM referrals WHERE referee_id = ?', [$user['id']])) {
+        return;
+    }
+    $account = row('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at, id LIMIT 1 FOR UPDATE',
+        [$user['id']]);
+    if (!$account) {
+        return;
+    }
+    apply_referral_bonus($user['id'], $user['name'], $user['email'] ?? '', $account['account_number'],
+        (float)$account['balance'], $code);
+}
+
 function route_referral_code(array $d): void
 {
     global $config;
