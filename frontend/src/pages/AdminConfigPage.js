@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle2, UserCheck, Send, Clock } from 'lucide-react';
+import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, AlertCircle, CheckCircle2, UserCheck, Send, Clock } from 'lucide-react';
 import { api } from '../services/api';
+import { PlainInput, SecretInput } from '../components/FormField';
 import { toast } from 'sonner';
 
 const STATE_STYLE = {
@@ -339,33 +340,6 @@ function Section({ title, icon: Icon, children }) {
         <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
       </div>
       <div className="p-5">{children}</div>
-    </div>
-  );
-}
-
-function PlainInput({ label, value, onChange, type = 'text', placeholder, testId }) {
-  return (
-    <div>
-      <label className="block text-[11px] text-slate-600 mb-1">{label}</label>
-      <input type={type} value={value ?? ''} placeholder={placeholder} data-testid={testId}
-        onChange={e => onChange(e.target.value)}
-        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900" />
-    </div>
-  );
-}
-
-function SecretInput({ label, value, onChange, show, onToggle, placeholder, testId }) {
-  return (
-    <div>
-      <label className="block text-[11px] text-slate-600 mb-1">{label}</label>
-      <div className="relative">
-        <input type={show ? 'text' : 'password'} value={value} placeholder={placeholder} data-testid={testId}
-          onChange={e => onChange(e.target.value)}
-          className="w-full border border-slate-200 rounded-md px-3 py-2 pr-10 text-sm text-slate-900 font-mono" />
-        <button type="button" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-700">
-          {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-        </button>
-      </div>
     </div>
   );
 }

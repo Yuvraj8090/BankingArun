@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Calculator, TrendingUp, AlertTriangle } from 'lucide-react';
+import { inr as inrShared } from '../utils/format';
 
-const inr = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+// The ₹ is printed by each call site here, not by this helper.
+const inr = (n) => inrShared(n, { symbol: false });
 
 const UNIT_WORD = {
   daily: 'a day',

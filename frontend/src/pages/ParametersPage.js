@@ -3,6 +3,7 @@ import { SlidersHorizontal, RefreshCw, Plus, Save, Trash2, Search, ChevronLeft, 
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
+import { ValueField as Field, PairSelect as Select } from '../components/FormField';
 import { toast } from 'sonner';
 
 const BLANK = {
@@ -232,28 +233,6 @@ export default function ParametersPage() {
           </div>
         </Modal>
       )}
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, type = 'text', testId, disabled }) {
-  return (
-    <div>
-      <label className="block text-[11px] text-slate-600 mb-1">{label}</label>
-      <input type={type} value={value} disabled={disabled} data-testid={testId} onChange={e => onChange(e.target.value)}
-        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50 disabled:text-slate-500" />
-    </div>
-  );
-}
-
-function Select({ label, value, options, onChange, testId, disabled }) {
-  return (
-    <div>
-      <label className="block text-[11px] text-slate-600 mb-1">{label}</label>
-      <select value={value} disabled={disabled} data-testid={testId} onChange={e => onChange(e.target.value)}
-        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 bg-white disabled:bg-slate-50 disabled:text-slate-500">
-        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
     </div>
   );
 }

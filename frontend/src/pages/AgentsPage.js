@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, RefreshCw, Plus, Save, Trash2, ReceiptText, Info } from 'lucide-react';
 import { api } from '../services/api';
 import Modal from '../components/Modal';
+import { ValueField as Field } from '../components/FormField';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
@@ -245,16 +246,6 @@ export default function AgentsPage() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, type = 'text', testId }) {
-  return (
-    <div>
-      <label className="block text-[11px] text-slate-600 mb-1">{label}</label>
-      <input type={type} value={value} data-testid={testId} onChange={e => onChange(e.target.value)}
-        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900" />
     </div>
   );
 }

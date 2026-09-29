@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MapPin, RefreshCw, Plus, Save, Trash2, Pencil, Info, Search } from 'lucide-react';
 import { api } from '../services/api';
-import Modal from '../components/Modal';
+import Modal, { Field, inputClass as input } from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
@@ -9,16 +9,6 @@ const BLANK = {
   name: '', code: '', bank: 'AJSPay', address: '', lat: '', lng: '',
   phone: '', timing: '9:30 AM - 4:30 PM', has_atm: 1, has_cdm: 1, has_locker: 0
 };
-
-const Field = ({ label, hint, children }) => (
-  <label className="block">
-    <span className="block text-slate-500 mb-1">{label}</span>
-    {children}
-    {hint && <span className="block text-[10px] text-slate-500 mt-1">{hint}</span>}
-  </label>
-);
-
-const input = 'w-full border border-slate-200 rounded-md px-3 py-2 text-xs outline-none focus:border-[#0b3b8c]';
 
 // The branch and ATM network behind the public locator. Editing a row here changes
 // what visitors see at /branches, so it is the director's to change.

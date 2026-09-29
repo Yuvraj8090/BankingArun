@@ -6,6 +6,7 @@ import {
 import { api } from '../services/api';
 import Pagination from '../components/Pagination';
 import Modal, { PasswordGenField } from '../components/Modal';
+import { ValueField as Field } from '../components/FormField';
 import DocumentUpload from '../components/DocumentUpload';
 import { inr } from '../utils/format';
 import { toast } from 'sonner';
@@ -1054,16 +1055,8 @@ const Row = ({ left, right }) => (
 
 const Empty = ({ children }) => <p className="py-6 text-center text-xs text-slate-500">{children}</p>;
 
-function Field({ label, value, onChange, type = 'text', testId }) {
-  return (
-    <div>
-      <label className="block text-[11px] text-slate-600 mb-1">{label}</label>
-      <input type={type} value={value} data-testid={testId} onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900" />
-    </div>
-  );
-}
-
+// CrmPage's own options shape (a flat list, value === label) doesn't match
+// FormField's PairSelect ([value, label] pairs), so this one stays local.
 function Select({ label, value, onChange, options, testId }) {
   return (
     <div>

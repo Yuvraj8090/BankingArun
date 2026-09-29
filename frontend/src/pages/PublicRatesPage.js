@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Percent, Info, ChevronRight, RefreshCw, ShieldCheck, Building2, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 import ReturnsCalculator from '../components/ReturnsCalculator';
+import { inr as inrShared } from '../utils/format';
 
 const TYPE_LABEL = {
   daily: 'Daily deposit',
@@ -14,7 +15,8 @@ const TYPE_LABEL = {
 // Per-day for a daily plan, per-month for a recurring one, one payment for the rest.
 const UNIT_LABEL = { daily: 'Per day', recurring: 'Per month', fixed: 'Amount', mis: 'Amount' };
 
-const inr = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+// The ₹ is printed by each call site here, not by this helper.
+const inr = (n) => inrShared(n, { symbol: false });
 
 const years = (months) => (months % 12 === 0 ? `${months / 12} year` : `${months} month`);
 

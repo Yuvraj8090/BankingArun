@@ -28,8 +28,6 @@ const rankName = (tiers, position) =>
   (tiers || []).find((t) => t.position === position)?.name || `rank ${position}`;
 
 
-const inr = (n) => `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-
 const blankTier = (programme, position) => ({
   programme, position, name: '', direct_required: 2, required_below: 0,
   min_deposit_each: programme === 'booster' ? 1000 : '',
