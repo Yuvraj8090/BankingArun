@@ -190,7 +190,7 @@ function route_counter_deposit(array $d): void
 function route_staff_member_lookup(array $d): void
 {
     staff_user(CRM_ROLES);
-    $accountNumber = clip($d['account_number'] ?? '', 30);
+    $accountNumber = clip($_GET['account_number'] ?? '', 30);
     if ($accountNumber === '') {
         fail(422, 'account_number is required.');
     }
@@ -242,8 +242,11 @@ function route_staff_book_deposit(array $d): void
     }
     $accountNumber = clip($d['account_number'], 30);
 
-    $pdo->beginTransaction();
-    $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$accountNumber]);
+    // Membership admission (require_membership -> admit_member) runs its own
+    // begin/commit and cannot nest inside the transaction below, so it has to
+    // happen before that transaction opens -- same ordering route_book_deposit
+    // uses for the logged-in member's own booking.
+    $account = row('SELECT * FROM accounts WHERE account_number = ?', [$accountNumber]);
     if (!$account) {
         fail(404, 'No member account with that number.');
     }
@@ -282,6 +285,8 @@ function route_staff_book_deposit(array $d): void
         $principal = $amount;
     }
 
+    $pdo->beginTransaction();
+    $account = row('SELECT * FROM accounts WHERE id = ? FOR UPDATE', [$account['id']]);
     if ((float)$account['balance'] < $dueToday) {
         fail(400, 'Insufficient funds in the member\'s selected savings account.');
     }
@@ -322,6 +327,11 @@ function route_book_deposit(array $d): void
 {
     global $pdo;
     $user = current_user();
+    // Same "is this person who they say they are" bar as every other route
+    // that moves money -- see require_kyc_verified() in api.php. Membership
+    // alone is not enough: require_membership() below will happily admit an
+    // unverified self-registration, and admission is not identity proof.
+    require_kyc_verified($user);
     need($d, 'account_number', 'amount');
     $amount = money($d['amount']);
     if ($amount <= 0) {
@@ -480,6 +490,7 @@ function route_invest(array $d): void
 {
     global $pdo;
     $user = current_user();
+    require_kyc_verified($user);
     need($d, 'account_number', 'scheme_id', 'amount');
     $amount = money($d['amount']);
     if ($amount <= 0) {
@@ -522,6 +533,7 @@ function route_insure(array $d): void
 {
     global $pdo;
     $user = current_user();
+    require_kyc_verified($user);
     need($d, 'account_number', 'plan_id');
     $plans = array_column(investment_catalog()['insurance_plans'], null, 'id');
     $planId = clip($d['plan_id'], 20);
