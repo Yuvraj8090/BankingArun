@@ -39,6 +39,7 @@ export const NAV_BY_ROLE = {
   admin: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'book-deposit', label: 'Book Member Deposit', icon: PiggyBank, testId: 'tab-book-deposit' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
     { id: 'screening', label: 'Sanctions Screening', icon: ShieldAlert, testId: 'tab-screening' },
     { id: 'data-requests', label: 'Data Requests', icon: FileLock2, testId: 'tab-data-requests' },
@@ -55,6 +56,7 @@ export const NAV_BY_ROLE = {
   branch_manager: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'book-deposit', label: 'Book Member Deposit', icon: PiggyBank, testId: 'tab-book-deposit' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
     { id: 'screening', label: 'Sanctions Screening', icon: ShieldAlert, testId: 'tab-screening' },
     { id: 'data-requests', label: 'Data Requests', icon: FileLock2, testId: 'tab-data-requests' },
@@ -72,6 +74,7 @@ export const NAV_BY_ROLE = {
     { id: 'owner', label: 'Executive Dashboard', icon: Crown, testId: 'tab-owner' },
     { id: 'security-center', label: 'Security Centre', icon: ShieldCheck, testId: 'tab-security-center', highlight: true },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'book-deposit', label: 'Book Member Deposit', icon: PiggyBank, testId: 'tab-book-deposit' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'fraud', label: 'Fraud & AML Review', icon: ShieldAlert, testId: 'tab-fraud' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
@@ -95,6 +98,7 @@ export const NAV_BY_ROLE = {
   staff: [
     { id: 'staff', label: 'Customer Console', icon: Users, testId: 'tab-staff' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
+    { id: 'book-deposit', label: 'Book Member Deposit', icon: PiggyBank, testId: 'tab-book-deposit' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },

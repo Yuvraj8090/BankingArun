@@ -92,6 +92,11 @@ export const api = {
 
   // Deposits
   bookDeposit: async (payload) => (await axios.post(`${API}/deposits/book`, payload, getAuthHeaders())).data,
+  // Staff-assisted booking: lookup a member by account number (name, KYC, existing
+  // FD/RD/MIS totals) then book a new deposit on their behalf at the counter.
+  staffMemberLookup: async (accountNumber) =>
+    (await axios.get(`${API}/deposits/staff-member-lookup`, { ...getAuthHeaders(), params: { account_number: accountNumber } })).data,
+  staffBookDeposit: async (payload) => (await axios.post(`${API}/deposits/staff-book`, payload, getAuthHeaders())).data,
 
   // Loans
   applyLoan: async (payload) => (await axios.post(`${API}/loans/apply`, payload, getAuthHeaders())).data,

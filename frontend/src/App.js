@@ -45,6 +45,7 @@ import ProductAdminPage from './pages/ProductAdminPage';
 import MemberRanksPage from './pages/MemberRanksPage';
 import FraudMonitorPage from './pages/FraudMonitorPage';
 import CrmPage from './pages/CrmPage';
+import StaffBookDepositPage from './pages/StaffBookDepositPage';
 import MemberRegisterPage from './pages/MemberRegisterPage';
 import ScreeningPage from './pages/ScreeningPage';
 import DataRequestsPage from './pages/DataRequestsPage';
@@ -182,6 +183,7 @@ function AppShell() {
     'member-ranks': <MemberRanksPage />,
     fraud: <FraudMonitorPage />,
     crm: <CrmPage />,
+    'book-deposit': <StaffBookDepositPage />,
     'member-register': <MemberRegisterPage />,
     screening: <ScreeningPage />,
     'data-requests': <DataRequestsPage />,

@@ -77,10 +77,14 @@ export default function DepositsInvestmentsPage() {
   const calculateMaturity = () => {
     if (fdType === 'mis') {
       if (!misSlab) return { rate: 0, interest: 0, total: 0, monthlyPayout: 0 };
+      // misSlab.maturity is the sum of monthly payouts only (schema note: "the
+      // maturity column is the total received"). The locked principal is repaid
+      // separately at term end (cron.php pays out principal_amount on top), so
+      // the true total received over the term is principal + monthly payouts.
       return {
         rate: misSlab.effective_rate_pa ?? 0,
-        interest: Math.round(misSlab.maturity - misSlab.deposit),
-        total: Math.round(misSlab.maturity),
+        interest: Math.round(misSlab.maturity),
+        total: Math.round(misSlab.deposit + misSlab.maturity),
         monthlyPayout: misSlab.monthly_payout ?? 0,
       };
     }
@@ -357,10 +361,20 @@ export default function DepositsInvestmentsPage() {
                 <span className="font-bold text-[#0b3b8c]">{maturityCalc.rate}% p.a.</span>
               </div>
               {fdType === 'mis' ? (
-                <div className="flex justify-between text-slate-500">
-                  <span>Monthly Payout:</span>
-                  <span className="font-semibold text-emerald-700">₹{(maturityCalc.monthlyPayout || 0).toLocaleString('en-IN')}/mo</span>
-                </div>
+                <>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Monthly Payout:</span>
+                    <span className="font-semibold text-emerald-700">₹{(maturityCalc.monthlyPayout || 0).toLocaleString('en-IN')}/mo</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Total Monthly Payouts:</span>
+                    <span className="font-semibold text-emerald-700">+ ₹{maturityCalc.interest.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Principal Repaid at Maturity:</span>
+                    <span className="font-semibold text-slate-900">+ ₹{(misSlab?.deposit || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                </>
               ) : (
                 <div className="flex justify-between text-slate-500">
                   <span>Estimated Interest:</span>

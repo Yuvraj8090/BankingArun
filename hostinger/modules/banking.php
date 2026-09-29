@@ -183,6 +183,140 @@ function route_counter_deposit(array $d): void
         'message' => rupees($amount) . " credited to $accountNumber ({$owner['name']}). New balance: " . rupees($newBalance)]);
 }
 
+// --- Staff-assisted deposit booking ---------------------------------------------------
+// A teller opening an FD/RD/MIS for a member who is standing at the counter needs the
+// same lookup a counter deposit does (account -> owner), plus a quick read of what that
+// member already holds by deposit type, before booking a new one on their behalf.
+function route_staff_member_lookup(array $d): void
+{
+    staff_user(CRM_ROLES);
+    $accountNumber = clip($d['account_number'] ?? '', 30);
+    if ($accountNumber === '') {
+        fail(422, 'account_number is required.');
+    }
+    $account = row('SELECT * FROM accounts WHERE account_number = ?', [$accountNumber]);
+    if (!$account) {
+        fail(404, 'No member account with that number.');
+    }
+    $owner = row('SELECT * FROM users WHERE id = ?', [$account['user_id']]);
+    $uid = $owner['id'];
+
+    // deposit_type on the deposits table is only ever 'fixed' or 'recurring' -- a Monthly
+    // Income Scheme deposit is a lump sum booked against a scheme, so it is stored as
+    // 'fixed' and only distinguishable by joining back to schemes.scheme_type.
+    $rows = rows("SELECT CASE WHEN s.scheme_type = 'mis' THEN 'mis' ELSE d.deposit_type END AS bucket,
+            COALESCE(SUM(d.principal_amount), 0) AS total
+        FROM deposits d LEFT JOIN schemes s ON s.code = d.scheme_code
+        WHERE d.user_id = ? AND d.status = 'active' GROUP BY bucket", [$uid]);
+    $byType = ['fixed' => 0.0, 'recurring' => 0.0, 'mis' => 0.0];
+    foreach ($rows as $r) {
+        if (isset($byType[$r['bucket']])) {
+            $byType[$r['bucket']] = round((float)$r['total'], 2);
+        }
+    }
+
+    respond([
+        'member' => public_user($owner),
+        'account' => out($account),
+        'kyc' => ['status' => $owner['kyc_status'], 'reason' => $owner['kyc_reason']],
+        'deposit_summary' => [
+            'fixed' => $byType['fixed'],
+            'recurring' => $byType['recurring'],
+            'mis' => $byType['mis'],
+            'total' => round($byType['fixed'] + $byType['recurring'] + $byType['mis'], 2),
+        ],
+    ]);
+}
+
+// Same pricing and booking logic as route_book_deposit, but for a member a teller is
+// serving at the counter rather than the logged-in customer -- the account is looked up
+// directly (as route_counter_deposit does) instead of scoped to current_user().
+function route_staff_book_deposit(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(CRM_ROLES);
+    need($d, 'account_number', 'amount');
+    $amount = money($d['amount']);
+    if ($amount <= 0) {
+        fail(400, 'Deposit amount must be greater than ₹0.');
+    }
+    $accountNumber = clip($d['account_number'], 30);
+
+    $pdo->beginTransaction();
+    $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$accountNumber]);
+    if (!$account) {
+        fail(404, 'No member account with that number.');
+    }
+    if ($account['status'] !== 'active') {
+        fail(403, 'This account is not active for deposits.');
+    }
+    $owner = row('SELECT * FROM users WHERE id = ?', [$account['user_id']]);
+    require_kyc_verified($owner);
+    require_membership($owner);
+
+    $planCode = strtoupper(clip($d['scheme_code'] ?? '', 20));
+    if ($planCode !== '') {
+        $scheme = row("SELECT * FROM schemes WHERE code = ? AND status = 'active' AND deleted_at IS NULL",
+            [$planCode]);
+        if (!$scheme) {
+            fail(422, 'That plan is not one of our current schemes.');
+        }
+        $terms = scheme_deposit_terms($scheme, $amount);
+        $type = $terms['deposit_type'];
+        $tenure = $terms['tenure_months'];
+        $rate = $terms['interest_rate'];
+        $maturity = $terms['maturity_amount'];
+        $interestPayout = $terms['interest_payout'];
+        $dueToday = $terms['due_today'];
+        $principal = $terms['total_deposit'];
+    } else {
+        $type = ($d['deposit_type'] ?? 'fixed') === 'recurring' ? 'recurring' : 'fixed';
+        $tenure = (int)($d['tenure_months'] ?? 12);
+        if ($tenure < 1 || $tenure > 120) {
+            fail(422, 'Tenure must be between 1 and 120 months.');
+        }
+        $rate = deposit_tier_rate($tenure);
+        $maturity = round($amount * (1 + $rate / 400) ** (4 * $tenure / 12), 2);
+        $interestPayout = clip($d['interest_payout'] ?? '', 20) ?: 'on_maturity';
+        $dueToday = $amount;
+        $principal = $amount;
+    }
+
+    if ((float)$account['balance'] < $dueToday) {
+        fail(400, 'Insufficient funds in the member\'s selected savings account.');
+    }
+    $newBalance = round((float)$account['balance'] - $dueToday, 2);
+    $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$dueToday, $account['id']]);
+
+    $number = 'DEP' . random_int(10000000, 99999999);
+    $deposit = [
+        'id' => uuid4(), 'user_id' => $owner['id'], 'deposit_number' => $number, 'deposit_type' => $type,
+        'scheme_code' => $planCode !== '' ? $planCode : null,
+        'source_account' => $account['account_number'], 'principal_amount' => $principal, 'interest_rate' => $rate,
+        'tenure_months' => $tenure, 'interest_payout' => $interestPayout,
+        'maturity_amount' => $maturity,
+        'maturity_date' => (new DateTimeImmutable('today', new DateTimeZone(IST)))
+            ->modify('+' . (int)($tenure * 30.4) . ' days')->format('Y-m-d'),
+        'nominee_name' => clip($d['nominee_name'] ?? '', 150) ?: ($owner['nominee_name'] ?? 'Registered Nominee'),
+        'status' => 'active', 'created_at' => now_utc(),
+    ];
+    $pdo->prepare('INSERT INTO deposits (id, user_id, deposit_number, deposit_type, scheme_code, source_account,
+            principal_amount, interest_rate, tenure_months, interest_payout, maturity_amount, maturity_date,
+            nominee_name, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute(array_values($deposit));
+    insert_txn(['user_id' => $owner['id'], 'account_number' => $account['account_number'], 'type' => 'debit',
+        'mode' => 'DEPOSIT_BOOKING', 'amount' => $dueToday, 'balance_after' => $newBalance,
+        'counterparty_name' => $planCode !== '' ? $terms['scheme_name'] : 'AJSPay Term Deposit',
+        'counterparty_acc' => $number, 'ref_number' => $number,
+        'description' => ($planCode !== '' ? $terms['scheme_name'] : ucfirst($type) . ' deposit')
+            . " #$number booked by branch staff"]);
+    audit($staff, 'STAFF_DEPOSIT_BOOKED', "$number " . rupees($dueToday) . " for {$owner['name']} ({$account['account_number']})");
+    $pdo->commit();
+    respond(['status' => 'SUCCESS',
+        'message' => strtoupper($type) . " #$number booked for {$owner['name']}! Maturity value: " . rupees($maturity),
+        'deposit' => out($deposit)]);
+}
+
 // --- Deposits ----------------------------------------------------------------------------
 function route_book_deposit(array $d): void
 {

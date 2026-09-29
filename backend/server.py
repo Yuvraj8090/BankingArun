@@ -204,6 +204,10 @@ class BookDepositRequest(BaseModel):
     tenure_months: int = 12
     interest_payout: str = "on_maturity"
     nominee_name: Optional[str] = None
+    scheme_code: Optional[str] = None
+
+class StaffBookDepositRequest(BookDepositRequest):
+    pass
 
 class LoanApplicationRequest(BaseModel):
     loan_type: str
@@ -1203,28 +1207,98 @@ async def issue_demand_draft(req: DemandDraftRequest, current_user: dict = Depen
     await db.demand_drafts.insert_one(dd_doc)
     return {"status": "SUCCESS", "message": f"Demand Draft {dd_number} issued successfully for ₹{req.amount:,.2f} payable at {req.payable_at}.", "dd": {k: v for k, v in dd_doc.items() if k != "_id"}}
 
-# ----------------- Deposits (FD / RD) -----------------
-@api_router.post("/deposits/book")
-async def book_deposit(req: BookDepositRequest, current_user: dict = Depends(get_current_user)):
-    acc = await db.accounts.find_one({"account_number": req.account_number, "user_id": current_user["id"]})
-    if not acc or acc["balance"] < req.amount:
-        raise HTTPException(status_code=400, detail="Insufficient funds in selected savings account.")
-    
-    if req.tenure_months < 12:
+# ----------------- Deposits (FD / RD / MIS) -----------------
+# Nidhi Rules, 2014: deposit interest may not exceed 12.5% p.a. Schemes above
+# that stay in the catalog for reference but are never sold as-is.
+NIDHI_MAX_DEPOSIT_RATE = 12.5
+
+def _mis_effective_rate_pa(months: int, deposit: float, monthly_payout: float) -> float:
+    """Time-value-adjusted annual rate a monthly-payout scheme's own figures imply,
+    found by bisecting on the monthly rate. A member receives the payouts across the
+    term rather than in one lump sum at maturity, so this runs higher than the plain
+    nominal rate (payout*12/deposit) the payout amount itself was derived from."""
+    def paid_out(rate: float) -> float:
+        return sum(monthly_payout / ((1 + rate) ** i) for i in range(1, months + 1))
+    low, high = 0.0, 0.05
+    for _ in range(80):
+        mid = (low + high) / 2
+        if paid_out(mid) > deposit:
+            low = mid
+        else:
+            high = mid
+    return round(((1 + (low + high) / 2) ** 12 - 1) * 100, 2)
+
+# Monthly Income Scheme (Niyamit Aay 60 Month MIS): a published, fixed-tenure plan
+# priced by its own printed slabs rather than the generic tenure tiers below. Kept
+# as a module-level constant, matching how the rest of this dev backend's catalog
+# data (investments/catalog, loan rates) is declared inline rather than seeded.
+_MIS_SLAB_ROWS = [
+    (10000, 10000, 13260, 221), (20000, 20000, 26580, 443), (30000, 30000, 39840, 664),
+    (40000, 40000, 53160, 886), (50000, 50000, 66480, 1108), (60000, 60000, 79740, 1329),
+    (70000, 70000, 93060, 1551), (80000, 80000, 106320, 1772), (100000, 100000, 132960, 2216),
+    (200000, 200000, 265920, 4432),
+]
+MIS_SCHEME = {
+    "code": "AJS-MIS-5Y",
+    "name": "Niyamit Aay 60 Month MIS",
+    "scheme_type": "mis",
+    "payout_type": "monthly",
+    "tenure_months": 60,
+    "slabs": [
+        {
+            "unit": unit, "deposit": deposit, "maturity": maturity, "monthly_payout": payout,
+            "effective_rate_pa": _mis_effective_rate_pa(60, deposit, payout),
+        }
+        for unit, deposit, maturity, payout in _MIS_SLAB_ROWS
+    ],
+}
+
+@api_router.get("/public/schemes")
+async def public_schemes():
+    return {"schemes": [MIS_SCHEME], "max_rate_pa": NIDHI_MAX_DEPOSIT_RATE}
+
+def _price_deposit(deposit_type: str, amount: float, tenure_months: int, scheme_code: Optional[str]):
+    """Shared pricing for both the member self-service and staff-assisted booking
+    paths, so a deposit costs the same regardless of who books it."""
+    if scheme_code:
+        if scheme_code.upper() != MIS_SCHEME["code"]:
+            raise HTTPException(status_code=422, detail="That plan is not one of our current schemes.")
+        slab = next((s for s in MIS_SCHEME["slabs"] if abs(s["unit"] - amount) < 0.005), None)
+        if not slab:
+            raise HTTPException(status_code=422, detail="That amount is not one of the denominations this plan is sold in.")
+        nominal_rate = round(slab["monthly_payout"] * 12 * 100 / slab["deposit"], 2)
+        return {
+            "deposit_type": "fixed", "principal_amount": slab["deposit"], "interest_rate": nominal_rate,
+            "tenure_months": MIS_SCHEME["tenure_months"], "interest_payout": "monthly",
+            "maturity_amount": round(slab["deposit"] + slab["maturity"], 2), "due_today": slab["deposit"],
+            "scheme_code": MIS_SCHEME["code"], "scheme_name": MIS_SCHEME["name"],
+        }
+
+    if tenure_months < 12:
         rate = 6.50
-    elif req.tenure_months <= 24:
+    elif tenure_months <= 24:
         rate = 7.25
-    elif req.tenure_months <= 36:
+    elif tenure_months <= 36:
         rate = 7.50
     else:
         rate = 7.10
-
-    p = req.amount
-    t = req.tenure_months / 12.0
+    t = tenure_months / 12.0
     r = rate / 100.0
-    maturity_amt = round(p * ((1 + r/4) ** (4 * t)), 2)
+    maturity_amt = round(amount * ((1 + r / 4) ** (4 * t)), 2)
+    return {
+        "deposit_type": deposit_type, "principal_amount": amount, "interest_rate": rate,
+        "tenure_months": tenure_months, "interest_payout": "on_maturity",
+        "maturity_amount": maturity_amt, "due_today": amount, "scheme_code": None, "scheme_name": None,
+    }
 
-    new_bal = acc["balance"] - req.amount
+@api_router.post("/deposits/book")
+async def book_deposit(req: BookDepositRequest, current_user: dict = Depends(get_current_user)):
+    terms = _price_deposit(req.deposit_type, req.amount, req.tenure_months, req.scheme_code)
+    acc = await db.accounts.find_one({"account_number": req.account_number, "user_id": current_user["id"]})
+    if not acc or acc["balance"] < terms["due_today"]:
+        raise HTTPException(status_code=400, detail="Insufficient funds in selected savings account.")
+
+    new_bal = acc["balance"] - terms["due_today"]
     await db.accounts.update_one({"account_number": req.account_number}, {"$set": {"balance": new_bal}})
 
     dep_id = f"DEP{random.randint(10000000, 99999999)}"
@@ -1232,21 +1306,99 @@ async def book_deposit(req: BookDepositRequest, current_user: dict = Depends(get
         "id": str(uuid.uuid4()),
         "user_id": current_user["id"],
         "deposit_number": dep_id,
-        "deposit_type": req.deposit_type,
+        "deposit_type": terms["deposit_type"],
+        "scheme_code": terms["scheme_code"],
         "source_account": req.account_number,
-        "principal_amount": req.amount,
-        "interest_rate": rate,
-        "tenure_months": req.tenure_months,
-        "interest_payout": req.interest_payout,
-        "maturity_amount": maturity_amt,
-        "maturity_date": (datetime.now(timezone.utc) + timedelta(days=int(req.tenure_months * 30.4))).strftime("%Y-%m-%d"),
+        "principal_amount": terms["principal_amount"],
+        "interest_rate": terms["interest_rate"],
+        "tenure_months": terms["tenure_months"],
+        "interest_payout": terms["interest_payout"],
+        "maturity_amount": terms["maturity_amount"],
+        "maturity_date": (datetime.now(timezone.utc) + timedelta(days=int(terms["tenure_months"] * 30.4))).strftime("%Y-%m-%d"),
         "nominee_name": req.nominee_name or current_user.get("nominee", {}).get("name", "Registered Nominee"),
         "status": "active",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.deposits.insert_one(dep_doc)
 
-    return {"status": "SUCCESS", "message": f"{req.deposit_type.upper()} #{dep_id} booked successfully! Maturity value: ₹{maturity_amt:,.2f}", "deposit": {k: v for k, v in dep_doc.items() if k != "_id"}}
+    label = terms["scheme_name"] or terms["deposit_type"].upper()
+    return {"status": "SUCCESS", "message": f"{label} #{dep_id} booked successfully! Maturity value: ₹{terms['maturity_amount']:,.2f}", "deposit": {k: v for k, v in dep_doc.items() if k != "_id"}}
+
+# ----------------- Staff-assisted deposit booking -----------------
+# A teller opening an FD/RD/MIS for a member standing at the counter needs a quick
+# lookup (account -> owner -> what they already hold by type) before booking a new
+# one on the member's behalf, rather than the member's own self-service form.
+STAFF_DEPOSIT_ROLES = ["staff", "admin", "branch_manager", "bank_owner"]
+
+@api_router.get("/deposits/staff-member-lookup")
+async def staff_member_lookup(account_number: str, current_user: dict = Depends(get_current_user)):
+    await _require_roles(current_user, STAFF_DEPOSIT_ROLES)
+    acc = await db.accounts.find_one({"account_number": account_number}, {"_id": 0})
+    if not acc:
+        raise HTTPException(status_code=404, detail="No member account with that number.")
+    owner = await db.users.find_one({"id": acc["user_id"]}, {"_id": 0, "password_hash": 0, "transaction_password_hash": 0})
+    if not owner:
+        raise HTTPException(status_code=404, detail="Member not found.")
+
+    # deposit_type is only ever 'fixed' or 'recurring' -- an MIS deposit is a lump
+    # sum booked against a scheme, so it is stored as 'fixed' and only distinguishable
+    # by its scheme_code.
+    deposits = await db.deposits.find({"user_id": owner["id"], "status": "active"}, {"_id": 0}).to_list(500)
+    by_type = {"fixed": 0.0, "recurring": 0.0, "mis": 0.0}
+    for dep in deposits:
+        bucket = "mis" if dep.get("scheme_code") == MIS_SCHEME["code"] else dep.get("deposit_type", "fixed")
+        if bucket not in by_type:
+            bucket = "fixed"
+        by_type[bucket] = round(by_type[bucket] + dep.get("principal_amount", 0), 2)
+
+    return {
+        "member": owner,
+        "account": acc,
+        "kyc": {"status": owner.get("kyc_status"), "reason": owner.get("kyc_reason")},
+        "deposit_summary": {**by_type, "total": round(sum(by_type.values()), 2)},
+    }
+
+@api_router.post("/deposits/staff-book")
+async def staff_book_deposit(req: StaffBookDepositRequest, current_user: dict = Depends(get_current_user)):
+    await _require_roles(current_user, STAFF_DEPOSIT_ROLES)
+    terms = _price_deposit(req.deposit_type, req.amount, req.tenure_months, req.scheme_code)
+    acc = await db.accounts.find_one({"account_number": req.account_number})
+    if not acc:
+        raise HTTPException(status_code=404, detail="No member account with that number.")
+    if acc["balance"] < terms["due_today"]:
+        raise HTTPException(status_code=400, detail="Insufficient funds in the member's selected savings account.")
+    owner = await db.users.find_one({"id": acc["user_id"]})
+    if not owner:
+        raise HTTPException(status_code=404, detail="Member not found.")
+
+    new_bal = acc["balance"] - terms["due_today"]
+    await db.accounts.update_one({"account_number": req.account_number}, {"$set": {"balance": new_bal}})
+
+    dep_id = f"DEP{random.randint(10000000, 99999999)}"
+    dep_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": owner["id"],
+        "deposit_number": dep_id,
+        "deposit_type": terms["deposit_type"],
+        "scheme_code": terms["scheme_code"],
+        "source_account": req.account_number,
+        "principal_amount": terms["principal_amount"],
+        "interest_rate": terms["interest_rate"],
+        "tenure_months": terms["tenure_months"],
+        "interest_payout": terms["interest_payout"],
+        "maturity_amount": terms["maturity_amount"],
+        "maturity_date": (datetime.now(timezone.utc) + timedelta(days=int(terms["tenure_months"] * 30.4))).strftime("%Y-%m-%d"),
+        "nominee_name": req.nominee_name or owner.get("nominee", {}).get("name", "Registered Nominee"),
+        "status": "active",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "booked_by_staff_id": current_user["id"],
+    }
+    await db.deposits.insert_one(dep_doc)
+
+    label = terms["scheme_name"] or terms["deposit_type"].upper()
+    return {"status": "SUCCESS",
+            "message": f"{label} #{dep_id} booked for {owner.get('name', 'the member')}! Maturity value: ₹{terms['maturity_amount']:,.2f}",
+            "deposit": {k: v for k, v in dep_doc.items() if k != "_id"}}
 
 # ----------------- Loans & Calculators -----------------
 @api_router.post("/loans/apply")

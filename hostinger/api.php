@@ -1322,6 +1322,9 @@ $routes = [
     // (modules/banking.php). Not to be confused with /collections, which only
     // logs what a field agent collected and never touches the ledger.
     'POST /accounts/counter-deposit' => 'route_counter_deposit',
+    // Staff-assisted FD/RD/MIS booking for a member at the counter (modules/banking.php).
+    'GET /deposits/staff-member-lookup' => 'route_staff_member_lookup',
+    'POST /deposits/staff-book' => 'route_staff_book_deposit',
     // Cards & UPI
     'GET /cards' => 'route_cards',
     'POST /cards/manage' => 'route_manage_card',
