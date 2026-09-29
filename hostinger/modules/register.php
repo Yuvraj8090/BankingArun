@@ -212,8 +212,13 @@ function require_membership(array $user): array
 {
     $member = membership_of($user['id']);
     if (!$member) {
-        fail(403, 'This service is for members only. Under the Nidhi Rules, 2014 we may deal solely with '
-            . 'members, so the account must be admitted to the member register first.');
+        // Most people who reach a deposit route without a folio are not being
+        // turned away for a real reason -- they self-registered and no teller
+        // has admitted them yet. Admit them here, on the spot, with the
+        // statutory minimum shares, rather than block the deposit they came to
+        // make and send them off to ask for the same ten shares at a desk.
+        admit_member($user, MIN_SHARES, [], $user);
+        $member = membership_of($user['id']);
     }
     if ((int)$member['shares_held'] < MIN_SHARES) {
         fail(403, 'A member must hold at least ' . MIN_SHARES . ' equity shares before placing a deposit '
@@ -234,20 +239,15 @@ function next_folio(): string
     return 'AJS-' . str_pad((string)($last + 1), 6, '0', STR_PAD_LEFT);
 }
 
-function route_register_admit(array $d): void
+// The admission itself: allot the shares, open the folio, screen and rate the
+// new member. Shared by the staff-facing route below and by require_membership's
+// auto-admission of a member who reaches a deposit route with no folio yet.
+function admit_member(array $user, int $shares, array $extra, array $actor): array
 {
     global $pdo;
-    $staff = staff_user(REGISTER_WRITE_ROLES);
-    need($d, 'user_id', 'shares');
-    $user = row('SELECT * FROM users WHERE id = ? OR email = ?',
-        [clip($d['user_id'], 36), clip($d['user_id'], 150)]);
-    if (!$user) {
-        fail(404, 'No such person.');
-    }
     if (membership_of($user['id'])) {
         fail(400, 'This person is already on the member register.');
     }
-    $shares = (int)$d['shares'];
     if ($shares < MIN_SHARES) {
         fail(422, 'At least ' . MIN_SHARES . ' shares must be allotted (Nidhi Rules, 2014).');
     }
@@ -260,29 +260,44 @@ function route_register_admit(array $d): void
     $pdo->beginTransaction();
     $pdo->prepare('INSERT INTO member_register (id, user_id, folio_no, admitted_on, shares_held,
             share_face_value, certificate_no, address, occupation, introduced_by, is_pep)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$memberId, $user['id'], $folio, $today, $shares, SHARE_FACE_VALUE, $certificate,
-            clip($d['address'] ?? '', 500) ?: null, clip($d['occupation'] ?? '', 100) ?: null,
-            clip($d['introduced_by'] ?? '', 36) ?: null, !empty($d['is_pep']) ? 1 : 0]);
+            clip($extra['address'] ?? '', 500) ?: null, clip($extra['occupation'] ?? '', 100) ?: null,
+            clip($extra['introduced_by'] ?? '', 36) ?: null, !empty($extra['is_pep']) ? 1 : 0]);
     $pdo->prepare('INSERT INTO share_allotments (id, member_id, user_id, kind, shares, face_value, amount,
             certificate_no, allotted_on, reference, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([uuid4(), $memberId, $user['id'], 'allotment', $shares, SHARE_FACE_VALUE,
-            $shares * SHARE_FACE_VALUE, $certificate, $today, 'Admission', $staff['id']]);
+            $shares * SHARE_FACE_VALUE, $certificate, $today, clip($extra['reference'] ?? '', 100) ?: 'Admission',
+            $actor['id']]);
     $pdo->commit();
 
     // Screen and rate on admission — that is the point at which it is useful.
     $hits = record_screening($user);
     [$category, $reasons] = apply_risk($user);
 
-    audit($staff, 'MEMBER_ADMITTED', "$folio {$user['email']} · $shares shares");
+    audit($actor, 'MEMBER_ADMITTED', "$folio {$user['email']} · $shares shares");
     security_event('MEMBER_ADMITTED', $hits === [] ? 'info' : 'warning',
-        "$folio admitted" . ($hits === [] ? '' : ' with ' . count($hits) . ' watchlist match(es)'), $staff);
-    respond(['status' => 'SUCCESS', 'folio_no' => $folio, 'certificate_no' => $certificate,
-        'shares' => $shares, 'paid_up' => $shares * SHARE_FACE_VALUE,
+        "$folio admitted" . ($hits === [] ? '' : ' with ' . count($hits) . ' watchlist match(es)'), $actor);
+
+    return ['folio_no' => $folio, 'certificate_no' => $certificate, 'shares' => $shares,
+        'paid_up' => $shares * SHARE_FACE_VALUE,
         'screening' => ['matches' => count($hits), 'names' => array_column($hits, 'full_name')],
-        'risk_category' => $category, 'risk_reasons' => $reasons,
-        'message' => "Admitted as $folio with $shares shares."
-            . ($hits === [] ? '' : ' A watchlist match was raised for review — see Compliance.')]);
+        'risk_category' => $category, 'risk_reasons' => $reasons];
+}
+
+function route_register_admit(array $d): void
+{
+    $staff = staff_user(REGISTER_WRITE_ROLES);
+    need($d, 'user_id', 'shares');
+    $user = row('SELECT * FROM users WHERE id = ? OR email = ?',
+        [clip($d['user_id'], 36), clip($d['user_id'], 150)]);
+    if (!$user) {
+        fail(404, 'No such person.');
+    }
+    $result = admit_member($user, (int)$d['shares'], $d, $staff);
+    respond(['status' => 'SUCCESS'] + $result + ['message' => "Admitted as {$result['folio_no']} "
+        . "with {$result['shares']} shares."
+        . ($result['screening']['matches'] === 0 ? '' : ' A watchlist match was raised for review — see Compliance.')]);
 }
 
 function route_register_shares(array $d): void

@@ -190,8 +190,9 @@ function route_book_deposit(array $d): void
         fail(400, 'Deposit amount must be greater than ₹0.');
     }
     // Nidhi Rules, 2014: deposits may be accepted from members only, and a
-    // member must hold at least ten equity shares. This is the check that makes
-    // the member register more than a list.
+    // member must hold at least ten equity shares. require_membership() admits
+    // the depositor on the spot if they are not on the register yet, so this
+    // never turns away someone who is otherwise clear to deposit.
     require_membership($user);
 
     // A plan code (e.g. the Monthly Income Scheme) prices the deposit from the
