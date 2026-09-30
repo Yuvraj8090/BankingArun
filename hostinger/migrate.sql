@@ -967,6 +967,24 @@ UPDATE schemes SET name = 'Niyamit Aay 60 Month MIS', scheme_type = 'mis',
     payout_type = 'monthly', status = 'active', slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]'
     WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL;
 
+-- AJS-MIS-40M: Dainik Aay 40 Month Plan. A simple daily-% plan (no slab
+-- table -- see schemes.daily_rate_percent, modules/master.php) rather than
+-- AJS-MIS-5Y's printed-slab monthly one. ₹10,000 x 0.167%/day =~ ₹16.70/day
+-- (~₹501/month), paid out daily with nothing held back (no
+-- withdrawal_threshold). Same as AJS-MIS-5Y, published straight from the
+-- brochure figures, above the 12.5% Nidhi Rules cap on its own numbers.
+INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, principal_amount, total_deposit,
+    maturity_amount, payout_type, daily_rate_percent, withdrawal_threshold, status, notes)
+VALUES (UUID(), 'AJS-MIS-40M', 'Dainik Aay 40 Month Plan', 'mis', 40, 10000.0, 10000.0, 30040.0,
+    'daily', 0.167, NULL, 'active',
+    'Plan book: ₹10,000 minimum, ~5% a month paid out daily (~₹16.70/day) -- above the Nidhi cap on its own numbers.');
+UPDATE schemes SET name = 'Dainik Aay 40 Month Plan', scheme_type = 'mis',
+    tenure_months = 40, contribution_months = NULL, contribution_amount = NULL,
+    principal_amount = 10000.0, total_deposit = 10000.0, maturity_amount = 30040.0,
+    payout_type = 'daily', daily_rate_percent = 0.167, withdrawal_threshold = NULL, status = 'active',
+    notes = 'Plan book: ₹10,000 minimum, ~5% a month paid out daily (~₹16.70/day) -- above the Nidhi cap on its own numbers.'
+    WHERE code = 'AJS-MIS-40M' AND deleted_at IS NULL;
+
 -- Every scheduled run, so "is the automation running" is a question the
 -- application can answer. cron.php wrote to the journal and nowhere else, which
 -- is how it went months without being invoked at all: nothing inside the system

@@ -982,6 +982,18 @@ INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribu
 ('sch-fd-8y', 'AJS-FD-8Y', 'Savadhi Yojana (3x in 8 years)', 'fixed', 96, NULL, 2500.00, 2500.00, 7500.00, 'maturity', 'draft', 'Plan book: 3x in 8 years — well above the Nidhi cap'),
 ('sch-mis-5y', 'AJS-MIS-5Y', 'Niyamit Aay 60 Month MIS', 'mis', 60, NULL, 10000.00, 10000.00, 15000.00, 'monthly', 'draft', 'Plan book: ₹10,000 unit, ₹250 monthly payout');
 
+-- Dainik Aay 40 Month Plan: a simple daily-% plan (no slab table -- any
+-- amount at or above the minimum qualifies), rather than AJS-MIS-5Y's
+-- printed-slab monthly one. daily_rate_percent/withdrawal_threshold are not
+-- in the batch insert above -- inserted separately so the columns are
+-- explicit.  ₹10,000 x 0.167%/day = ~₹16.70/day (~₹501/month), paid out
+-- daily with nothing held back. Same as AJS-MIS-5Y, published straight from
+-- the brochure figures, above the 12.5% Nidhi Rules cap on its own numbers.
+INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, principal_amount, total_deposit,
+    maturity_amount, payout_type, daily_rate_percent, withdrawal_threshold, status, notes) VALUES
+('sch-mis-40m', 'AJS-MIS-40M', 'Dainik Aay 40 Month Plan', 'mis', 40, 10000.00, 10000.00, 30040.00, 'daily',
+    0.167, NULL, 'active', 'Plan book: ₹10,000 minimum, ~5% a month paid out daily (~₹16.70/day) -- above the Nidhi cap on its own numbers.');
+
 -- Content behind the public product pages (/personal/savings-account and friends).
 -- Seeded from what the frontend used to carry hardcoded, so the pages are
 -- unchanged on day one but editable by the director from then on.
