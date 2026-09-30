@@ -188,6 +188,10 @@ CREATE TABLE IF NOT EXISTS deposits (
     -- deposit -- FD/RD/MIS interest is not taxed at source here.
     tds_deducted DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     matured_on DATETIME,
+    -- Set by route_premature_close when a member ends a deposit before its
+    -- maturity_date. Mutually exclusive with matured_on -- a deposit reaches
+    -- 'closed' status only by this route, 'matured' only by cron.php.
+    closed_on DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
     INDEX idx_maturity (status, maturity_date),
@@ -575,7 +579,9 @@ INSERT IGNORE INTO system_parameters
 ('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
     'The highest online/ATM limit a member can set on a debit card.'),
 ('param-tds-daily-interest', 'tds_rate_daily_interest', 'TDS on daily-interest payout', 'fees', 10.00, '%', 0, 30,
-    'Deducted under Section 194A from a simple daily-interest plan''s payout each time it releases (threshold reached, or at maturity). Does not apply to FD/RD/MIS interest.');
+    'Deducted under Section 194A from a simple daily-interest plan''s payout each time it releases (threshold reached, or at maturity). Does not apply to FD/RD/MIS interest.'),
+('param-premature-penalty', 'premature_withdrawal_penalty_pct', 'Premature withdrawal penalty', 'fees', 1.00, '%', 0, 10,
+    'Subtracted from the rate a deposit earns when closed before maturity, same as breaking a bank FD early. The rate itself also drops to whatever a deposit of the time actually held would have earned.');
 
 -- ---------------------------------------------------------------------------
 -- Demo data

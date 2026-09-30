@@ -585,7 +585,9 @@ INSERT IGNORE INTO system_parameters
 ('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
     'The highest online/ATM limit a member can set on a debit card.'),
 ('param-tds-daily-interest', 'tds_rate_daily_interest', 'TDS on daily-interest payout', 'fees', 10.00, '%', 0, 30,
-    'Deducted under Section 194A from a simple daily-interest plan''s payout each time it releases (threshold reached, or at maturity). Does not apply to FD/RD/MIS interest.');
+    'Deducted under Section 194A from a simple daily-interest plan''s payout each time it releases (threshold reached, or at maturity). Does not apply to FD/RD/MIS interest.'),
+('param-premature-penalty', 'premature_withdrawal_penalty_pct', 'Premature withdrawal penalty', 'fees', 1.00, '%', 0, 10,
+    'Subtracted from the rate a deposit earns when closed before maturity, same as breaking a bank FD early. The rate itself also drops to whatever a deposit of the time actually held would have earned.');
 
 -- The 3-year monthly plan was already seeded, deliberately held as a draft with
 -- a note that its printed maturity works out above the cap. Activating it is the
@@ -1201,3 +1203,6 @@ ALTER TABLE deposits ADD COLUMN IF NOT EXISTS accrued_interest DECIMAL(15,2) NOT
 -- Section 194A TDS on a daily-interest plan's payout -- see
 -- tds_rate_daily_interest below and run_daily_interest_accrual (cron.php).
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS tds_deducted DECIMAL(15,2) NOT NULL DEFAULT 0.00;
+
+-- Set by route_premature_close when a member ends a deposit before maturity.
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS closed_on DATETIME;

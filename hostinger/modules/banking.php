@@ -405,6 +405,89 @@ function route_book_deposit(array $d): void
         'deposit' => out($deposit)]);
 }
 
+const PREMATURE_MIN_HOLD_DAYS = 30;
+
+// Same principle as breaking a bank FD early: the deposit does not keep the
+// rate it was booked at, it drops to whatever a deposit of the time actually
+// held would have earned (deposit_tier_rate, capped at the deposit's own
+// contracted rate so a short-tenure tier can never pay MORE for leaving
+// early), minus a penalty on top. Interest already paid out along the way
+// (MIS monthly instalments, released daily-plan accruals) is never clawed
+// back -- this only ever pays what is still owed for the time held, floored
+// at zero, plus any daily-plan interest still sitting unreleased.
+//
+// ponytail: no automated test covers this route yet -- it needs a live API
+// server plus a deposit backdated past PREMATURE_MIN_HOLD_DAYS, which the
+// existing suites (api_test.sh's curl harness, cron_test.sh's cron.php
+// harness) are not set up to do together. Exercise it by hand against a
+// deposit whose created_at has been pushed back 30+ days before relying on
+// this in production.
+function route_premature_close(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    require_kyc_verified($user);
+    need($d, 'deposit_number');
+    $pdo->beginTransaction();
+    $deposit = row("SELECT * FROM deposits WHERE deposit_number = ? AND user_id = ? AND status = 'active' FOR UPDATE",
+        [clip($d['deposit_number'], 30), $user['id']]);
+    if (!$deposit) {
+        $pdo->rollBack();
+        fail(404, 'No active deposit with that number.');
+    }
+    if (!$deposit['source_account']) {
+        $pdo->rollBack();
+        fail(400, 'This deposit has no linked account to pay proceeds into. Contact the branch.');
+    }
+    $heldDays = (int)floor((strtotime(now_utc()) - strtotime($deposit['created_at'])) / 86400);
+    if ($heldDays < PREMATURE_MIN_HOLD_DAYS) {
+        $pdo->rollBack();
+        fail(400, "This deposit must be held at least " . PREMATURE_MIN_HOLD_DAYS
+            . " days before it can be closed early. It has been held $heldDays.");
+    }
+    $heldMonths = max(1, (int)round($heldDays / 30.4));
+    $principal = (float)$deposit['principal_amount'];
+    $penaltyPct = param_value('premature_withdrawal_penalty_pct', 1.0);
+    $effectiveRate = max(0.0, min(deposit_tier_rate($heldMonths), (float)$deposit['interest_rate']) - $penaltyPct);
+    $earnedForPeriod = round($principal * $effectiveRate / 100 * $heldDays / 365, 2);
+    $alreadyPaid = (float)$deposit['interest_paid'];
+    $owedNow = max(0.0, $earnedForPeriod - $alreadyPaid);
+    // A daily plan's unreleased accrual is still owed regardless of the
+    // formula above -- it is real interest already earned day by day, just
+    // held back for the threshold -- so it goes out net of the same TDS a
+    // scheduled release would have deducted, on top of $owedNow.
+    $accrued = (float)$deposit['accrued_interest'];
+    $tds = $accrued > 0 ? round($accrued * param_value('tds_rate_daily_interest', 10.0) / 100, 2) : 0.0;
+    $owedNow = round($owedNow + max(0.0, $accrued - $tds), 2);
+    $payout = round($principal + $owedNow, 2);
+
+    $account = row('SELECT * FROM accounts WHERE account_number = ?', [$deposit['source_account']]);
+    if (!$account) {
+        $pdo->rollBack();
+        fail(404, 'The account this deposit pays into no longer exists. Contact the branch.');
+    }
+    $newBalance = round((float)$account['balance'] + $payout, 2);
+    $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?')->execute([$payout, $account['id']]);
+    $ref = 'PMC-' . $deposit['deposit_number'];
+    insert_txn(['user_id' => $user['id'], 'account_number' => $account['account_number'], 'type' => 'credit',
+        'mode' => 'DEPOSIT_PREMATURE_CLOSURE', 'amount' => $payout, 'balance_after' => $newBalance,
+        'counterparty_name' => 'AJSPay Term Deposit', 'counterparty_acc' => $deposit['deposit_number'],
+        'ref_number' => $ref,
+        'description' => "{$deposit['deposit_number']} closed early after $heldDays days: " . rupees($principal)
+            . " principal + " . rupees($owedNow) . " interest ({$effectiveRate}% p.a., {$penaltyPct}% early-exit "
+            . "penalty applied)" . ($tds > 0 ? ", " . rupees($tds) . " TDS deducted from accrued interest" : '')]);
+    $pdo->prepare("UPDATE deposits SET status = 'closed', closed_on = ?, interest_paid = interest_paid + ?,
+            tds_deducted = tds_deducted + ?, accrued_interest = 0 WHERE id = ?")
+        ->execute([now_utc(), $owedNow, $tds, $deposit['id']]);
+    audit($user, 'DEPOSIT_CLOSED_EARLY', "{$deposit['deposit_number']} " . rupees($payout) . " after $heldDays days");
+    $pdo->commit();
+    respond(['status' => 'SUCCESS',
+        'message' => "{$deposit['deposit_number']} closed. " . rupees($payout)
+            . " credited to {$account['account_number']} (" . rupees($principal) . " principal + "
+            . rupees($owedNow) . " interest, at $effectiveRate% p.a. after the early-exit penalty).",
+        'payout' => $payout, 'principal' => $principal, 'interest' => $owedNow, 'effective_rate' => $effectiveRate]);
+}
+
 // --- Loans -------------------------------------------------------------------------------
 // Customer applications go straight into the loan department's pipeline.
 function route_apply_loan(array $d): void

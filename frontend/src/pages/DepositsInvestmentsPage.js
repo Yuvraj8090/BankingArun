@@ -12,6 +12,8 @@ export default function DepositsInvestmentsPage() {
   const { currentTheme } = useBankTheme();
   const [activeTab, setActiveTab] = useState('fd'); // fd, mf, insurance
   const [accounts, setAccounts] = useState([]);
+  const [myDeposits, setMyDeposits] = useState([]);
+  const [closingNumber, setClosingNumber] = useState('');
   const [catalog, setCatalog] = useState({ mutual_funds: [], insurance_plans: [] });
   const [myInvestments, setMyInvestments] = useState([]);
 
@@ -38,14 +40,19 @@ export default function DepositsInvestmentsPage() {
   const canInvest = !!features?.includes('mutual_funds');
   const canInsure = !!features?.includes('insurance');
 
+  const loadAccounts = async () => {
+    const accRes = await api.getAccounts();
+    if (accRes.accounts?.length > 0) {
+      setAccounts(accRes.accounts);
+      setSelectedAcc(prev => prev || accRes.accounts[0].account_number);
+    }
+    setMyDeposits(accRes.deposits || []);
+  };
+
   useEffect(() => {
     const init = async () => {
       try {
-        const accRes = await api.getAccounts();
-        if (accRes.accounts?.length > 0) {
-          setAccounts(accRes.accounts);
-          setSelectedAcc(accRes.accounts[0].account_number);
-        }
+        await loadAccounts();
       } catch (err) {
         toast.error('Could not load your accounts');
         return;
@@ -156,10 +163,29 @@ export default function DepositsInvestmentsPage() {
             }
       );
       toast.success(res.message);
+      loadAccounts();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Booking failed");
     } finally {
       setBooking(false);
+    }
+  };
+
+  const handlePrematureClose = async (deposit) => {
+    if (!window.confirm(
+      `Close ${deposit.deposit_number} now? You'll get back the principal plus interest for the time you've `
+      + `actually held it, at a lower rate with an early-exit penalty — not the full ${deposit.tenure_months}-month `
+      + `rate you'd get by waiting for maturity (${new Date(deposit.maturity_date).toLocaleDateString('en-IN')}).`
+    )) return;
+    setClosingNumber(deposit.deposit_number);
+    try {
+      const res = await api.prematureClose(deposit.deposit_number);
+      toast.success(res.message);
+      loadAccounts();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not close this deposit');
+    } finally {
+      setClosingNumber('');
     }
   };
 
@@ -459,6 +485,61 @@ export default function DepositsInvestmentsPage() {
             </div>
           </div>
 
+        </div>
+      )}
+
+      {activeTab === 'fd' && myDeposits.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl mt-6">
+          <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 mb-3">Your Deposits</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-[10px] uppercase text-slate-500">
+                <tr>
+                  <th className="py-2 pr-3 font-semibold">Deposit</th>
+                  <th className="py-2 pr-3 font-semibold text-right">Principal</th>
+                  <th className="py-2 pr-3 font-semibold">Maturity</th>
+                  <th className="py-2 pr-3 font-semibold">Status</th>
+                  <th className="py-2 pr-3 font-semibold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {myDeposits.map(dep => (
+                  <tr key={dep.id} data-testid={`my-deposit-${dep.deposit_number}`}>
+                    <td className="py-2 pr-3 font-mono text-slate-700">{dep.deposit_number}</td>
+                    <td className="py-2 pr-3 text-right text-slate-900 font-semibold">
+                      ₹{Number(dep.principal_amount).toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-2 pr-3 text-slate-600">
+                      {new Date(dep.maturity_date).toLocaleDateString('en-IN')}
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        dep.status === 'active' ? 'bg-emerald-50 text-emerald-700'
+                          : dep.status === 'matured' ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-700'}`}>
+                        {dep.status}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3 text-right">
+                      {dep.status === 'active' && (
+                        <button
+                          data-testid={`close-early-${dep.deposit_number}`}
+                          onClick={() => handlePrematureClose(dep)}
+                          disabled={closingNumber === dep.deposit_number}
+                          className="text-[#c8102e] font-semibold hover:underline disabled:opacity-50"
+                        >
+                          {closingNumber === dep.deposit_number ? 'Closing…' : 'Close Early'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-slate-500 mt-2">
+            Closing before maturity pays a reduced rate for the time actually held, minus an early-exit penalty —
+            not the full-term rate. A deposit must be held at least 30 days before it can be closed this way.
+          </p>
         </div>
       )}
 

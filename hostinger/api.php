@@ -1356,6 +1356,7 @@ $routes = [
     'POST /services/stop-cheque' => 'route_stop_cheque',
     'POST /services/demand-draft' => 'route_demand_draft',
     'POST /deposits/book' => 'route_book_deposit',
+    'POST /deposits/premature-close' => 'route_premature_close',
     'POST /loans/apply' => 'route_apply_loan',
     'GET /loans/my-applications' => 'route_my_loans',
     'GET /investments/catalog' => 'route_investment_catalog',

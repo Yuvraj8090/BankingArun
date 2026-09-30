@@ -92,6 +92,8 @@ export const api = {
 
   // Deposits
   bookDeposit: async (payload) => (await axios.post(`${API}/deposits/book`, payload, getAuthHeaders())).data,
+  prematureClose: async (depositNumber) =>
+    (await axios.post(`${API}/deposits/premature-close`, { deposit_number: depositNumber }, getAuthHeaders())).data,
   // Staff-assisted booking: lookup a member by account number (name, KYC, existing
   // FD/RD/MIS totals) then book a new deposit on their behalf at the counter.
   staffMemberLookup: async (accountNumber) =>
