@@ -72,7 +72,13 @@ INSERT INTO deposits (id,user_id,deposit_number,deposit_type,scheme_code,source_
     100.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY)),
 ('crontest-dep-daily-b','retail-001','CRONTEST-DAILY-B','fixed','CRONTEST-DAILY','$RETAIL_ACC',1000.00,365.00,12,
     'daily',1000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 1 MONTH),
-    145.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY));
+    145.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY)),
+-- Matures today with ₹50 still accrued below the threshold -- that leftover
+-- rides out with the principal, net of the same 10% TDS a normal release
+-- would deduct (₹1000 + ₹45 = ₹1045).
+('crontest-dep-daily-c','retail-001','CRONTEST-DAILY-C','fixed','CRONTEST-DAILY','$RETAIL_ACC',1000.00,365.00,12,
+    'daily',1000.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'active',DATE_SUB(NOW(),INTERVAL 13 MONTH),
+    50.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY));
 SQL
 
 print "\n-- dry run changes nothing --"
@@ -113,19 +119,26 @@ print "\n-- daily interest accrual --"
 ck "under threshold: accrues, no payout" "110.00|active" \
   "$(Q "SELECT CONCAT_WS('|',accrued_interest,status) FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"
 ck "under threshold: no transaction written" "0" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-A%'")"
-ck "over threshold: released and reset to zero" "0.00|155.00" \
+ck "over threshold: interest_paid is gross, before TDS" "0.00|155.00" \
   "$(Q "SELECT CONCAT_WS('|',accrued_interest,interest_paid) FROM deposits WHERE deposit_number='CRONTEST-DAILY-B'")"
-ck "over threshold: full accrued total credited" "155.00" \
+ck "over threshold: 10% TDS withheld on the release" "15.50" \
+  "$(Q "SELECT tds_deducted FROM deposits WHERE deposit_number='CRONTEST-DAILY-B'")"
+ck "over threshold: net of TDS credited, not the gross total" "139.50" \
   "$(Q "SELECT amount FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-B%'")"
+ck "matures with leftover accrued interest: gross tracked, TDS withheld" "matured|50.00|5.00" \
+  "$(Q "SELECT status,interest_paid,tds_deducted FROM deposits WHERE deposit_number='CRONTEST-DAILY-C'")"
+ck "matures with leftover: principal + net interest paid out" "1045.00" \
+  "$(Q "SELECT amount FROM transactions WHERE ref_number='MAT-CRONTEST-DAILY-C'")"
 
 print "\n-- balance reconciles --"
 # out: 100 daily + 300 clamp + 250 scheduled + 400 external scheduled = 1050
-# in: 10725 maturity + 600 interest + 155 daily interest released = 11480
-ck "balance = 137800 - 1050 + 11480" "148230.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+# in: 10725 maturity + 600 interest + 139.50 daily interest released (155 - 10% TDS)
+#     + 1045 daily-plan maturity (1000 principal + 50 accrued - 10% TDS) = 12509.50
+ck "balance = 137800 - 1050 + 12509.50" "149259.50" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 
 print "\n-- a second run the same day is a no-op --"
 CRON >/dev/null 2>&1
-ck "nothing paid twice" "148230.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "nothing paid twice" "149259.50" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 ck "maturity credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number='MAT-CRONTEST-MAT'")"
 ck "interest credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='DEPOSIT_INTEREST' AND ref_number LIKE 'INT-CRONTEST-MON%'")"
 ck "daily interest not accrued twice" "110.00" "$(Q "SELECT accrued_interest FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"

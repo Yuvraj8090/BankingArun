@@ -408,15 +408,20 @@ export default function DepositsInvestmentsPage() {
                 <span className="font-bold text-[#0b3b8c]">{maturityCalc.rate}% p.a.</span>
               </div>
               {isDailyMis ? (
-                <div className="flex justify-between text-slate-500">
-                  <span>Daily Credit:</span>
-                  <span className="font-semibold text-emerald-700">
-                    + ₹{maturityCalc.dailyAmount.toLocaleString('en-IN')}/day
-                    {maturityCalc.threshold
-                      ? ` (paid out once it reaches ₹${Number(maturityCalc.threshold).toLocaleString('en-IN')})`
-                      : ' (paid out daily)'}
-                  </span>
-                </div>
+                <>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Daily Credit:</span>
+                    <span className="font-semibold text-emerald-700">
+                      + ₹{maturityCalc.dailyAmount.toLocaleString('en-IN')}/day
+                      {maturityCalc.threshold
+                        ? ` (paid out once it reaches ₹${Number(maturityCalc.threshold).toLocaleString('en-IN')})`
+                        : ' (paid out daily)'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 -mt-1">
+                    Shown before tax. TDS is deducted from each payout under Section 194A, as applicable, before it reaches your account.
+                  </p>
+                </>
               ) : fdType === 'mis' ? (
                 <>
                   <div className="flex justify-between text-slate-500">

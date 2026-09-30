@@ -183,6 +183,10 @@ CREATE TABLE IF NOT EXISTS deposits (
     -- cross the scheme's withdrawal_threshold -- see run_daily_interest_accrual
     -- in cron.php. Always 0 for every other kind of deposit.
     accrued_interest DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    -- Cumulative Section 194A TDS withheld from this deposit's daily-interest
+    -- payouts (tds_rate_daily_interest). Always 0 for every other kind of
+    -- deposit -- FD/RD/MIS interest is not taxed at source here.
+    tds_deducted DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     matured_on DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
@@ -569,7 +573,9 @@ INSERT IGNORE INTO system_parameters
 ('param-dd-fee', 'demand_draft_fee', 'Demand draft issuing fee', 'fees', 50.00, '₹', 0, 1000,
     'Flat fee charged in addition to the draft amount when a demand draft is issued.'),
 ('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
-    'The highest online/ATM limit a member can set on a debit card.');
+    'The highest online/ATM limit a member can set on a debit card.'),
+('param-tds-daily-interest', 'tds_rate_daily_interest', 'TDS on daily-interest payout', 'fees', 10.00, '%', 0, 30,
+    'Deducted under Section 194A from a simple daily-interest plan''s payout each time it releases (threshold reached, or at maturity). Does not apply to FD/RD/MIS interest.');
 
 -- ---------------------------------------------------------------------------
 -- Demo data

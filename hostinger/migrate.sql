@@ -583,7 +583,9 @@ INSERT IGNORE INTO system_parameters
 ('param-dd-fee', 'demand_draft_fee', 'Demand draft issuing fee', 'fees', 50.00, '₹', 0, 1000,
     'Flat fee charged in addition to the draft amount when a demand draft is issued.'),
 ('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
-    'The highest online/ATM limit a member can set on a debit card.');
+    'The highest online/ATM limit a member can set on a debit card.'),
+('param-tds-daily-interest', 'tds_rate_daily_interest', 'TDS on daily-interest payout', 'fees', 10.00, '%', 0, 30,
+    'Deducted under Section 194A from a simple daily-interest plan''s payout each time it releases (threshold reached, or at maturity). Does not apply to FD/RD/MIS interest.');
 
 -- The 3-year monthly plan was already seeded, deliberately held as a draft with
 -- a note that its printed maturity works out above the cap. Activating it is the
@@ -1195,3 +1197,7 @@ UPDATE users SET name = 'Aditi Verma'
 ALTER TABLE schemes ADD COLUMN IF NOT EXISTS daily_rate_percent DECIMAL(6,3);
 ALTER TABLE schemes ADD COLUMN IF NOT EXISTS withdrawal_threshold DECIMAL(15,2);
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS accrued_interest DECIMAL(15,2) NOT NULL DEFAULT 0.00;
+
+-- Section 194A TDS on a daily-interest plan's payout -- see
+-- tds_rate_daily_interest below and run_daily_interest_accrual (cron.php).
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS tds_deducted DECIMAL(15,2) NOT NULL DEFAULT 0.00;

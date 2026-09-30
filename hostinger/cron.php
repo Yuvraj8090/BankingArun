@@ -247,20 +247,31 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
         $total = round((float)$locked['accrued_interest'] + $interest, 2);
         $threshold = (float)$deposit['withdrawal_threshold'];
         if ($threshold <= 0 || $total >= $threshold) {
+            // Section 194A: TDS comes off the interest itself, not off the
+            // principal, so it is worked out on $total (the accrued interest
+            // being released) and never touches anything else this deposit holds.
+            $tdsRate = param_value('tds_rate_daily_interest', 10.0);
+            $tds = round($total * $tdsRate / 100, 2);
+            $net = round($total - $tds, 2);
             $ref = 'DINT-' . $locked['deposit_number'] . '-' . str_replace('-', '', $today);
-            [$ok, $result] = credit($locked['source_account'], $total, 'DEPOSIT_INTEREST',
-                'AJSPay Daily Interest', "Daily interest on deposit {$locked['deposit_number']}", $ref);
+            [$ok, $result] = credit($locked['source_account'], $net, 'DEPOSIT_INTEREST',
+                'AJSPay Daily Interest',
+                "Daily interest on deposit {$locked['deposit_number']}: " . rupees($total)
+                    . " earned, " . rupees($tds) . " TDS deducted @{$tdsRate}%, " . rupees($net) . " credited",
+                $ref);
             if (!$ok) {
                 $pdo->rollBack();
                 $failed++;
                 say("  FAILED     $label — $result");
                 continue;
             }
-            $pdo->prepare('UPDATE deposits SET interest_paid = interest_paid + ?, accrued_interest = 0,
-                last_payout_date = ? WHERE id = ?')->execute([$total, $today, $locked['id']]);
+            $pdo->prepare('UPDATE deposits SET interest_paid = interest_paid + ?, tds_deducted = tds_deducted + ?,
+                accrued_interest = 0, last_payout_date = ? WHERE id = ?')
+                ->execute([$total, $tds, $today, $locked['id']]);
             $released++;
             if ($verbose) {
-                say("  released   " . rupees($total) . " on {$locked['deposit_number']} to {$locked['source_account']}");
+                say("  released   " . rupees($net) . " (of " . rupees($total) . ", " . rupees($tds)
+                    . " TDS) on {$locked['deposit_number']} to {$locked['source_account']}");
             }
         } else {
             $pdo->prepare('UPDATE deposits SET accrued_interest = ?, last_payout_date = ? WHERE id = ?')
@@ -287,12 +298,19 @@ function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): arr
         // way, so only the principal is returned at the end. A daily-payout
         // deposit is the same, except whatever is still sitting in
         // accrued_interest below the withdrawal threshold has nowhere else to
-        // go, so it rides along with the principal rather than being lost.
-        $payout = match ($deposit['interest_payout']) {
-            'monthly' => (float)$deposit['principal_amount'],
-            'daily' => (float)$deposit['principal_amount'] + (float)$deposit['accrued_interest'],
-            default => (float)$deposit['maturity_amount'],
-        };
+        // go, so it rides along with the principal rather than being lost --
+        // still net of the same Section 194A TDS a normal release would deduct.
+        $grossInterest = 0.0;
+        $tds = 0.0;
+        if ($deposit['interest_payout'] === 'monthly') {
+            $payout = (float)$deposit['principal_amount'];
+        } elseif ($deposit['interest_payout'] === 'daily') {
+            $grossInterest = (float)$deposit['accrued_interest'];
+            $tds = round($grossInterest * param_value('tds_rate_daily_interest', 10.0) / 100, 2);
+            $payout = (float)$deposit['principal_amount'] + round($grossInterest - $tds, 2);
+        } else {
+            $payout = (float)$deposit['maturity_amount'];
+        }
         $label = "Deposit {$deposit['deposit_number']} matured, " . rupees($payout);
         if ($dryRun) {
             say("  would pay  $label");
@@ -307,16 +325,21 @@ function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): arr
         }
         $ref = 'MAT-' . $locked['deposit_number'];
         [$ok, $result] = credit($locked['source_account'], $payout, 'DEPOSIT_MATURITY',
-            'AJSPay Term Deposit', "Maturity proceeds of deposit {$locked['deposit_number']}", $ref);
+            'AJSPay Term Deposit', $tds > 0
+                ? "Maturity proceeds of deposit {$locked['deposit_number']} (" . rupees($tds) . " TDS deducted from the accrued interest)"
+                : "Maturity proceeds of deposit {$locked['deposit_number']}", $ref);
         if (!$ok) {
             $pdo->rollBack();
             $failed++;
             say("  FAILED     $label — $result");
             continue;
         }
-        $interestPart = round($payout - (float)$locked['principal_amount'], 2);
+        // Gross interest earned, not what was actually paid out -- same
+        // convention run_daily_interest_accrual uses for interest_paid.
+        $interestPart = $grossInterest > 0 ? $grossInterest : round($payout - (float)$locked['principal_amount'], 2);
         $pdo->prepare("UPDATE deposits SET status = 'matured', matured_on = ?, interest_paid = interest_paid + ?,
-            accrued_interest = 0 WHERE id = ?")->execute([now_utc(), max($interestPart, 0), $locked['id']]);
+            tds_deducted = tds_deducted + ?, accrued_interest = 0 WHERE id = ?")
+            ->execute([now_utc(), max($interestPart, 0), $tds, $locked['id']]);
         $owner = row('SELECT * FROM users WHERE id = ?', [$locked['user_id']]);
         if ($owner) {
             audit($owner, 'DEPOSIT_MATURED', "{$locked['deposit_number']} paid " . rupees($payout));

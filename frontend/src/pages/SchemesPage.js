@@ -33,6 +33,22 @@ const parseSlabs = (text, monthly) => text.split('\n')
     ? { unit, deposit, maturity, monthly_payout: monthlyPayout }
     : { unit, deposit, maturity }));
 
+// Typing deposit and maturity by hand for every denomination is the exact
+// complaint this exists to fix: one rate applied to a pasted list of amounts
+// (just the first column -- what the brochure actually varies row to row) is
+// enough to work out the other two/three numbers for every row at once.
+const generateSlabs = (unitsText, rate, monthly, tenureMonths) => {
+  const units = unitsText.split(/[\n,]+/).map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n > 0);
+  if (!units.length || !Number.isFinite(rate) || rate <= 0) return null;
+  return units.map(unit => {
+    if (monthly) {
+      const monthly_payout = Math.round(unit * rate) / 100;
+      return { unit, deposit: unit, maturity: Math.round(monthly_payout * tenureMonths * 100) / 100, monthly_payout };
+    }
+    return { unit, deposit: unit, maturity: Math.round(unit * (1 + rate / 100) * 100) / 100 };
+  }).sort((a, b) => a.unit - b.unit);
+};
+
 // Back-office scheme master. Nothing here is shown on the public site.
 export default function SchemesPage() {
   const { user } = useAuth();
@@ -40,6 +56,8 @@ export default function SchemesPage() {
   const [data, setData] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [autoUnits, setAutoUnits] = useState('');
+  const [autoRate, setAutoRate] = useState('');
   const overCap = (data?.schemes || []).filter((x) => x.exceeds_cap);
 
   const load = async () => {
@@ -93,7 +111,7 @@ export default function SchemesPage() {
           </div>
         </div>
         {canEdit && (
-          <button data-testid="scheme-new-btn" onClick={() => setForm({ ...BLANK })}
+          <button data-testid="scheme-new-btn" onClick={() => { setForm({ ...BLANK }); setAutoUnits(''); setAutoRate(''); }}
             className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> New scheme
           </button>
@@ -207,7 +225,7 @@ export default function SchemesPage() {
                 </td>
                 {canEdit && (
                   <td className="p-3 text-right whitespace-nowrap">
-                    <button onClick={() => setForm({ ...s })} data-testid={`scheme-edit-${s.code}`}
+                    <button onClick={() => { setForm({ ...s }); setAutoUnits(''); setAutoRate(''); }} data-testid={`scheme-edit-${s.code}`}
                       className="text-[#0b3b8c] font-semibold hover:underline py-1.5 px-1 -mx-1">Edit</button>
                     <button onClick={() => remove(s)} className="ml-2 text-[#c8102e] hover:underline inline-flex items-center gap-1 py-1.5 px-1">
                       <Trash2 className="w-3 h-3" /> Delete
@@ -289,6 +307,55 @@ export default function SchemesPage() {
                 Every line has to stay within the {data.max_rate_pa}% cap before a new plan can go
                 active.
               </p>
+              <div className="p-3 rounded-md bg-slate-50 border border-slate-200 mb-2 space-y-1.5">
+                <label className="block text-[11px] font-semibold text-slate-700">
+                  Don't want to type deposit{form.payout_type === 'monthly' ? ', maturity and payout' : ' and maturity'} for
+                  every line by hand? Paste just the amounts and one rate, and generate the table instead.
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto,auto] gap-2 items-start">
+                  <textarea
+                    data-testid="scheme-auto-units"
+                    rows={2}
+                    value={autoUnits}
+                    onChange={e => setAutoUnits(e.target.value)}
+                    placeholder={'Amounts, one per line or comma-separated:\n2500, 3000, 3500, ...'}
+                    className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs font-mono text-slate-900 bg-white"
+                  />
+                  <input
+                    data-testid="scheme-auto-rate"
+                    type="number"
+                    value={autoRate}
+                    onChange={e => setAutoRate(e.target.value)}
+                    placeholder={form.payout_type === 'monthly' ? 'Monthly rate %' : 'Return over term %'}
+                    title={form.payout_type === 'monthly'
+                      ? 'What the plan pays per month, as a % of the amount deposited — e.g. 5 means ₹5,000/mo on a ₹1,00,000 deposit.'
+                      : 'Total growth over the whole term, as a % — e.g. 200 means the amount triples (3x).'}
+                    className="w-28 px-2 py-1.5 rounded border border-slate-300 text-xs text-slate-900 bg-white"
+                  />
+                  <button
+                    type="button"
+                    data-testid="scheme-auto-generate-btn"
+                    onClick={() => {
+                      const generated = generateSlabs(autoUnits, Number(autoRate), form.payout_type === 'monthly', form.tenure_months);
+                      if (!generated) {
+                        toast.error('Paste at least one amount and a rate greater than 0');
+                        return;
+                      }
+                      setForm(f => ({ ...f, slabs: generated }));
+                      toast.success(`Generated ${generated.length} amount${generated.length === 1 ? '' : 's'} — check the table below before saving`);
+                    }}
+                    className="px-3 py-1.5 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold whitespace-nowrap"
+                  >
+                    Generate table
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  {form.payout_type === 'monthly'
+                    ? 'Deposit = the amount itself. Monthly payout = amount × rate ÷ 100. Maturity = monthly payout × tenure.'
+                    : 'Deposit = the amount itself. Maturity = amount × (1 + rate ÷ 100) — e.g. rate 200 triples it.'}
+                  {' '}This fills in the table below, which you can still hand-edit afterwards.
+                </p>
+              </div>
               <textarea
                 data-testid="scheme-slabs"
                 rows={6}
