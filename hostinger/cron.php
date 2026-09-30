@@ -220,7 +220,16 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
 {
     global $pdo;
     $accrued = $released = $failed = 0;
-    $due = rows("SELECT d.*, s.daily_rate_percent, s.withdrawal_threshold FROM deposits d
+    // The rate comes off the deposit's own interest_rate, not a fresh read of
+    // schemes.daily_rate_percent -- deposits.interest_rate is what
+    // scheme_deposit_terms() worked out and stored the day this was booked,
+    // same as every other deposit type here. Re-reading the scheme's current
+    // rate would let an admin editing a scheme's rate later silently change
+    // what an already-booked member earns, which nothing else in this file
+    // does. withdrawal_threshold has no such contract to honour -- it is an
+    // operational setting, not a promised return -- so that part alone is
+    // read live.
+    $due = rows("SELECT d.*, s.withdrawal_threshold FROM deposits d
         JOIN schemes s ON s.code = d.scheme_code
         WHERE d.status = 'active' AND d.interest_payout = 'daily' AND d.source_account IS NOT NULL
           AND d.maturity_date > ?
@@ -228,7 +237,7 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
         ORDER BY d.created_at LIMIT " . CRON_BATCH, [$today, $today]);
 
     foreach ($due as $deposit) {
-        $interest = round((float)$deposit['principal_amount'] * (float)$deposit['daily_rate_percent'] / 100, 2);
+        $interest = round((float)$deposit['principal_amount'] * (float)$deposit['interest_rate'] / 100 / 365, 2);
         if ($interest <= 0) {
             continue;
         }

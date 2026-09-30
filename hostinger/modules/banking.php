@@ -439,6 +439,25 @@ function route_premature_close(array $d): void
         $pdo->rollBack();
         fail(400, 'This deposit has no linked account to pay proceeds into. Contact the branch.');
     }
+    // A scheme-priced instalment plan (Masik/Daily Yojana) stores the full
+    // contracted total in principal_amount, but only the first instalment was
+    // ever actually debited -- everything after that is collected in person
+    // by a field agent (agent_collections) and never touches this account.
+    // Paying out principal_amount here would hand back money that was never
+    // banked. scheme_deposit_terms() maps every by-instalment scheme to
+    // deposit_type 'recurring'; a scheme-less self-service "recurring" booking
+    // debits its full amount up front like a fixed deposit, so this only
+    // catches the genuinely under-funded case.
+    if ($deposit['scheme_code'] && $deposit['deposit_type'] === 'recurring') {
+        $pdo->rollBack();
+        fail(400, 'This is an instalment plan collected in person, so only part of the committed amount has '
+            . 'actually reached your account. Early closure needs a branch visit, not a self-service action.');
+    }
+    if (strtotime($deposit['maturity_date']) <= strtotime(now_utc())) {
+        $pdo->rollBack();
+        fail(400, 'This deposit has already reached its maturity date. It settles automatically at full '
+            . 'term value; there is nothing to close early.');
+    }
     $heldDays = (int)floor((strtotime(now_utc()) - strtotime($deposit['created_at'])) / 86400);
     if ($heldDays < PREMATURE_MIN_HOLD_DAYS) {
         $pdo->rollBack();
@@ -451,15 +470,19 @@ function route_premature_close(array $d): void
     $effectiveRate = max(0.0, min(deposit_tier_rate($heldMonths), (float)$deposit['interest_rate']) - $penaltyPct);
     $earnedForPeriod = round($principal * $effectiveRate / 100 * $heldDays / 365, 2);
     $alreadyPaid = (float)$deposit['interest_paid'];
-    $owedNow = max(0.0, $earnedForPeriod - $alreadyPaid);
+    $tierInterest = max(0.0, $earnedForPeriod - $alreadyPaid);
     // A daily plan's unreleased accrual is still owed regardless of the
     // formula above -- it is real interest already earned day by day, just
     // held back for the threshold -- so it goes out net of the same TDS a
-    // scheduled release would have deducted, on top of $owedNow.
+    // scheduled release would have deducted, on top of $tierInterest.
     $accrued = (float)$deposit['accrued_interest'];
     $tds = $accrued > 0 ? round($accrued * param_value('tds_rate_daily_interest', 10.0) / 100, 2) : 0.0;
-    $owedNow = round($owedNow + max(0.0, $accrued - $tds), 2);
-    $payout = round($principal + $owedNow, 2);
+    // interest_paid tracks the gross amount earned, same convention
+    // cron.php uses -- tds_deducted is where the TDS itself is recorded, so
+    // this must not be reduced by it before going into interest_paid.
+    $grossInterest = round($tierInterest + $accrued, 2);
+    $netInterest = round($tierInterest + max(0.0, $accrued - $tds), 2);
+    $payout = round($principal + $netInterest, 2);
 
     $account = row('SELECT * FROM accounts WHERE account_number = ?', [$deposit['source_account']]);
     if (!$account) {
@@ -474,18 +497,18 @@ function route_premature_close(array $d): void
         'counterparty_name' => 'AJSPay Term Deposit', 'counterparty_acc' => $deposit['deposit_number'],
         'ref_number' => $ref,
         'description' => "{$deposit['deposit_number']} closed early after $heldDays days: " . rupees($principal)
-            . " principal + " . rupees($owedNow) . " interest ({$effectiveRate}% p.a., {$penaltyPct}% early-exit "
+            . " principal + " . rupees($netInterest) . " interest ({$effectiveRate}% p.a., {$penaltyPct}% early-exit "
             . "penalty applied)" . ($tds > 0 ? ", " . rupees($tds) . " TDS deducted from accrued interest" : '')]);
     $pdo->prepare("UPDATE deposits SET status = 'closed', closed_on = ?, interest_paid = interest_paid + ?,
             tds_deducted = tds_deducted + ?, accrued_interest = 0 WHERE id = ?")
-        ->execute([now_utc(), $owedNow, $tds, $deposit['id']]);
+        ->execute([now_utc(), $grossInterest, $tds, $deposit['id']]);
     audit($user, 'DEPOSIT_CLOSED_EARLY', "{$deposit['deposit_number']} " . rupees($payout) . " after $heldDays days");
     $pdo->commit();
     respond(['status' => 'SUCCESS',
         'message' => "{$deposit['deposit_number']} closed. " . rupees($payout)
             . " credited to {$account['account_number']} (" . rupees($principal) . " principal + "
-            . rupees($owedNow) . " interest, at $effectiveRate% p.a. after the early-exit penalty).",
-        'payout' => $payout, 'principal' => $principal, 'interest' => $owedNow, 'effective_rate' => $effectiveRate]);
+            . rupees($netInterest) . " interest, at $effectiveRate% p.a. after the early-exit penalty).",
+        'payout' => $payout, 'principal' => $principal, 'interest' => $netInterest, 'effective_rate' => $effectiveRate]);
 }
 
 // --- Loans -------------------------------------------------------------------------------
