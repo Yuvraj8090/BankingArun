@@ -3,7 +3,7 @@ import {
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
   GanttChartSquare, Building2, Video, ShieldCheck, FileText, Gift, Repeat, Settings2,
   Layers, ClipboardList, Contact2, BarChart3, BookUser, FileLock2, Gavel, Award, Radio,
-  SlidersHorizontal
+  SlidersHorizontal, Eye
 } from 'lucide-react';
 
 // Role → sidebar menu. The same list is the access rule for /app/* URLs:
@@ -73,6 +73,7 @@ export const NAV_BY_ROLE = {
   bank_owner: [
     { id: 'owner', label: 'Executive Dashboard', icon: Crown, testId: 'tab-owner' },
     { id: 'security-center', label: 'Security Centre', icon: ShieldCheck, testId: 'tab-security-center', highlight: true },
+    { id: 'support-view', label: 'View as Member (read-only)', icon: Eye, testId: 'tab-support-view' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
     { id: 'book-deposit', label: 'Book Member Deposit', icon: PiggyBank, testId: 'tab-book-deposit' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },

@@ -92,6 +92,9 @@ export const api = {
 
   // Deposits
   bookDeposit: async (payload) => (await axios.post(`${API}/deposits/book`, payload, getAuthHeaders())).data,
+  impersonateCandidates: async (params) => (await axios.get(`${API}/impersonate/candidates`, { ...getAuthHeaders(), params })).data,
+  impersonateStart: async (payload) => (await axios.post(`${API}/impersonate/start`, payload, getAuthHeaders())).data,
+  impersonateStop: async () => (await axios.post(`${API}/impersonate/stop`, {}, getAuthHeaders())).data,
   prematureClose: async (depositNumber) =>
     (await axios.post(`${API}/deposits/premature-close`, { deposit_number: depositNumber }, getAuthHeaders())).data,
   // Staff-assisted booking: lookup a member by account number (name, KYC, existing

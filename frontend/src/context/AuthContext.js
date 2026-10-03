@@ -11,6 +11,8 @@ export const AuthProvider = ({ children }) => {
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
+  // Set while a bank owner is viewing a member's account (modules/impersonation.php).
+  const [impersonation, setImpersonation] = useState(null);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
   const API = `${BACKEND_URL}/api`;
@@ -25,6 +27,7 @@ export const AuthProvider = ({ children }) => {
         if (res.data?.user) {
           setUser(res.data.user);
           if (Array.isArray(res.data.features)) setFeatures(res.data.features);
+          setImpersonation(res.data.impersonation || null);
         } else {
           setUser(false);
         }
@@ -81,7 +84,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, setUser, features }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, setUser, features, impersonation }}>
       {children}
     </AuthContext.Provider>
   );

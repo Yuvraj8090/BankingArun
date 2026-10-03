@@ -53,6 +53,8 @@ import GrievancePage from './pages/GrievancePage';
 import ReportsPage from './pages/ReportsPage';
 import TutorialOverlay from './components/TutorialOverlay';
 import SecurityCenterPage from './pages/SecurityCenterPage';
+import SupportViewPage from './pages/SupportViewPage';
+import SupportBanner from './components/SupportBanner';
 import AuthPage from './pages/AuthPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { Toaster } from 'sonner';
@@ -195,11 +197,13 @@ function AppShell() {
     'data-requests': <DataRequestsPage />,
     grievance: <GrievancePage />,
     reports: <ReportsPage />,
-    'security-center': <SecurityCenterPage />
+    'security-center': <SecurityCenterPage />,
+    'support-view': <SupportViewPage />
   };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-100">
+      <SupportBanner />
       <Navbar onNavigate={go} activeTab={tab} />
       <div className="flex-1 flex flex-col md:flex-row">
         <Sidebar activeTab={tab} onSelectTab={go} />
