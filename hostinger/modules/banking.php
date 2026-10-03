@@ -318,7 +318,8 @@ function route_staff_book_deposit(array $d): void
     audit($staff, 'STAFF_DEPOSIT_BOOKED', "$number " . rupees($dueToday) . " for {$owner['name']} ({$account['account_number']})");
     $pdo->commit();
     respond(['status' => 'SUCCESS',
-        'message' => strtoupper($type) . " #$number booked for {$owner['name']}! Maturity value: " . rupees($maturity),
+        'message' => strtoupper($type) . " #$number booked for {$owner['name']}! "
+            . deposit_outcome_note($interestPayout, $maturity, $principal),
         'deposit' => out($deposit)]);
 }
 
@@ -401,8 +402,22 @@ function route_book_deposit(array $d): void
     audit($user, 'DEPOSIT_BOOKED', "$number " . rupees($dueToday));
     $pdo->commit();
     respond(['status' => 'SUCCESS',
-        'message' => strtoupper($type) . " #$number booked successfully! Maturity value: " . rupees($maturity),
+        'message' => strtoupper($type) . " #$number booked successfully! " . deposit_outcome_note($interestPayout, $maturity, $principal),
         'deposit' => out($deposit)]);
+}
+
+// What the member is told they will get. A plan that pays out as it goes only
+// returns its principal at maturity, so "Maturity value" -- which for a daily
+// plan is just the amount deposited -- read as if the deposit earned nothing.
+function deposit_outcome_note(?string $interestPayout, float $maturity, float $principal): string
+{
+    return match ($interestPayout) {
+        'daily' => 'Interest is credited to your account every day (less TDS); your '
+            . rupees($principal) . ' is returned at maturity.',
+        'monthly' => 'Interest is credited to your account every month; your '
+            . rupees($principal) . ' is returned at maturity.',
+        default => 'Maturity value: ' . rupees($maturity),
+    };
 }
 
 const PREMATURE_MIN_HOLD_DAYS = 30;
