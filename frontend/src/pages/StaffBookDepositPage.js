@@ -28,7 +28,9 @@ export default function StaffBookDepositPage() {
   useEffect(() => {
     api.publicSchemes()
       .then((res) => {
-        const mis = (res.schemes || []).find((s) => s.scheme_type === 'mis');
+        // Slab-priced MIS only: a daily-% plan has no amount list to pick from
+        // here, and without this it sorts first and leaves the dropdown empty.
+        const mis = (res.schemes || []).find((s) => s.scheme_type === 'mis' && s.daily_rate_percent == null);
         if (mis) {
           setMisScheme(mis);
           setMisUnit(String(mis.slabs?.[0]?.unit || ''));

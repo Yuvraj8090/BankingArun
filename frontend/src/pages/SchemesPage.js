@@ -336,6 +336,13 @@ export default function SchemesPage() {
                     type="button"
                     data-testid="scheme-auto-generate-btn"
                     onClick={() => {
+                      // For an instalment plan the amount is one instalment and the
+                      // total deposit is that times the pay-in months, so "deposit =
+                      // the amount itself" would print a wrong table.
+                      if (['daily', 'recurring'].includes(form.scheme_type)) {
+                        toast.error('Auto-fill only works for lump-sum plans (Fixed deposit or Monthly income). Type instalment plans line by line.');
+                        return;
+                      }
                       const generated = generateSlabs(autoUnits, Number(autoRate), form.payout_type === 'monthly', form.tenure_months);
                       if (!generated) {
                         toast.error('Paste at least one amount and a rate greater than 0');

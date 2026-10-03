@@ -29,7 +29,13 @@ export default function DepositsInvestmentsPage() {
   // rather than the generic tenure tiers, so it books against a fixed
   // denomination instead of a freeform amount.
   const [misScheme, setMisScheme] = useState(null);
+  const [misPlans, setMisPlans] = useState([]);
   const [misUnit, setMisUnit] = useState('');
+  const selectPlan = (plan) => {
+    setMisScheme(plan);
+    setMisUnit(String(plan.slabs?.[0]?.unit || ''));
+    setMisAmount(String(plan.principal_amount || ''));
+  };
   // A daily-% plan (misScheme.daily_rate_percent set) has no slab table -- any
   // amount at or above the minimum qualifies, so it is typed rather than
   // picked from a dropdown of printed denominations.
@@ -59,12 +65,11 @@ export default function DepositsInvestmentsPage() {
       }
       try {
         const schemeRes = await api.publicSchemes();
-        const mis = (schemeRes.schemes || []).find(s => s.scheme_type === 'mis' || s.daily_rate_percent != null);
-        if (mis) {
-          setMisScheme(mis);
-          setMisUnit(String(mis.slabs?.[0]?.unit || ''));
-          setMisAmount(String(mis.principal_amount || ''));
-        }
+        // Every plan-priced scheme, not just the first: there are now two
+        // MIS-type plans, and .find() was returning only whichever sorted first.
+        const plans = (schemeRes.schemes || []).filter(s => s.scheme_type === 'mis' || s.daily_rate_percent != null);
+        setMisPlans(plans);
+        if (plans[0]) selectPlan(plans[0]);
       } catch (err) {
         // The plan-priced schemes are a bonus on this page, not the page's
         // reason to exist — fixed/recurring booking still works without it.
@@ -305,17 +310,25 @@ export default function DepositsInvestmentsPage() {
                   <label className="block text-slate-500 mb-1">Deposit Type</label>
                   <select
                     data-testid="deposit-type-select"
-                    value={fdType}
-                    onChange={(e) => setFdType(e.target.value)}
+                    value={fdType === 'mis' && misScheme ? `mis:${misScheme.code}` : fdType}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v.startsWith('mis:')) {
+                        selectPlan(misPlans.find(p => p.code === v.slice(4)));
+                        setFdType('mis');
+                      } else {
+                        setFdType(v);
+                      }
+                    }}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
                   >
                     <option value="fixed">Fixed Deposit (Lumpsum Principal)</option>
                     <option value="recurring">Recurring Deposit (Monthly Installment)</option>
-                    {misScheme && (
-                      <option value="mis">
-                        {isDailyMis ? `Daily Income Plan (${misScheme.name})` : `Monthly Income Scheme (${misScheme.name})`}
+                    {misPlans.map(p => (
+                      <option key={p.code} value={`mis:${p.code}`}>
+                        {p.daily_rate_percent != null ? `Daily Income Plan (${p.name})` : `Monthly Income Scheme (${p.name})`}
                       </option>
-                    )}
+                    ))}
                   </select>
                 </div>
               </div>

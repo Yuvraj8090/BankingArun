@@ -978,12 +978,9 @@ INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, principa
 VALUES (UUID(), 'AJS-MIS-40M', 'Dainik Aay 40 Month Plan', 'mis', 40, 10000.0, 10000.0, 30040.0,
     'daily', 0.167, NULL, 'active',
     'Plan book: ₹10,000 minimum, ~5% a month paid out daily (~₹16.70/day) -- above the Nidhi cap on its own numbers.');
-UPDATE schemes SET name = 'Dainik Aay 40 Month Plan', scheme_type = 'mis',
-    tenure_months = 40, contribution_months = NULL, contribution_amount = NULL,
-    principal_amount = 10000.0, total_deposit = 10000.0, maturity_amount = 30040.0,
-    payout_type = 'daily', daily_rate_percent = 0.167, withdrawal_threshold = NULL, status = 'active',
-    notes = 'Plan book: ₹10,000 minimum, ~5% a month paid out daily (~₹16.70/day) -- above the Nidhi cap on its own numbers.'
-    WHERE code = 'AJS-MIS-40M' AND deleted_at IS NULL;
+-- Deliberately no UPDATE here, unlike AJS-MIS-5Y above: this file runs on every
+-- deploy, so a re-asserting UPDATE would silently undo any edit the director
+-- makes in Scheme Master (a changed rate, or taking the plan back to draft).
 
 -- Every scheduled run, so "is the automation running" is a question the
 -- application can answer. cron.php wrote to the journal and nowhere else, which
