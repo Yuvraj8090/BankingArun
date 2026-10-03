@@ -66,6 +66,46 @@ function report_definitions(): array
                 'status' => 'text'],
             'totals' => ['principal_amount', 'maturity_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
         ],
+        // Everyone connected to a plan in one list, so "who took it" and "who is
+        // still pending" are one question. Deposits are the people who booked
+        // (with interest held back flagged as 'interest pending'); enquiries are
+        // CRM leads who named a plan but have not enrolled; and anyone awaiting
+        // KYC is listed too -- they have no plan yet, so a plan filter keeps them
+        // in view (state = 'waiting KYC') rather than hiding the people it exists to show.
+        'plan_enrolment' => [
+            'name' => 'Plan enrolment',
+            'note' => 'Members who took a plan, plus the people still pending: interest earned but not yet paid out, '
+                . 'enquiries that have not booked, and members waiting on KYC. Filter by plan code.',
+            'roles' => ['admin', 'branch_manager', 'bank_owner'],
+            'sql' => "SELECT * FROM (
+                    SELECT u.name AS name, u.phone AS phone, d.source_account AS account, d.scheme_code AS plan,
+                        CASE WHEN d.status = 'active' AND d.accrued_interest > 0 THEN 'interest pending'
+                             WHEN d.status = 'active' THEN 'enrolled' ELSE d.status END AS state,
+                        d.deposit_number AS deposit_number, d.principal_amount AS principal_amount,
+                        d.interest_paid AS interest_paid, d.accrued_interest AS accrued_interest,
+                        d.tds_deducted AS tds_deducted, d.created_at AS since
+                    FROM deposits d JOIN users u ON u.id = d.user_id
+                    UNION ALL
+                    SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, 0, 0, 0, 0, l.created_at
+                    FROM crm_leads l WHERE l.scheme_code IS NOT NULL AND l.stage NOT IN ('enrolled', 'lost')
+                    UNION ALL
+                    SELECT u.name, u.phone,
+                        (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at LIMIT 1),
+                        NULL, 'waiting KYC', NULL, 0, 0, 0, 0, u.created_at
+                    FROM users u WHERE u.role = 'retail' AND u.kyc_status = 'pending_approval'
+                ) p WHERE 1 = 1",
+            'filters' => ['plan' => ["p.plan = ? OR p.state = 'waiting KYC'", 'exact'],
+                'state' => ['p.state = ?', 'exact'],
+                'q' => ['p.name LIKE ? OR p.phone LIKE ?', 'like2'],
+                'from_date' => ['p.since >= ?', 'date_start'],
+                'to_date' => ['p.since <= ?', 'date_end']],
+            'order' => 'p.since DESC',
+            'columns' => ['name' => 'text', 'phone' => 'text', 'account' => 'text', 'plan' => 'text',
+                'state' => 'text', 'deposit_number' => 'text', 'principal_amount' => 'money',
+                'interest_paid' => 'money', 'accrued_interest' => 'money', 'tds_deducted' => 'money',
+                'since' => 'date'],
+            'totals' => ['principal_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
+        ],
         'loan_register' => [
             'name' => 'Loan register',
             'note' => 'Applications with their EMI and the risk grade the AI module assigned.',
