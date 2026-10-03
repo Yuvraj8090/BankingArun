@@ -1243,3 +1243,19 @@ ALTER TABLE schemes ADD COLUMN IF NOT EXISTS lock_in_months INT;
 UPDATE schemes SET daily_rate_percent = 0.08333, maturity_amount = 20000.0,
     notes = 'Plan book: ₹10,000 minimum, doubles in 40 months, paid out daily (~₹8.33/day) -- above the Nidhi cap on its own numbers.'
     WHERE code = 'AJS-MIS-40M' AND daily_rate_percent = 0.16667;
+
+-- Move deposits already booked on AJS-MIS-40M to the doubling rate. A deposit
+-- locks the rate it was booked at (deposits.interest_rate), so changing the
+-- scheme above does not reach them; this does, once. Active deposits only,
+-- and only those still on the old ~61% rate (anything above 31%): new
+-- bookings are already at 30.42, so a re-run touches nothing. Interest
+-- already paid or accrued is left as it was; only future accrual changes. One
+-- audit row per deposit records the old rate, since this lowers a return the
+-- member was sold.
+INSERT INTO audit_logs (id, user_id, email, action, details)
+SELECT UUID(), d.user_id, NULL, 'DEPOSIT_RATE_REPRICED',
+    CONCAT(d.deposit_number, ': ', d.interest_rate, '% -> 30.42% p.a. (AJS-MIS-40M now doubles in 40 months)')
+FROM deposits d
+WHERE d.scheme_code = 'AJS-MIS-40M' AND d.status = 'active' AND d.interest_rate > 31;
+UPDATE deposits SET interest_rate = 30.42
+    WHERE scheme_code = 'AJS-MIS-40M' AND status = 'active' AND interest_rate > 31;
