@@ -6,7 +6,7 @@ import {
 import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
-import { txnMode } from '../utils/format';
+import { txnMode, showsDetail } from '../utils/format';
 
 export default function TransferPage() {
   const { currentTheme } = useBankTheme();
@@ -524,7 +524,12 @@ export default function TransferPage() {
                 <tr key={t.id} className="hover:bg-blue-50/40 transition-colors transition">
                   <td className="p-3 font-mono text-[#0b3b8c]">{t.ref_number}</td>
                   <td className="p-3 font-semibold text-slate-700">{txnMode(t.mode)}</td>
-                  <td className="p-3">{t.counterparty_name || t.description}</td>
+                  <td className="p-3">
+                    {t.counterparty_name || t.description}
+                    {showsDetail(t.mode) && t.description && (
+                      <span className="block text-[10px] text-slate-500 font-normal">{t.description}</span>
+                    )}
+                  </td>
                   <td className="p-3 text-slate-500">{new Date(t.timestamp).toLocaleString('en-IN')}</td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">

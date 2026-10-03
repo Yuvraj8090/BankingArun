@@ -13,6 +13,7 @@ export default function DepositsInvestmentsPage() {
   const [activeTab, setActiveTab] = useState('fd'); // fd, mf, insurance
   const [accounts, setAccounts] = useState([]);
   const [myDeposits, setMyDeposits] = useState([]);
+  const [interestReceived, setInterestReceived] = useState({ day: 0, total: 0 });
   const [closingNumber, setClosingNumber] = useState('');
   const [catalog, setCatalog] = useState({ mutual_funds: [], insurance_plans: [] });
   const [myInvestments, setMyInvestments] = useState([]);
@@ -53,6 +54,7 @@ export default function DepositsInvestmentsPage() {
       setSelectedAcc(prev => prev || accRes.accounts[0].account_number);
     }
     setMyDeposits(accRes.deposits || []);
+    setInterestReceived({ day: accRes.interest_received_24h || 0, total: accRes.interest_received_total || 0 });
   };
 
   useEffect(() => {
@@ -504,6 +506,30 @@ export default function DepositsInvestmentsPage() {
       {activeTab === 'fd' && myDeposits.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl mt-6">
           <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 mb-3">Your Deposits</h3>
+          <div data-testid="interest-summary" className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 text-xs">
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+              <p className="text-emerald-800">Interest received, last 24 hours</p>
+              <p data-testid="interest-24h" className="text-lg font-extrabold text-emerald-700">
+                ₹{Number(interestReceived.day).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10px] text-emerald-800/80">After TDS, as credited to your account. Daily plans credit once a day.</p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <p className="text-slate-600">Interest received, all time</p>
+              <p className="text-lg font-extrabold text-slate-900">
+                ₹{Number(interestReceived.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <p className="text-slate-600">Earning per day (active daily plans)</p>
+              <p data-testid="earning-per-day" className="text-lg font-extrabold text-slate-900">
+                ₹{myDeposits.filter(d => d.status === 'active' && d.interest_payout === 'daily')
+                  .reduce((sum, d) => sum + Number(d.principal_amount) * Number(d.interest_rate) / 100 / 365, 0)
+                  .toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10px] text-slate-500">Before TDS.</p>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="text-[10px] uppercase text-slate-500">
@@ -529,6 +555,11 @@ export default function DepositsInvestmentsPage() {
                     <td className="py-2 pr-3 text-right text-slate-700" data-testid={`interest-${dep.deposit_number}`}>
                       ₹{Number(dep.interest_paid || 0).toLocaleString('en-IN')}
                       <span className="block text-[10px] text-slate-500">paid to your account</span>
+                      {dep.status === 'active' && dep.interest_payout === 'daily' && (
+                        <span className="block text-[10px] text-emerald-700">
+                          earning ₹{(Number(dep.principal_amount) * Number(dep.interest_rate) / 100 / 365).toFixed(2)} a day
+                        </span>
+                      )}
                       {Number(dep.accrued_interest) > 0 && (
                         <span className="block text-[10px] text-amber-700">
                           + ₹{Number(dep.accrued_interest).toLocaleString('en-IN')} earned, not paid out yet

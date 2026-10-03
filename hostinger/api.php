@@ -921,8 +921,17 @@ function route_accounts(array $d): void
     $cards = array_map('public_card', rows('SELECT * FROM cards WHERE user_id = ? ORDER BY created_at, id', [$user['id']]));
     $savings = array_sum(array_column($accounts, 'balance'));
     $deposited = array_sum(array_column($deposits, 'principal_amount'));
+    // Interest actually received into the account (net of any TDS -- the credit
+    // is the amount after deduction), for the Deposits page's "earned today"
+    // line. transactions.timestamp is UTC, same as now_utc().
+    $received = fn(string $since) => (float)scalar(
+        "SELECT COALESCE(SUM(amount), 0) FROM transactions
+         WHERE user_id = ? AND type = 'credit' AND mode = 'DEPOSIT_INTEREST' AND timestamp >= ?",
+        [$user['id'], $since]);
     respond(['accounts' => $accounts, 'deposits' => $deposits, 'cards' => $cards, 'net_worth' => $savings + $deposited,
-        'total_savings_balance' => $savings, 'total_deposits_balance' => $deposited]);
+        'total_savings_balance' => $savings, 'total_deposits_balance' => $deposited,
+        'interest_received_24h' => $received(gmdate('Y-m-d H:i:s', time() - 86400)),
+        'interest_received_total' => $received('1970-01-01 00:00:00')]);
 }
 
 function route_transactions(array $d): void

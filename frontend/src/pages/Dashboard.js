@@ -7,7 +7,7 @@ import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import { txnMode } from '../utils/format';
+import { txnMode, showsDetail } from '../utils/format';
 
 export default function Dashboard({ onNavigate }) {
   const { currentTheme } = useBankTheme();
@@ -231,6 +231,9 @@ export default function Dashboard({ onNavigate }) {
                       </div>
                       <div>
                         <p className="font-semibold text-xs text-slate-900">{txn.counterparty_name || txn.description}</p>
+                        {showsDetail(txn.mode) && txn.description && (
+                          <p className="text-[10px] text-slate-500 max-w-md">{txn.description}</p>
+                        )}
                         <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                           <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{txnMode(txn.mode)}</span>
                           <span>{new Date(txn.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
