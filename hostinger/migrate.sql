@@ -1235,3 +1235,11 @@ UPDATE schemes SET daily_rate_percent = 0.16667
 -- How many months a plan's deposits are locked before they can be closed
 -- early. NULL falls back to the 30-day minimum in route_premature_close.
 ALTER TABLE schemes ADD COLUMN IF NOT EXISTS lock_in_months INT;
+
+-- AJS-MIS-40M is meant to double the deposit over its 40 months, not triple it:
+-- 100% over 1,200 days = 0.08333%/day (~Rs 8.33/day, ~Rs 250/month on Rs 10,000).
+-- Keyed on the previous published rate, so it runs once and never overrides a
+-- rate the director sets afterwards.
+UPDATE schemes SET daily_rate_percent = 0.08333, maturity_amount = 20000.0,
+    notes = 'Plan book: ₹10,000 minimum, doubles in 40 months, paid out daily (~₹8.33/day) -- above the Nidhi cap on its own numbers.'
+    WHERE code = 'AJS-MIS-40M' AND daily_rate_percent = 0.16667;
