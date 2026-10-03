@@ -16,6 +16,7 @@ FLOAT_COLUMNS = {
     'outstanding', 'roi', 'face_match_score', 'lat', 'lng', 'credit_amount', 'sum_assured',
     'annual_premium', 'amount_requested', 'calculated_emi', 'monthly_income', 'total_deposit',
     'contribution_amount', 'collected_total',
+    'daily_rate_percent', 'withdrawal_threshold', 'accrued_interest',
 }
 BOOL_COLUMNS = {
     'is_virtual', 'international_enabled', 'contactless_enabled', 'ecom_enabled', 'upi_linked',

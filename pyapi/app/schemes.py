@@ -99,11 +99,18 @@ def cap_compliant_maturity(scheme: dict[str, Any]) -> dict[str, Any] | None:
 
 def scheme_public(scheme: dict[str, Any]) -> dict[str, Any]:
     shaped = out(scheme)
-    rate = effective_rate(shaped)
+    # A simple daily-interest plan's rate is the percent itself (modules/master.php
+    # scheme_public): there is no slab, and total_deposit/maturity_amount are only
+    # an illustrative example, so solving for a rate from them gives nonsense.
+    daily = shaped.get('daily_rate_percent')
+    rate = php_round(daily * 365, 2) if daily is not None else effective_rate(shaped)
     shaped['effective_rate_pa'] = rate
     shaped['exceeds_cap'] = rate is not None and rate > NIDHI_MAX_DEPOSIT_RATE
-    # Only worked out where it is needed: a plan inside the cap has nothing to fix.
-    shaped['cap_compliant'] = cap_compliant_maturity(shaped) if shaped['exceeds_cap'] else None
+    # Only worked out where it is needed: a plan inside the cap has nothing to fix,
+    # and there is no slab-priced form of a daily-percent plan to solve for.
+    shaped['cap_compliant'] = (
+        cap_compliant_maturity(shaped) if shaped['exceeds_cap'] and daily is None else None
+    )
 
     # Every denomination is rated, not only the representative one. A slab whose
     # own figures imply a different return is either priced differently on
