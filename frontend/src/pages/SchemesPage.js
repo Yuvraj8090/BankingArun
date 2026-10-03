@@ -10,7 +10,7 @@ const BLANK = {
   code: '', name: '', scheme_type: 'recurring', tenure_months: 12, contribution_months: '',
   contribution_amount: '',
   principal_amount: '', total_deposit: '', maturity_amount: '', payout_type: 'maturity',
-  daily_rate_percent: '', withdrawal_threshold: '',
+  daily_rate_percent: '', withdrawal_threshold: '', lock_in_months: '',
   status: 'draft', notes: '', slabs: []
 };
 
@@ -56,6 +56,8 @@ export default function SchemesPage() {
   const [data, setData] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [autoMonthly, setAutoMonthly] = useState('');
+  const [autoMultiple, setAutoMultiple] = useState('');
   const [autoUnits, setAutoUnits] = useState('');
   const [autoRate, setAutoRate] = useState('');
   const overCap = (data?.schemes || []).filter((x) => x.exceeds_cap);
@@ -71,7 +73,7 @@ export default function SchemesPage() {
     try {
       const payload = { ...form };
       ['tenure_months', 'contribution_amount', 'principal_amount', 'total_deposit', 'maturity_amount',
-        'daily_rate_percent', 'withdrawal_threshold']
+        'daily_rate_percent', 'withdrawal_threshold', 'lock_in_months']
         .forEach(k => { payload[k] = payload[k] === '' ? null : Number(payload[k]); });
       // A simple daily-% plan has no slab table -- total_deposit/maturity_amount
       // are filled in server-side as an illustrative example, and slabs stays
@@ -111,7 +113,7 @@ export default function SchemesPage() {
           </div>
         </div>
         {canEdit && (
-          <button data-testid="scheme-new-btn" onClick={() => { setForm({ ...BLANK }); setAutoUnits(''); setAutoRate(''); }}
+          <button data-testid="scheme-new-btn" onClick={() => { setForm({ ...BLANK }); setAutoUnits(''); setAutoRate(''); setAutoMonthly(''); setAutoMultiple(''); }}
             className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> New scheme
           </button>
@@ -225,7 +227,7 @@ export default function SchemesPage() {
                 </td>
                 {canEdit && (
                   <td className="p-3 text-right whitespace-nowrap">
-                    <button onClick={() => { setForm({ ...s }); setAutoUnits(''); setAutoRate(''); }} data-testid={`scheme-edit-${s.code}`}
+                    <button onClick={() => { setForm({ ...s }); setAutoUnits(''); setAutoRate(''); setAutoMonthly(''); setAutoMultiple(''); }} data-testid={`scheme-edit-${s.code}`}
                       className="text-[#0b3b8c] font-semibold hover:underline py-1.5 px-1 -mx-1">Edit</button>
                     <button onClick={() => remove(s)} className="ml-2 text-[#c8102e] hover:underline inline-flex items-center gap-1 py-1.5 px-1">
                       <Trash2 className="w-3 h-3" /> Delete
@@ -276,10 +278,41 @@ export default function SchemesPage() {
             {form.payout_type === 'daily' && (<>
               <Field label="Daily rate (%)" type="number" value={form.daily_rate_percent ?? ''}
                 onChange={v => setForm(f => ({ ...f, daily_rate_percent: v }))} testId="scheme-daily-rate" />
+              <Field label="…or type a monthly rate (%) — daily = monthly ÷ 30" type="number" value={autoMonthly}
+                onChange={v => {
+                  setAutoMonthly(v);
+                  const m = Number(v);
+                  if (m > 0) setForm(f => ({ ...f, daily_rate_percent: Math.round(m / 30 * 100000) / 100000 }));
+                }} testId="scheme-monthly-rate" />
+              <Field label="…or: money grows to ×N of the deposit over the tenure (2 = doubles, 3 = triples)" type="number"
+                value={autoMultiple}
+                onChange={v => {
+                  setAutoMultiple(v);
+                  const x = Number(v);
+                  const days = Number(form.tenure_months) * 30;
+                  if (x > 1 && days > 0) setForm(f => ({ ...f, daily_rate_percent: Math.round((x - 1) * 100 / days * 100000) / 100000 }));
+                }} testId="scheme-multiple" />
+              {Number(form.daily_rate_percent) > 0 && (() => {
+                const principal = Number(form.principal_amount) || 10000;
+                const perDay = principal * Number(form.daily_rate_percent) / 100;
+                const days = Number(form.tenure_months) * 30;
+                return (
+                  <div data-testid="scheme-daily-preview"
+                    className="md:col-span-2 p-3 rounded-md bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900">
+                    On ₹{principal.toLocaleString('en-IN')}: <strong>₹{perDay.toFixed(2)} a day</strong>,
+                    about ₹{(perDay * 30).toFixed(0)} a month, ₹{(perDay * days).toFixed(0)} in interest over
+                    {' '}{form.tenure_months} months (deposit comes back ×{(1 + perDay * days / principal).toFixed(2)} in total),
+                    which is {(Number(form.daily_rate_percent) * 365).toFixed(2)}% a year — the Nidhi Rules cap is {data.max_rate_pa}%.
+                  </div>
+                );
+              })()}
               <Field label="Withdrawal threshold (₹, blank = pay out daily)" type="number"
                 value={form.withdrawal_threshold ?? ''}
                 onChange={v => setForm(f => ({ ...f, withdrawal_threshold: v }))} testId="scheme-threshold" />
             </>)}
+            <Field label="Lock-in months (blank = 30 days) — early closing is refused before this" type="number"
+              value={form.lock_in_months ?? ''} onChange={v => setForm(f => ({ ...f, lock_in_months: v }))}
+              testId="scheme-lock-in" />
             <Select label="Status" value={form.status} options={data.statuses.map(s => [s, s])}
               onChange={v => setForm(f => ({ ...f, status: v }))} testId="scheme-status" />
             {form.payout_type === 'daily' ? (

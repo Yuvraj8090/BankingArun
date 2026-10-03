@@ -18,6 +18,9 @@ export default function StaffBookDepositPage() {
   const [lookupError, setLookupError] = useState('');
 
   const [misScheme, setMisScheme] = useState(null);
+  // A daily-% plan: no amount list, any amount at or above its minimum.
+  const [dailyScheme, setDailyScheme] = useState(null);
+  const [dailyAmount, setDailyAmount] = useState('');
   const [depositType, setDepositType] = useState('fixed');
   const [amount, setAmount] = useState(50000);
   const [tenure, setTenure] = useState(12);
@@ -34,6 +37,11 @@ export default function StaffBookDepositPage() {
         if (mis) {
           setMisScheme(mis);
           setMisUnit(String(mis.slabs?.[0]?.unit || ''));
+        }
+        const daily = (res.schemes || []).find((s) => s.daily_rate_percent != null);
+        if (daily) {
+          setDailyScheme(daily);
+          setDailyAmount(String(daily.principal_amount || ''));
         }
       })
       .catch(() => {});
@@ -76,6 +84,14 @@ export default function StaffBookDepositPage() {
   const misSlab = depositType === 'mis' ? (misScheme?.slabs || []).find((s) => String(s.unit) === String(misUnit)) : null;
 
   const calculateMaturity = () => {
+    if (depositType === 'daily') {
+      const p = parseFloat(dailyAmount) || 0;
+      return {
+        rate: dailyScheme.effective_rate_pa ?? 0,
+        dailyCredit: Math.round(p * dailyScheme.daily_rate_percent) / 100,
+        total: Math.round(p),
+      };
+    }
     if (depositType === 'mis') {
       if (!misSlab) return { rate: 0, total: 0, monthlyPayout: 0 };
       return {
@@ -99,7 +115,12 @@ export default function StaffBookDepositPage() {
       toast.error('Look up a member account first');
       return;
     }
-    if (depositType === 'mis') {
+    if (depositType === 'daily') {
+      if (!dailyScheme || !(parseFloat(dailyAmount) >= dailyScheme.principal_amount)) {
+        toast.error(`Minimum deposit for this plan is ₹${Number(dailyScheme?.principal_amount || 0).toLocaleString('en-IN')}`);
+        return;
+      }
+    } else if (depositType === 'mis') {
       if (!misScheme || !misSlab) {
         toast.error('Choose an MIS amount');
         return;
@@ -111,7 +132,9 @@ export default function StaffBookDepositPage() {
     setBooking(true);
     try {
       const res = await api.staffBookDeposit(
-        depositType === 'mis'
+        depositType === 'daily'
+          ? { account_number: accountNumber.trim(), scheme_code: dailyScheme.code, amount: parseFloat(dailyAmount), nominee_name: nominee }
+          : depositType === 'mis'
           ? { account_number: accountNumber.trim(), scheme_code: misScheme.code, amount: misSlab.unit, nominee_name: nominee }
           : {
               account_number: accountNumber.trim(),
@@ -225,10 +248,27 @@ export default function StaffBookDepositPage() {
                   <option value="fixed">Fixed Deposit (Lumpsum Principal)</option>
                   <option value="recurring">Recurring Deposit (Monthly Installment)</option>
                   {misScheme && <option value="mis">Monthly Income Scheme ({misScheme.name})</option>}
+                  {dailyScheme && <option value="daily">Daily Income Plan ({dailyScheme.name})</option>}
                 </select>
               </div>
 
-              {depositType === 'mis' ? (
+              {depositType === 'daily' ? (
+                <div>
+                  <label className="block text-slate-500 mb-1">
+                    Amount to Lock (₹, minimum ₹{Number(dailyScheme.principal_amount).toLocaleString('en-IN')})
+                  </label>
+                  <input
+                    data-testid="staff-daily-amount-input"
+                    type="number"
+                    min={dailyScheme.principal_amount}
+                    step="1000"
+                    required
+                    value={dailyAmount}
+                    onChange={(e) => setDailyAmount(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
+                  />
+                </div>
+              ) : depositType === 'mis' ? (
                 <div>
                   <label className="block text-slate-500 mb-1">Amount to Lock (₹)</label>
                   <select
@@ -307,13 +347,19 @@ export default function StaffBookDepositPage() {
               <div className="flex justify-between text-slate-500">
                 <span>Principal Locked:</span>
                 <span className="font-semibold text-slate-900">
-                  ₹{(depositType === 'mis' ? (misSlab?.unit || 0) : parseFloat(amount || 0)).toLocaleString('en-IN')}
+                  ₹{(depositType === 'daily' ? (parseFloat(dailyAmount) || 0) : depositType === 'mis' ? (misSlab?.unit || 0) : parseFloat(amount || 0)).toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="flex justify-between text-slate-500">
                 <span>Interest Rate:</span>
                 <span className="font-bold text-[#0b3b8c]">{maturityCalc.rate}% p.a.</span>
               </div>
+              {depositType === 'daily' && (
+                <div className="flex justify-between text-slate-500">
+                  <span>Daily Credit (before TDS):</span>
+                  <span className="font-semibold text-emerald-700">₹{maturityCalc.dailyCredit.toLocaleString('en-IN')}/day</span>
+                </div>
+              )}
               {depositType === 'mis' && (
                 <div className="flex justify-between text-slate-500">
                   <span>Monthly Payout:</span>
@@ -321,7 +367,7 @@ export default function StaffBookDepositPage() {
                 </div>
               )}
               <div className="pt-2 border-t border-slate-200 flex justify-between text-sm">
-                <span className="font-bold text-slate-900">{depositType === 'mis' ? 'Total Received Over Term:' : 'Maturity Value:'}</span>
+                <span className="font-bold text-slate-900">{depositType === 'daily' ? 'Principal Repaid at Maturity:' : depositType === 'mis' ? 'Total Received Over Term:' : 'Maturity Value:'}</span>
                 <span className="font-extrabold text-emerald-700">₹{maturityCalc.total.toLocaleString('en-IN')}</span>
               </div>
             </div>

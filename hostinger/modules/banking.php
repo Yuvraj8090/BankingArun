@@ -459,10 +459,21 @@ function route_premature_close(array $d): void
             . 'term value; there is nothing to close early.');
     }
     $heldDays = (int)floor((strtotime(now_utc()) - strtotime($deposit['created_at'])) / 86400);
-    if ($heldDays < PREMATURE_MIN_HOLD_DAYS) {
+    // The plan's own lock-in (Scheme Master -> "Lock-in months"), else the
+    // 30-day default. Read live: it governs when an exit is allowed, not a
+    // return the member was promised, so unlike the rate it is not locked
+    // into the deposit at booking.
+    $lockIn = $deposit['scheme_code']
+        ? scalar('SELECT lock_in_months FROM schemes WHERE code = ?', [$deposit['scheme_code']]) : null;
+    $minHoldDays = $lockIn === null || $lockIn === false ? PREMATURE_MIN_HOLD_DAYS : (int)round((int)$lockIn * 30.4);
+    if ($heldDays < $minHoldDays) {
         $pdo->rollBack();
-        fail(400, "This deposit must be held at least " . PREMATURE_MIN_HOLD_DAYS
-            . " days before it can be closed early. It has been held $heldDays.");
+        fail(400, $lockIn === null || $lockIn === false
+            ? "This deposit must be held at least " . PREMATURE_MIN_HOLD_DAYS
+                . " days before it can be closed early. It has been held $heldDays."
+            : "This plan locks deposits for $lockIn month" . ((int)$lockIn === 1 ? '' : 's')
+                . " before they can be closed early. It has been held $heldDays days, "
+                . "so it unlocks in " . ($minHoldDays - $heldDays) . " more.");
     }
     $heldMonths = max(1, (int)round($heldDays / 30.4));
     $principal = (float)$deposit['principal_amount'];

@@ -1221,3 +1221,17 @@ ALTER TABLE deposits ADD COLUMN IF NOT EXISTS tds_deducted DECIMAL(15,2) NOT NUL
 
 -- Set by route_premature_close when a member ends a deposit before maturity.
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS closed_on DATETIME;
+
+-- A daily rate such as 5% a month (0.16667%/day) needs more than the 3 decimals
+-- this column started with: at 0.167 a "Rs 500 a month" plan paid Rs 16.70/day
+-- and Rs 501/month. MODIFY is safe to repeat.
+ALTER TABLE schemes MODIFY COLUMN daily_rate_percent DECIMAL(8,5);
+-- One-time correction of the one plan that was published with the rounded
+-- figure. Keyed on the old value, so it never overrides a rate the director
+-- has since set by hand.
+UPDATE schemes SET daily_rate_percent = 0.16667
+    WHERE code = 'AJS-MIS-40M' AND daily_rate_percent = 0.167;
+
+-- How many months a plan's deposits are locked before they can be closed
+-- early. NULL falls back to the 30-day minimum in route_premature_close.
+ALTER TABLE schemes ADD COLUMN IF NOT EXISTS lock_in_months INT;

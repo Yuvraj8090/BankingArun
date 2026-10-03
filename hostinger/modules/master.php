@@ -289,6 +289,11 @@ function scheme_payload(array $d, array $existing = []): array
     // this key, including an explicit null to switch a plan away from daily
     // pricing, and $get()'s ?? would otherwise treat that null the same as
     // "not sent" and fall back to $existing -- silently undoing the switch.
+    // Same direct read as daily_rate_percent below, for the same reason: the
+    // editor always sends this key, and an explicit null (back to the default
+    // 30-day minimum) must not fall back to $existing through $get()'s ??.
+    $lockRaw = array_key_exists('lock_in_months', $d) ? $d['lock_in_months'] : ($existing['lock_in_months'] ?? null);
+    $lockIn = $lockRaw === null || $lockRaw === '' ? null : max(0, min((int)$lockRaw, $months));
     $dailyRateRaw = array_key_exists('daily_rate_percent', $d) ? $d['daily_rate_percent'] : $get('daily_rate_percent');
     $dailyRate = $dailyRateRaw === null || $dailyRateRaw === '' ? null : (float)$dailyRateRaw;
     if ($dailyRate !== null) {
@@ -310,6 +315,7 @@ function scheme_payload(array $d, array $existing = []): array
             'contribution_months' => null, 'contribution_amount' => null,
             'principal_amount' => $minDeposit, 'total_deposit' => $minDeposit, 'maturity_amount' => $example,
             'payout_type' => 'daily', 'daily_rate_percent' => $dailyRate, 'withdrawal_threshold' => $threshold,
+            'lock_in_months' => $lockIn,
             'slabs' => null, 'status' => $status, 'notes' => clip($get('notes', ''), 255) ?: null,
         ];
     }
@@ -328,7 +334,7 @@ function scheme_payload(array $d, array $existing = []): array
         'total_deposit' => money($get('total_deposit', 0)),
         'maturity_amount' => money($get('maturity_amount', 0)),
         'payout_type' => in_array($payout, ['maturity', 'monthly'], true) ? $payout : 'maturity',
-        'daily_rate_percent' => null, 'withdrawal_threshold' => null,
+        'daily_rate_percent' => null, 'withdrawal_threshold' => null, 'lock_in_months' => $lockIn,
         'slabs' => scheme_slabs($get('slabs'), $payout === 'monthly'),
         'status' => $status,
         'notes' => clip($get('notes', ''), 255) ?: null,

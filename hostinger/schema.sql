@@ -926,7 +926,10 @@ CREATE TABLE IF NOT EXISTS schemes (
     -- there is no slab table to type in at all. NULL means this is an
     -- ordinary slab-priced scheme; set, it means the opposite -- slabs is
     -- ignored and scheme_deposit_terms() takes the percent branch instead.
-    daily_rate_percent DECIMAL(6,3),
+    daily_rate_percent DECIMAL(8,5),
+    -- Months a deposit is locked before it can be closed early (route_premature_close).
+    -- NULL = the default 30-day minimum.
+    lock_in_months INT,
     -- The accrued daily interest on one deposit is held back, not paid into the
     -- account daily, until it reaches this amount (see accrued_interest on
     -- deposits, and run_daily_interest_accrual in cron.php). NULL/0 means pay
@@ -986,13 +989,13 @@ INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribu
 -- amount at or above the minimum qualifies), rather than AJS-MIS-5Y's
 -- printed-slab monthly one. daily_rate_percent/withdrawal_threshold are not
 -- in the batch insert above -- inserted separately so the columns are
--- explicit.  ₹10,000 x 0.167%/day = ~₹16.70/day (~₹501/month), paid out
+-- explicit.  ₹10,000 x 0.16667%/day = ~₹16.67/day (~₹500/month), paid out
 -- daily with nothing held back. Same as AJS-MIS-5Y, published straight from
 -- the brochure figures, above the 12.5% Nidhi Rules cap on its own numbers.
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, principal_amount, total_deposit,
     maturity_amount, payout_type, daily_rate_percent, withdrawal_threshold, status, notes) VALUES
 ('sch-mis-40m', 'AJS-MIS-40M', 'Dainik Aay 40 Month Plan', 'mis', 40, 10000.00, 10000.00, 30040.00, 'daily',
-    0.167, NULL, 'active', 'Plan book: ₹10,000 minimum, ~5% a month paid out daily (~₹16.70/day) -- above the Nidhi cap on its own numbers.');
+    0.16667, NULL, 'active', 'Plan book: ₹10,000 minimum, 5% a month paid out daily (~₹16.67/day) -- above the Nidhi cap on its own numbers.');
 
 -- Content behind the public product pages (/personal/savings-account and friends).
 -- Seeded from what the frontend used to carry hardcoded, so the pages are

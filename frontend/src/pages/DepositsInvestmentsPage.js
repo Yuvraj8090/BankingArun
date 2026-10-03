@@ -511,6 +511,7 @@ export default function DepositsInvestmentsPage() {
                   <th className="py-2 pr-3 font-semibold">Deposit</th>
                   <th className="py-2 pr-3 font-semibold text-right">Principal</th>
                   <th className="py-2 pr-3 font-semibold">Maturity</th>
+                  <th className="py-2 pr-3 font-semibold text-right">Interest earned</th>
                   <th className="py-2 pr-3 font-semibold">Status</th>
                   <th className="py-2 pr-3 font-semibold text-right">Action</th>
                 </tr>
@@ -524,6 +525,20 @@ export default function DepositsInvestmentsPage() {
                     </td>
                     <td className="py-2 pr-3 text-slate-600">
                       {new Date(dep.maturity_date).toLocaleDateString('en-IN')}
+                    </td>
+                    <td className="py-2 pr-3 text-right text-slate-700" data-testid={`interest-${dep.deposit_number}`}>
+                      ₹{Number(dep.interest_paid || 0).toLocaleString('en-IN')}
+                      <span className="block text-[10px] text-slate-500">paid to your account</span>
+                      {Number(dep.accrued_interest) > 0 && (
+                        <span className="block text-[10px] text-amber-700">
+                          + ₹{Number(dep.accrued_interest).toLocaleString('en-IN')} earned, not paid out yet
+                        </span>
+                      )}
+                      {Number(dep.tds_deducted) > 0 && (
+                        <span className="block text-[10px] text-slate-500">
+                          ₹{Number(dep.tds_deducted).toLocaleString('en-IN')} TDS withheld
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
@@ -551,7 +566,7 @@ export default function DepositsInvestmentsPage() {
           </div>
           <p className="text-[10px] text-slate-500 mt-2">
             Closing before maturity pays a reduced rate for the time actually held, minus an early-exit penalty —
-            not the full-term rate. A deposit must be held at least 30 days before it can be closed this way.
+            not the full-term rate. Each plan has a lock-in (30 days unless the plan sets longer); closing before it is refused and tells you when it unlocks.
           </p>
         </div>
       )}
