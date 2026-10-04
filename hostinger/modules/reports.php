@@ -44,12 +44,12 @@ function report_definitions(): array
         // The statutory one: who the members are. The Nidhi Rules turn on this.
         'member_register' => [
             'name' => 'Member register',
-            'note' => 'Every member, when they joined and what they hold. Required under the Nidhi Rules, 2014.',
+            'note' => 'Every member, when they joined and what they hold (deposits = money actually collected, not the committed total of an instalment plan). Required under the Nidhi Rules, 2014.',
             'roles' => ['admin', 'branch_manager', 'bank_owner'],
             'sql' => "SELECT u.id, u.name, u.email, u.phone, u.role, u.branch, u.kyc_status, u.created_at,
                     (SELECT COUNT(*) FROM accounts a WHERE a.user_id = u.id) AS accounts,
                     (SELECT COALESCE(SUM(a.balance), 0) FROM accounts a WHERE a.user_id = u.id) AS balances,
-                    (SELECT COALESCE(SUM(d.principal_amount), 0) FROM deposits d
+                    (SELECT COALESCE(SUM($collected), 0) FROM deposits d
                         WHERE d.user_id = u.id AND d.status = 'active') AS deposits
                 FROM users u WHERE u.role IN ('retail', 'corporate')",
             'filters' => ['q' => ['u.name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?', 'like3'],
