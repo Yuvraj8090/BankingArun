@@ -9,8 +9,15 @@ const PDF_M = 42.5;    // 15 mm margins
 const PDF_ROW = 14.0;
 const PDF_BLUE = [0.043, 0.231, 0.549];
 // width (pt), heading, alignment, max characters
-const PDF_COLS = [[62, 'Date', 'l', 10], [96, 'Ref No', 'l', 22], [45, 'Mode', 'l', 11], [128, 'Description', 'l', 34],
-    [57, 'Debit (Rs.)', 'r', 0], [57, 'Credit (Rs.)', 'r', 0], [65, 'Balance (Rs.)', 'r', 0]];
+const PDF_COLS = [[50, 'Date', 'l', 10], [108, 'Ref No', 'l', 25], [42, 'Mode', 'l', 11], [138, 'Description', 'l', 38],
+    [54, 'Debit (Rs.)', 'r', 0], [54, 'Credit (Rs.)', 'r', 0], [64, 'Balance (Rs.)', 'r', 0]];
+
+// The long mode codes do not fit the PDF's narrow column ("DEPOSIT_INTE…"), so the deposit ones read short.
+function statement_mode(string $mode): string
+{
+    return ['DEPOSIT_INTEREST' => 'Interest', 'DEPOSIT_MATURITY' => 'Maturity', 'DEPOSIT_BOOKING' => 'Deposit',
+        'DEPOSIT_PREMATURE_CLOSURE' => 'Early close'][$mode] ?? $mode;
+}
 
 // Account number and dates arrive in the POST body, never in the URL.
 function statement_request(array $d): array
@@ -146,7 +153,7 @@ function statement_pdf(array $user, array $account, array $txns, ?string $start,
             $ops .= pdf_rect(PDF_M, $y - PDF_ROW, 510, PDF_ROW, [0.973, 0.98, 0.988]);
         }
         $amount = number_format((float)$t['amount'], 2);
-        $ops .= pdf_row([substr($t['timestamp'], 0, 10), $t['ref_number'], $t['mode'], $t['description'] ?? '',
+        $ops .= pdf_row([substr($t['timestamp'], 0, 10), $t['ref_number'], statement_mode($t['mode']), $t['description'] ?? '',
             $t['type'] === 'debit' ? $amount : '', $t['type'] === 'credit' ? $amount : '',
             number_format((float)$t['balance_after'], 2)], $y, 'F1', [0.1, 0.1, 0.12]);
         $y -= PDF_ROW;
@@ -281,8 +288,8 @@ function statement_xlsx(array $user, array $account, array $txns, ?string $start
     ];
     foreach ($txns as $t) {
         $amount = (float)$t['amount'];
-        $rows[] = [[substr($t['timestamp'], 0, 10), 0], [$t['ref_number'], 0], [$t['mode'], 0],
-            [mb_substr($t['description'] ?? '', 0, 80), 0], [$t['type'] === 'debit' ? $amount : '', 4],
+        $rows[] = [[substr($t['timestamp'], 0, 10), 0], [$t['ref_number'], 0], [statement_mode($t['mode']), 0],
+            [mb_substr($t['description'] ?? '', 0, 120), 0], [$t['type'] === 'debit' ? $amount : '', 4],
             [$t['type'] === 'credit' ? $amount : '', 4], [(float)$t['balance_after'], 4]];
     }
     $files = [
@@ -291,7 +298,7 @@ function statement_xlsx(array $user, array $account, array $txns, ?string $start
         'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Statement" sheetId="1" r:id="rId1"/><sheet name="TDS Note" sheetId="2" r:id="rId2"/></sheets></workbook>',
         'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
         'xl/styles.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts><fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF0B3B8C"/><name val="Calibri"/></font><font><b/><sz val="12"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0B3B8C"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
-        'xl/worksheets/sheet1.xml' => xlsx_sheet($rows, [12, 24, 16, 42, 16, 16, 18]),
+        'xl/worksheets/sheet1.xml' => xlsx_sheet($rows, [12, 28, 16, 56, 16, 16, 18]),
         'xl/worksheets/sheet2.xml' => xlsx_sheet([
             [['TDS is deducted on interest under Section 194A of the Income-tax Act, 1961 where applicable.', 0]],
         ], [90]),

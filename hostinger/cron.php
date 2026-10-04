@@ -290,9 +290,10 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
                 $ref = 'DINT-' . $locked['deposit_number'] . '-' . $day->format('Ymd');
                 [$credited, $result] = credit($locked['source_account'], $net, 'DEPOSIT_INTEREST',
                     'AJSPay Daily Interest',
-                    "Daily interest on deposit {$locked['deposit_number']} for " . $day->format('j M Y') . ": "
-                        . rupees($total) . " earned, " . rupees($tds) . " TDS deducted @{$tdsRate}%, "
-                        . rupees($net) . " credited",
+                    // Short on purpose: the PDF statement clips a description at 38 characters, and the TDS
+                    // is the part a member needs to see. The credit column carries the net; the deposit number
+                    // is in the ref.
+                    'Interest ' . rupees($total) . ' - TDS ' . rupees($tds) . ', ' . $day->format('j M'),
                     $ref);
                 if (!$credited) {
                     $ok = false;
