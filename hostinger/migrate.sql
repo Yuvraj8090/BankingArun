@@ -1315,3 +1315,31 @@ UPDATE support_tickets
     WHERE user_name IN
         ('Arunabh Mukherjee (Chief Branch Manager)', 'Vikram Kothari (Bank Owner)',
          'Meera Iyer (Customer Service Officer)', 'Rajesh Nair (Collection Agent)', 'Aditi Verma (Loan Officer)');
+
+-- The AJS-MIS-5Y deposits booked before 5 Oct 2026 were meant for the 40-month
+-- daily plan (the owner asked for them moved). Re-term each onto AJS-MIS-40M as
+-- if booked there on its own start date: 30.42% p.a. (0.08333%/day), daily
+-- payout, 40 months from the start date, principal matures. Interest earned
+-- since the start date is backfilled into accrued_interest (whole days, start
+-- date to today IST) so the daily cron releases it, TDS and all, on its next
+-- run; last_payout_date = today stops that run counting today twice. Only
+-- active deposits that have paid nothing yet, so there is no double count. The
+-- scheme_code changes, so a re-run (and every later deploy) matches nothing;
+-- the date bound keeps deposits booked on 5-year after this from being swept
+-- in. One audit row per deposit, since the terms the member was sold change.
+INSERT INTO audit_logs (id, user_id, email, action, details)
+SELECT UUID(), d.user_id, NULL, 'DEPOSIT_PLAN_MOVED',
+    CONCAT(d.deposit_number, ': AJS-MIS-5Y ', d.interest_rate, '% monthly -> AJS-MIS-40M 30.42% daily, 40 months')
+FROM deposits d
+WHERE d.scheme_code = 'AJS-MIS-5Y' AND d.status = 'active' AND d.interest_paid = 0
+  AND d.created_at < '2026-10-05'
+  AND EXISTS (SELECT 1 FROM schemes s WHERE s.code = 'AJS-MIS-40M' AND s.daily_rate_percent IS NOT NULL);
+UPDATE deposits SET
+    accrued_interest = ROUND(principal_amount * 30.42 / 100 / 365
+        * GREATEST(DATEDIFF(DATE(UTC_TIMESTAMP() + INTERVAL 330 MINUTE), DATE(created_at + INTERVAL 330 MINUTE)), 0), 2),
+    last_payout_date = DATE(UTC_TIMESTAMP() + INTERVAL 330 MINUTE),
+    interest_rate = 30.42, tenure_months = 40, interest_payout = 'daily', maturity_amount = principal_amount,
+    maturity_date = DATE_ADD(DATE(created_at + INTERVAL 330 MINUTE), INTERVAL 40 MONTH),
+    scheme_code = 'AJS-MIS-40M'
+    WHERE scheme_code = 'AJS-MIS-5Y' AND status = 'active' AND interest_paid = 0 AND created_at < '2026-10-05'
+      AND EXISTS (SELECT 1 FROM schemes s WHERE s.code = 'AJS-MIS-40M' AND s.daily_rate_percent IS NOT NULL);
