@@ -1259,3 +1259,59 @@ FROM deposits d
 WHERE d.scheme_code = 'AJS-MIS-40M' AND d.status = 'active' AND d.interest_rate > 31;
 UPDATE deposits SET interest_rate = 30.42
     WHERE scheme_code = 'AJS-MIS-40M' AND status = 'active' AND interest_rate > 31;
+
+-- Stored copies of the old role-suffixed staff names. The users rows were fixed
+-- above, but a name copied into another table when it was written (the
+-- counterparty on a counter deposit, a ticket reply's author, a CRM note's
+-- author) keeps whatever it said then. Keyed on the exact old text, so this is
+-- safe to run again and cannot touch a name anyone has typed since.
+--
+-- A counter deposit's counterparty should never have been the teller at all (see
+-- route_counter_deposit): those rows become what new ones already say, "Cash
+-- Deposit (Counter)" or "Cheque Deposit (Counter)". Every other table, and any
+-- other transaction mode, just loses the suffix.
+UPDATE transactions
+    SET counterparty_name = IF(description LIKE 'Cheque%', 'Cheque Deposit (Counter)', 'Cash Deposit (Counter)')
+    WHERE mode = 'COUNTER_DEPOSIT' AND counterparty_name IN
+        ('Arunabh Mukherjee (Chief Branch Manager)', 'Vikram Kothari (Bank Owner)',
+         'Meera Iyer (Customer Service Officer)', 'Rajesh Nair (Collection Agent)', 'Aditi Verma (Loan Officer)');
+UPDATE transactions
+    SET counterparty_name = CASE counterparty_name
+        WHEN 'Arunabh Mukherjee (Chief Branch Manager)' THEN 'Arunabh Mukherjee'
+        WHEN 'Vikram Kothari (Bank Owner)' THEN 'Vikram Kothari'
+        WHEN 'Meera Iyer (Customer Service Officer)' THEN 'Meera Iyer'
+        WHEN 'Rajesh Nair (Collection Agent)' THEN 'Rajesh Nair'
+        WHEN 'Aditi Verma (Loan Officer)' THEN 'Aditi Verma' END
+    WHERE counterparty_name IN
+        ('Arunabh Mukherjee (Chief Branch Manager)', 'Vikram Kothari (Bank Owner)',
+         'Meera Iyer (Customer Service Officer)', 'Rajesh Nair (Collection Agent)', 'Aditi Verma (Loan Officer)');
+UPDATE ticket_messages
+    SET author_name = CASE author_name
+        WHEN 'Arunabh Mukherjee (Chief Branch Manager)' THEN 'Arunabh Mukherjee'
+        WHEN 'Vikram Kothari (Bank Owner)' THEN 'Vikram Kothari'
+        WHEN 'Meera Iyer (Customer Service Officer)' THEN 'Meera Iyer'
+        WHEN 'Rajesh Nair (Collection Agent)' THEN 'Rajesh Nair'
+        WHEN 'Aditi Verma (Loan Officer)' THEN 'Aditi Verma' END
+    WHERE author_name IN
+        ('Arunabh Mukherjee (Chief Branch Manager)', 'Vikram Kothari (Bank Owner)',
+         'Meera Iyer (Customer Service Officer)', 'Rajesh Nair (Collection Agent)', 'Aditi Verma (Loan Officer)');
+UPDATE crm_interactions
+    SET recorded_by_name = CASE recorded_by_name
+        WHEN 'Arunabh Mukherjee (Chief Branch Manager)' THEN 'Arunabh Mukherjee'
+        WHEN 'Vikram Kothari (Bank Owner)' THEN 'Vikram Kothari'
+        WHEN 'Meera Iyer (Customer Service Officer)' THEN 'Meera Iyer'
+        WHEN 'Rajesh Nair (Collection Agent)' THEN 'Rajesh Nair'
+        WHEN 'Aditi Verma (Loan Officer)' THEN 'Aditi Verma' END
+    WHERE recorded_by_name IN
+        ('Arunabh Mukherjee (Chief Branch Manager)', 'Vikram Kothari (Bank Owner)',
+         'Meera Iyer (Customer Service Officer)', 'Rajesh Nair (Collection Agent)', 'Aditi Verma (Loan Officer)');
+UPDATE support_tickets
+    SET user_name = CASE user_name
+        WHEN 'Arunabh Mukherjee (Chief Branch Manager)' THEN 'Arunabh Mukherjee'
+        WHEN 'Vikram Kothari (Bank Owner)' THEN 'Vikram Kothari'
+        WHEN 'Meera Iyer (Customer Service Officer)' THEN 'Meera Iyer'
+        WHEN 'Rajesh Nair (Collection Agent)' THEN 'Rajesh Nair'
+        WHEN 'Aditi Verma (Loan Officer)' THEN 'Aditi Verma' END
+    WHERE user_name IN
+        ('Arunabh Mukherjee (Chief Branch Manager)', 'Vikram Kothari (Bank Owner)',
+         'Meera Iyer (Customer Service Officer)', 'Rajesh Nair (Collection Agent)', 'Aditi Verma (Loan Officer)');
