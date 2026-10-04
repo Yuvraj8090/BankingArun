@@ -632,7 +632,7 @@ UPDATE schemes SET status = 'active',
 UPDATE schemes SET status = 'active',
     slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]',
     notes = 'Brochure p9. Monthly payout for sixty months; the maturity column is the total received.'
-    WHERE code = 'AJS-MIS-5Y';
+    WHERE code = 'AJS-MIS-5Y' AND daily_rate_percent IS NULL;
 
 -- AJS-MIS-5Y repriced a second time, to sit at/under the 12.5% Nidhi cap (the
 -- printed ₹250/month figure above works out to 18.71% effective). schema.sql
@@ -643,7 +643,7 @@ UPDATE schemes SET status = 'active',
     total_deposit = 200000.00, maturity_amount = 265920.00,
     slabs = '[{"unit":10000,"deposit":10000,"maturity":13260,"monthly_payout":221},{"unit":20000,"deposit":20000,"maturity":26580,"monthly_payout":443},{"unit":30000,"deposit":30000,"maturity":39840,"monthly_payout":664},{"unit":40000,"deposit":40000,"maturity":53160,"monthly_payout":886},{"unit":50000,"deposit":50000,"maturity":66480,"monthly_payout":1108},{"unit":60000,"deposit":60000,"maturity":79740,"monthly_payout":1329},{"unit":70000,"deposit":70000,"maturity":93060,"monthly_payout":1551},{"unit":80000,"deposit":80000,"maturity":106320,"monthly_payout":1772},{"unit":100000,"deposit":100000,"maturity":132960,"monthly_payout":2216},{"unit":200000,"deposit":200000,"maturity":265920,"monthly_payout":4432}]',
     notes = 'Brochure p9, repriced to sit at/under the 12.5% Nidhi cap (was 18.71% effective on the printed ₹250/month figure). Monthly payout for sixty months; the maturity column is the total received.'
-    WHERE code = 'AJS-MIS-5Y';
+    WHERE code = 'AJS-MIS-5Y' AND daily_rate_percent IS NULL;
 
 -- The referral code an enquiry arrived with, kept as its own column rather than
 -- buried in the notes. It was free text before, which meant nothing could read
@@ -965,7 +965,7 @@ UPDATE schemes SET name = 'Niyamit Aay 60 Month MIS', scheme_type = 'mis',
     contribution_amount = NULL, principal_amount = 200000.0,
     total_deposit = 200000.0, maturity_amount = 300000.0,
     payout_type = 'monthly', status = 'active', slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]'
-    WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL AND daily_rate_percent IS NULL;
 
 -- AJS-MIS-40M: Dainik Aay 40 Month Plan. A simple daily-% plan (no slab
 -- table -- see schemes.daily_rate_percent, modules/master.php) rather than
@@ -1354,3 +1354,19 @@ UPDATE deposits SET
 UPDATE deposits SET accrued_interest = 0, last_payout_date = NULL
     WHERE scheme_code = 'AJS-MIS-40M' AND status = 'active' AND interest_paid = 0 AND accrued_interest > 0
       AND last_payout_date = '2026-10-04' AND created_at < '2026-10-05';
+
+-- AJS-MIS-5Y becomes a 40-month daily-interest plan: the same ₹250 a month on
+-- ₹10,000 (2.5% a month, 0.08333% a day) but for 40 months, so the money doubles,
+-- and the interest is credited every day instead of at month end. Same shape as
+-- AJS-MIS-40M (any amount from the minimum, no slab table). The three UPDATEs
+-- above that kept re-asserting the old monthly terms are now keyed on
+-- daily_rate_percent IS NULL, so they stop once this has run; this one is keyed
+-- the same way, so it runs once and a later edit in Scheme Master sticks. Deposits
+-- already booked keep the monthly terms they were sold (the deposit holds its own
+-- rate and payout type).
+UPDATE schemes SET name = 'Niyamit Aay 40 Month MIS', scheme_type = 'mis', tenure_months = 40,
+    contribution_months = NULL, contribution_amount = NULL, principal_amount = 10000.0, total_deposit = 10000.0,
+    maturity_amount = 10000.0, payout_type = 'daily', daily_rate_percent = 0.08333, withdrawal_threshold = NULL,
+    slabs = NULL, status = 'active',
+    notes = 'Plan book: ₹10,000 minimum, doubles in 40 months, paid out daily (~₹8.33/day on ₹10,000) -- above the Nidhi cap on its own numbers.'
+    WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL AND daily_rate_percent IS NULL;
