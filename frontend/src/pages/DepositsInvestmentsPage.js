@@ -8,11 +8,64 @@ import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 
+const inr = (n) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const day = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+// One deposit's earnings from the day it started: what has reached the account, then what is earned but waits for
+// the next daily run. Credits are net of TDS, exactly as they appear in Transactions and the statement.
+function DepositEarnings({ e }) {
+  const rows = [
+    ...e.pending.map(p => ({ date: p.date, amount: p.earned, note: 'earned, credited at the next daily run' })),
+    ...[...e.credits].reverse().map(c => ({ date: c.date, amount: c.credited, note: 'credited to your account' })),
+  ];
+  const daysEarned = e.credits.length + e.pending.length;
+  return (
+    <div className="mt-2 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+      <p className="font-semibold text-slate-900">
+        {e.deposit_number}{e.plan ? ` · ${e.plan}` : ''} · started {day(e.started)} · matures {day(e.maturity_date)}
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-3">
+        <div><p className="text-slate-500">Plan amount</p><p className="font-bold text-slate-900">{inr(e.principal)}</p></div>
+        <div><p className="text-slate-500">Earning per day</p><p className="font-bold text-slate-900">{e.per_day ? inr(e.per_day) : '—'}</p></div>
+        <div><p className="text-slate-500">Earned so far (before TDS)</p>
+          <p className="font-bold text-emerald-700">{inr(e.earned_paid + e.held_back + e.pending.reduce((a, p) => a + p.earned, 0))}</p></div>
+        <div><p className="text-slate-500">TDS withheld</p><p className="font-bold text-slate-900">{inr(e.tds_deducted)}</p></div>
+      </div>
+      {e.term_interest > 0 && (
+        <p className="text-slate-600 mb-2">
+          Over the full term this plan earns {inr(e.term_interest)}; {daysEarned} day{daysEarned === 1 ? '' : 's'} earned so far.
+        </p>
+      )}
+      {rows.length === 0 ? (
+        <p className="text-slate-500">Nothing earned yet. Interest starts the day after the deposit is booked.</p>
+      ) : (
+        <div className="max-h-64 overflow-y-auto">
+          <table className="w-full text-left">
+            <thead className="text-[10px] uppercase text-slate-500">
+              <tr><th className="py-1 pr-3">Day</th><th className="py-1 pr-3 text-right">Amount</th><th className="py-1">What happened</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map(r => (
+                <tr key={`${r.date}-${r.note}`}>
+                  <td className="py-1 pr-3">{day(r.date)}</td>
+                  <td className="py-1 pr-3 text-right font-semibold">{inr(r.amount)}</td>
+                  <td className="py-1 text-slate-600">{r.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DepositsInvestmentsPage() {
   const { currentTheme } = useBankTheme();
   const [activeTab, setActiveTab] = useState('fd'); // fd, mf, insurance
   const [accounts, setAccounts] = useState([]);
   const [myDeposits, setMyDeposits] = useState([]);
+  const [earnings, setEarnings] = useState(null); // the deposit whose day-by-day earnings are open
   const [interestReceived, setInterestReceived] = useState({ day: 0, total: 0 });
   const [closingNumber, setClosingNumber] = useState('');
   const [catalog, setCatalog] = useState({ mutual_funds: [], insurance_plans: [] });
@@ -175,6 +228,18 @@ export default function DepositsInvestmentsPage() {
       toast.error(err.response?.data?.detail || "Booking failed");
     } finally {
       setBooking(false);
+    }
+  };
+
+  const toggleEarnings = async (depositNumber) => {
+    if (earnings?.deposit_number === depositNumber) {
+      setEarnings(null);
+      return;
+    }
+    try {
+      setEarnings(await api.depositEarnings(depositNumber));
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not load the earnings for this deposit');
     }
   };
 
@@ -544,7 +609,8 @@ export default function DepositsInvestmentsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {myDeposits.map(dep => (
-                  <tr key={dep.id} data-testid={`my-deposit-${dep.deposit_number}`}>
+                  <React.Fragment key={dep.id}>
+                  <tr data-testid={`my-deposit-${dep.deposit_number}`}>
                     <td className="py-2 pr-3 font-mono text-slate-700">
                       {dep.deposit_number}
                       {dep.scheme_code && <span className="block font-sans text-[10px] text-slate-500">Plan {dep.scheme_code}</span>}
@@ -597,6 +663,13 @@ export default function DepositsInvestmentsPage() {
                       </span>
                     </td>
                     <td className="py-2 pr-3 text-right">
+                      <button
+                        data-testid={`view-earnings-${dep.deposit_number}`}
+                        onClick={() => toggleEarnings(dep.deposit_number)}
+                        className="block ml-auto text-[#0b3b8c] font-semibold hover:underline mb-1"
+                      >
+                        {earnings?.deposit_number === dep.deposit_number ? 'Hide earnings' : 'View earnings'}
+                      </button>
                       {dep.status === 'active' && (
                         <button
                           data-testid={`close-early-${dep.deposit_number}`}
@@ -609,6 +682,14 @@ export default function DepositsInvestmentsPage() {
                       )}
                     </td>
                   </tr>
+                  {earnings?.deposit_number === dep.deposit_number && (
+                    <tr data-testid={`earnings-${dep.deposit_number}`}>
+                      <td colSpan={6} className="pb-4">
+                        <DepositEarnings e={earnings} />
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

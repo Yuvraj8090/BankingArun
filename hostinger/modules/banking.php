@@ -437,6 +437,61 @@ const PREMATURE_MIN_HOLD_DAYS = 30;
 // harness) are not set up to do together. Exercise it by hand against a
 // deposit whose created_at has been pushed back 30+ days before relying on
 // this in production.
+// What one deposit has earned, day by day from the day it started: every interest credit that reached the
+// member's account, plus the days earned but not credited yet (the daily job has not run for them). POST, with
+// the deposit number in the body, like the other deposit actions -- a deposit number does not belong in a URL.
+function route_deposit_earnings(array $d): void
+{
+    $user = current_user();
+    need($d, 'deposit_number');
+    $dep = row('SELECT * FROM deposits WHERE deposit_number = ? AND user_id = ?',
+        [clip($d['deposit_number'], 30), $user['id']]);
+    if (!$dep) {
+        fail(404, 'No deposit with that number.');
+    }
+    $ist = new DateTimeZone(IST);
+    $started = (new DateTimeImmutable($dep['created_at'], new DateTimeZone('UTC')))->setTimezone($ist)->format('Y-m-d');
+    $credits = [];
+    foreach (rows("SELECT ref_number, amount, balance_after, timestamp FROM transactions
+            WHERE user_id = ? AND type = 'credit' AND mode = 'DEPOSIT_INTEREST'
+              AND (ref_number LIKE ? OR ref_number LIKE ?) ORDER BY seq",
+            [$user['id'], 'DINT-' . $dep['deposit_number'] . '-%', 'INT-' . $dep['deposit_number'] . '-%']) as $t) {
+        $day = preg_match('/-(\d{4})(\d{2})(\d{2})$/', $t['ref_number'], $m) ? "$m[1]-$m[2]-$m[3]" : substr($t['timestamp'], 0, 10);
+        $credits[] = ['date' => $day, 'credited' => (float)$t['amount'], 'balance_after' => (float)$t['balance_after']];
+    }
+    // Same day-by-day rule as run_daily_interest_accrual (cron.php): interest starts the day after booking, runs to
+    // the day before maturity, and stops at the term's 30-day-month total.
+    $perDay = $dep['interest_payout'] === 'daily'
+        ? round((float)$dep['principal_amount'] * (float)$dep['interest_rate'] / 100 / 365, 2) : 0.0;
+    $termTotal = $perDay > 0 ? round((float)$dep['principal_amount']
+        * round((float)$dep['interest_rate'] / 100 / 365 * 30 * (int)$dep['tenure_months'], 2), 2) : 0.0;
+    $pending = [];
+    if ($perDay > 0 && $dep['status'] === 'active') {
+        $day = new DateTimeImmutable($dep['last_payout_date'] ?? $started);
+        $end = min(new DateTimeImmutable((new DateTimeImmutable('now', $ist))->format('Y-m-d')),
+            new DateTimeImmutable($dep['maturity_date'] . ' -1 day'));
+        $left = round($termTotal - (float)$dep['interest_paid'] - (float)$dep['accrued_interest'], 2);
+        for ($n = 0; $n < 400 && $left > 0; $n++) {
+            $day = $day->modify('+1 day');
+            if ($day > $end) {
+                break;
+            }
+            $earn = min($perDay, $left);
+            $pending[] = ['date' => $day->format('Y-m-d'), 'earned' => $earn];
+            $left = round($left - $earn, 2);
+        }
+    }
+    respond([
+        'deposit_number' => $dep['deposit_number'], 'plan' => $dep['scheme_code'], 'status' => $dep['status'],
+        'principal' => (float)$dep['principal_amount'], 'interest_rate' => (float)$dep['interest_rate'],
+        'interest_payout' => $dep['interest_payout'], 'started' => $started, 'maturity_date' => $dep['maturity_date'],
+        'per_day' => $perDay, 'term_interest' => $termTotal,
+        'earned_paid' => (float)$dep['interest_paid'], 'tds_deducted' => (float)$dep['tds_deducted'],
+        'held_back' => (float)$dep['accrued_interest'],
+        'credits' => $credits, 'pending' => $pending,
+    ]);
+}
+
 function route_premature_close(array $d): void
 {
     global $pdo;
