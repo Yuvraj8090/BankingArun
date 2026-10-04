@@ -236,66 +236,93 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
           AND (d.last_payout_date IS NULL OR d.last_payout_date < ?)
         ORDER BY d.created_at LIMIT " . CRON_BATCH, [$today, $today]);
 
+    $ist = new DateTimeZone(IST);
     foreach ($due as $deposit) {
-        $interest = round((float)$deposit['principal_amount'] * (float)$deposit['interest_rate'] / 100 / 365, 2);
-        // A plan sold as "N months of 30 days" (40 months doubling the money) must not pay for the extra calendar
-        // days a month-based tenure holds -- 1217 days at 0.08333% would pay 101.4%, not 100%. Total interest is
-        // capped at the term's 30-day-month figure (ratio to 2dp: 1.00 for the 40-month plan).
-        // ponytail: the 2dp ratio is +-0.5% of principal for odd rates; store a per-deposit cap if that matters.
-        $cap = round((float)$deposit['principal_amount']
-            * round((float)$deposit['interest_rate'] / 100 / 365 * 30 * (int)$deposit['tenure_months'], 2), 2);
-        $interest = min($interest, round($cap - (float)$deposit['interest_paid'] - (float)$deposit['accrued_interest'], 2));
-        if ($interest <= 0) {
-            continue;
-        }
-        $label = "Deposit {$deposit['deposit_number']} daily interest " . rupees($interest);
-        if ($dryRun) {
-            say("  would accrue $label");
-            $accrued++;
-            continue;
-        }
         $pdo->beginTransaction();
         $locked = row("SELECT * FROM deposits WHERE id = ? AND status = 'active' FOR UPDATE", [$deposit['id']]);
         if (!$locked || ($locked['last_payout_date'] !== null && $locked['last_payout_date'] >= $today)) {
             $pdo->rollBack();
             continue;
         }
-        $total = round((float)$locked['accrued_interest'] + $interest, 2);
+        // Catch-up: every calendar day after the last one paid (or after the booking day, for a new deposit) up
+        // to today is owed, so a run that was late or missed is made good by the next one, a day at a time, each
+        // with its own credit dated in its description. Interest starts the day after booking.
+        $day = new DateTimeImmutable($locked['last_payout_date']
+            ?? (new DateTimeImmutable($locked['created_at'], new DateTimeZone('UTC')))->setTimezone($ist)->format('Y-m-d'));
+        $end = min(new DateTimeImmutable($today), new DateTimeImmutable($locked['maturity_date'] . ' -1 day'));
+        // Total interest is capped at the term's 30-day-month figure: a plan sold as "N months of 30 days" (40
+        // months doubling the money) must not pay for the extra calendar days a month-based tenure holds --
+        // 1217 days at 0.08333% would pay 101.4%, not 100%. Ratio to 2dp is 1.00 for the 40-month plan.
+        // ponytail: the 2dp ratio is +-0.5% of principal for odd rates; store a per-deposit cap if that matters.
+        $perDay = round((float)$locked['principal_amount'] * (float)$locked['interest_rate'] / 100 / 365, 2);
+        $cap = round((float)$locked['principal_amount']
+            * round((float)$locked['interest_rate'] / 100 / 365 * 30 * (int)$locked['tenure_months'], 2), 2);
         $threshold = (float)$deposit['withdrawal_threshold'];
-        if ($threshold <= 0 || $total >= $threshold) {
-            // Section 194A: TDS comes off the interest itself, not off the
-            // principal, so it is worked out on $total (the accrued interest
-            // being released) and never touches anything else this deposit holds.
-            $tdsRate = param_value('tds_rate_daily_interest', 10.0);
-            $tds = round($total * $tdsRate / 100, 2);
-            $net = round($total - $tds, 2);
-            $ref = 'DINT-' . $locked['deposit_number'] . '-' . str_replace('-', '', $today);
-            [$ok, $result] = credit($locked['source_account'], $net, 'DEPOSIT_INTEREST',
-                'AJSPay Daily Interest',
-                "Daily interest on deposit {$locked['deposit_number']}: " . rupees($total)
-                    . " earned, " . rupees($tds) . " TDS deducted @{$tdsRate}%, " . rupees($net) . " credited",
-                $ref);
-            if (!$ok) {
-                $pdo->rollBack();
-                $failed++;
-                say("  FAILED     $label — $result");
+        $paid = (float)$locked['interest_paid'];
+        $held = (float)$locked['accrued_interest'];
+        $tdsPaid = (float)$locked['tds_deducted'];
+        $last = $locked['last_payout_date'];
+        $ok = true;
+        for ($n = 0; $n < 400; $n++) {
+            $day = $day->modify('+1 day');
+            if ($day > $end) {
+                break;
+            }
+            $dayStr = $day->format('Y-m-d');
+            $last = $dayStr;
+            $interest = min($perDay, round($cap - $paid - $held, 2));
+            if ($interest <= 0) {
                 continue;
             }
-            $pdo->prepare('UPDATE deposits SET interest_paid = interest_paid + ?, tds_deducted = tds_deducted + ?,
-                accrued_interest = 0, last_payout_date = ? WHERE id = ?')
-                ->execute([$total, $tds, $today, $locked['id']]);
-            $released++;
-            if ($verbose) {
-                say("  released   " . rupees($net) . " (of " . rupees($total) . ", " . rupees($tds)
-                    . " TDS) on {$locked['deposit_number']} to {$locked['source_account']}");
+            $label = "Deposit {$locked['deposit_number']} daily interest " . rupees($interest) . " for $dayStr";
+            if ($dryRun) {
+                say("  would accrue $label");
+                $accrued++;
+                continue;
             }
-        } else {
-            $pdo->prepare('UPDATE deposits SET accrued_interest = ?, last_payout_date = ? WHERE id = ?')
-                ->execute([$total, $today, $locked['id']]);
-            $accrued++;
-            if ($verbose) {
-                say("  accrued    $label (" . rupees($total) . " of " . rupees($threshold) . ")");
+            $total = round($held + $interest, 2);
+            if ($threshold <= 0 || $total >= $threshold) {
+                // Section 194A: TDS comes off the interest itself, not off the principal, so it is worked out on
+                // $total (the accrued interest being released) and never touches anything else this deposit holds.
+                $tdsRate = param_value('tds_rate_daily_interest', 10.0);
+                $tds = round($total * $tdsRate / 100, 2);
+                $net = round($total - $tds, 2);
+                $ref = 'DINT-' . $locked['deposit_number'] . '-' . $day->format('Ymd');
+                [$credited, $result] = credit($locked['source_account'], $net, 'DEPOSIT_INTEREST',
+                    'AJSPay Daily Interest',
+                    "Daily interest on deposit {$locked['deposit_number']} for " . $day->format('j M Y') . ": "
+                        . rupees($total) . " earned, " . rupees($tds) . " TDS deducted @{$tdsRate}%, "
+                        . rupees($net) . " credited",
+                    $ref);
+                if (!$credited) {
+                    $ok = false;
+                    say("  FAILED     $label — $result");
+                    break;
+                }
+                $paid = round($paid + $total, 2);
+                $tdsPaid = round($tdsPaid + $tds, 2);
+                $held = 0.0;
+                $released++;
+                if ($verbose) {
+                    say("  released   " . rupees($net) . " (of " . rupees($total) . ", " . rupees($tds)
+                        . " TDS) on {$locked['deposit_number']} for $dayStr");
+                }
+            } else {
+                $held = $total;
+                $accrued++;
+                if ($verbose) {
+                    say("  accrued    $label (" . rupees($total) . " of " . rupees($threshold) . ")");
+                }
             }
+        }
+        if (!$ok) {
+            $pdo->rollBack();
+            $failed++;
+            continue;
+        }
+        if (!$dryRun && $last !== null) {
+            $pdo->prepare('UPDATE deposits SET interest_paid = ?, tds_deducted = ?, accrued_interest = ?,
+                last_payout_date = ? WHERE id = ?')->execute([$paid, $tdsPaid, $held, $last, $locked['id']]);
         }
         $pdo->commit();
     }

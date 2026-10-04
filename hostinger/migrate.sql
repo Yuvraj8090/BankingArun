@@ -1343,3 +1343,14 @@ UPDATE deposits SET
     scheme_code = 'AJS-MIS-40M'
     WHERE scheme_code = 'AJS-MIS-5Y' AND status = 'active' AND interest_paid = 0 AND created_at < '2026-10-05'
       AND EXISTS (SELECT 1 FROM schemes s WHERE s.code = 'AJS-MIS-40M' AND s.daily_rate_percent IS NOT NULL);
+
+-- The deposits moved above were given their interest-to-date as one lump in
+-- accrued_interest. The daily job now catches up a day at a time, one credit per
+-- day in the member's transactions, so hand that lump back to it: clear it and
+-- the 4 Oct marker and the next run pays 30 Sep..today separately (same total,
+-- 8.33 a day). Keyed on exactly what the lump migration left -- nothing paid yet,
+-- accrued interest held, marked 4 Oct -- so once the job has paid anything, or
+-- on any later deploy, it matches nothing.
+UPDATE deposits SET accrued_interest = 0, last_payout_date = NULL
+    WHERE scheme_code = 'AJS-MIS-40M' AND status = 'active' AND interest_paid = 0 AND accrued_interest > 0
+      AND last_payout_date = '2026-10-04' AND created_at < '2026-10-05';

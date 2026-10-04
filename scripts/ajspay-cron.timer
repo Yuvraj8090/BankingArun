@@ -7,6 +7,13 @@ Documentation=file:/srv/ajspay/current/cron.php
 # calendar month and matures exactly once -- so a catch-up run after the box has
 # been down cannot double-pay anybody.
 OnCalendar=*-*-* 09:30:00 Asia/Kolkata
+# Retries through the day: if the 09:30 run failed or the box was down, a later one
+# makes it good. Safe because every job is idempotent, and the daily-interest job
+# pays every day it finds unpaid, one credit per day.
+OnCalendar=*-*-* 12:30:00 Asia/Kolkata
+OnCalendar=*-*-* 15:30:00 Asia/Kolkata
+OnCalendar=*-*-* 18:30:00 Asia/Kolkata
+OnCalendar=*-*-* 21:30:00 Asia/Kolkata
 Persistent=true
 RandomizedDelaySec=300
 Unit=ajspay-cron.service
