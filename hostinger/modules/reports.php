@@ -33,6 +33,8 @@ function report_definitions(): array
     // against both.
     $instalment = "(d.scheme_code IS NOT NULL AND d.deposit_type = 'recurring')";
     $kind = "CASE WHEN $instalment THEN 'instalment' ELSE 'lump sum' END";
+    $dailyEarning = "CASE WHEN d.interest_payout = 'daily' AND d.status = 'active'
+        THEN ROUND(d.principal_amount * d.interest_rate / 100 / 365, 2) ELSE 0 END";
     $collected = "CASE WHEN $instalment THEN
             COALESCE((SELECT SUM(b.amount) FROM transactions b
                 WHERE b.ref_number = d.deposit_number AND b.mode = 'DEPOSIT_BOOKING' AND b.type = 'debit'), 0)
@@ -73,6 +75,7 @@ function report_definitions(): array
                     $collected AS collected_amount,
                     d.interest_rate, d.tenure_months, d.interest_payout, d.maturity_amount, d.maturity_date,
                     d.interest_paid, d.accrued_interest, d.tds_deducted,
+                    $dailyEarning AS daily_earning, d.interest_paid + d.accrued_interest AS earned_total,
                     (SELECT MAX(t.timestamp) FROM transactions t
                         WHERE t.user_id = d.user_id AND t.type = 'credit' AND t.mode = 'DEPOSIT_INTEREST'
                           AND t.ref_number LIKE CONCAT('%-', d.deposit_number, '-%')) AS last_credited,
@@ -91,9 +94,10 @@ function report_definitions(): array
                 'interest_rate' => 'text', 'tenure_months' => 'int',
                 'interest_payout' => 'text', 'maturity_amount' => 'money', 'maturity_date' => 'date',
                 'interest_paid' => 'money', 'accrued_interest' => 'money', 'tds_deducted' => 'money',
+                'daily_earning' => 'money', 'earned_total' => 'money',
                 'last_credited' => 'datetime', 'last_accrued' => 'date', 'status' => 'text'],
             'totals' => ['committed_amount', 'collected_amount', 'maturity_amount', 'interest_paid',
-                'accrued_interest', 'tds_deducted'],
+                'accrued_interest', 'tds_deducted', 'earned_total'],
         ],
         // Everyone connected to a plan in one list, so "who took it" and "who is
         // still pending" are one question. Deposits are the people who booked
@@ -116,18 +120,19 @@ function report_definitions(): array
                         $collected AS collected_amount,
                         d.interest_paid AS interest_paid, d.accrued_interest AS accrued_interest,
                         d.tds_deducted AS tds_deducted,
+                        $dailyEarning AS daily_earning, d.interest_paid + d.accrued_interest AS earned_total,
                         (SELECT MAX(t.timestamp) FROM transactions t
                         WHERE t.user_id = d.user_id AND t.type = 'credit' AND t.mode = 'DEPOSIT_INTEREST'
                           AND t.ref_number LIKE CONCAT('%-', d.deposit_number, '-%')) AS last_credited,
                         d.last_payout_date AS last_accrued, d.created_at AS since
                     FROM deposits d JOIN users u ON u.id = d.user_id
                     UNION ALL
-                    SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, NULL, 0, 0, 0, 0, 0, NULL, NULL, l.created_at
+                    SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, NULL, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, l.created_at
                     FROM crm_leads l WHERE l.scheme_code IS NOT NULL AND l.stage NOT IN ('enrolled', 'lost')
                     UNION ALL
                     SELECT u.name, u.phone,
                         (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at LIMIT 1),
-                        NULL, 'waiting KYC', NULL, NULL, 0, 0, 0, 0, 0, NULL, NULL, u.created_at
+                        NULL, 'waiting KYC', NULL, NULL, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, u.created_at
                     FROM users u WHERE u.role = 'retail' AND u.kyc_status = 'pending_approval'
                 ) p WHERE 1 = 1",
             'filters' => ['plan' => ["p.plan = ? OR p.state = 'waiting KYC'", 'exact'],
@@ -140,8 +145,10 @@ function report_definitions(): array
                 'state' => 'text', 'kind' => 'text', 'deposit_number' => 'text',
                 'committed_amount' => 'money', 'collected_amount' => 'money',
                 'interest_paid' => 'money', 'accrued_interest' => 'money', 'tds_deducted' => 'money',
+                'daily_earning' => 'money', 'earned_total' => 'money',
                 'last_credited' => 'datetime', 'last_accrued' => 'date', 'since' => 'date'],
-            'totals' => ['committed_amount', 'collected_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
+            'totals' => ['committed_amount', 'collected_amount', 'interest_paid', 'accrued_interest', 'tds_deducted',
+                'earned_total'],
         ],
         'loan_register' => [
             'name' => 'Loan register',
