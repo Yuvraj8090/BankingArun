@@ -292,7 +292,10 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
                 // Section 194A: TDS comes off the interest itself, not off the principal, so it is worked out on
                 // $total (the accrued interest being released) and never touches anything else this deposit holds.
                 $tdsRate = param_value('tds_rate_daily_interest', 10.0);
-                $tds = round($total * $tdsRate / 100, 2);
+                // Worked out on the running total of interest earned, less the TDS already withheld, so rounding a
+                // little each day never adds up to less than the rate on the whole (8.33 a day x 10% = 0.833 a day,
+                // not 0.83). The day's TDS is whatever brings the total to the rate.
+                $tds = max(0.0, round(($paid + $total) * $tdsRate / 100, 2) - $tdsPaid);
                 $net = round($total - $tds, 2);
                 $ref = 'DINT-' . $locked['deposit_number'] . '-' . $day->format('Ymd');
                 [$credited, $result] = credit($locked['source_account'], $net, 'DEPOSIT_INTEREST',
