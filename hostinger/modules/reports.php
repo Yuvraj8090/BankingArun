@@ -46,11 +46,15 @@ function report_definitions(): array
             'note' => 'Every deposit with its plan, rate, maturity, interest paid, interest still held back and TDS withheld. '
                 . 'Filter by plan code to list everyone enrolled in one plan.',
             'roles' => ['admin', 'branch_manager', 'bank_owner'],
-            'sql' => 'SELECT d.deposit_number, u.name AS member, d.source_account AS account, d.scheme_code AS plan,
+            'sql' => "SELECT d.deposit_number, u.name AS member, d.source_account AS account, d.scheme_code AS plan,
                     d.deposit_type, d.principal_amount,
                     d.interest_rate, d.tenure_months, d.interest_payout, d.maturity_amount, d.maturity_date,
-                    d.interest_paid, d.accrued_interest, d.tds_deducted, d.status, d.created_at
-                FROM deposits d JOIN users u ON u.id = d.user_id WHERE 1 = 1',
+                    d.interest_paid, d.accrued_interest, d.tds_deducted,
+                    (SELECT MAX(t.timestamp) FROM transactions t
+                        WHERE t.user_id = d.user_id AND t.type = 'credit' AND t.mode = 'DEPOSIT_INTEREST'
+                          AND t.ref_number LIKE CONCAT('%-', d.deposit_number, '-%')) AS last_credited,
+                    d.last_payout_date AS last_accrued, d.status, d.created_at
+                FROM deposits d JOIN users u ON u.id = d.user_id WHERE 1 = 1",
             'filters' => ['status' => ['d.status = ?', 'exact'],
                 'deposit_type' => ['d.deposit_type = ?', 'exact'],
                 'scheme_code' => ['d.scheme_code = ?', 'exact'],
@@ -63,7 +67,7 @@ function report_definitions(): array
                 'principal_amount' => 'money', 'interest_rate' => 'text', 'tenure_months' => 'int',
                 'interest_payout' => 'text', 'maturity_amount' => 'money', 'maturity_date' => 'date',
                 'interest_paid' => 'money', 'accrued_interest' => 'money', 'tds_deducted' => 'money',
-                'status' => 'text'],
+                'last_credited' => 'datetime', 'last_accrued' => 'date', 'status' => 'text'],
             'totals' => ['principal_amount', 'maturity_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
         ],
         // Everyone connected to a plan in one list, so "who took it" and "who is
@@ -83,15 +87,19 @@ function report_definitions(): array
                              WHEN d.status = 'active' THEN 'enrolled' ELSE d.status END AS state,
                         d.deposit_number AS deposit_number, d.principal_amount AS principal_amount,
                         d.interest_paid AS interest_paid, d.accrued_interest AS accrued_interest,
-                        d.tds_deducted AS tds_deducted, d.created_at AS since
+                        d.tds_deducted AS tds_deducted,
+                        (SELECT MAX(t.timestamp) FROM transactions t
+                        WHERE t.user_id = d.user_id AND t.type = 'credit' AND t.mode = 'DEPOSIT_INTEREST'
+                          AND t.ref_number LIKE CONCAT('%-', d.deposit_number, '-%')) AS last_credited,
+                        d.last_payout_date AS last_accrued, d.created_at AS since
                     FROM deposits d JOIN users u ON u.id = d.user_id
                     UNION ALL
-                    SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, 0, 0, 0, 0, l.created_at
+                    SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, 0, 0, 0, 0, NULL, NULL, l.created_at
                     FROM crm_leads l WHERE l.scheme_code IS NOT NULL AND l.stage NOT IN ('enrolled', 'lost')
                     UNION ALL
                     SELECT u.name, u.phone,
                         (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at LIMIT 1),
-                        NULL, 'waiting KYC', NULL, 0, 0, 0, 0, u.created_at
+                        NULL, 'waiting KYC', NULL, 0, 0, 0, 0, NULL, NULL, u.created_at
                     FROM users u WHERE u.role = 'retail' AND u.kyc_status = 'pending_approval'
                 ) p WHERE 1 = 1",
             'filters' => ['plan' => ["p.plan = ? OR p.state = 'waiting KYC'", 'exact'],
@@ -103,7 +111,7 @@ function report_definitions(): array
             'columns' => ['name' => 'text', 'phone' => 'text', 'account' => 'text', 'plan' => 'text',
                 'state' => 'text', 'deposit_number' => 'text', 'principal_amount' => 'money',
                 'interest_paid' => 'money', 'accrued_interest' => 'money', 'tds_deducted' => 'money',
-                'since' => 'date'],
+                'last_credited' => 'datetime', 'last_accrued' => 'date', 'since' => 'date'],
             'totals' => ['principal_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
         ],
         'loan_register' => [
