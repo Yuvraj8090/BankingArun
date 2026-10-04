@@ -18,7 +18,9 @@ const IMPERSONATION_TTL = 900;                // 15 minutes, shorter than a norm
 // be privilege escalation rather than support.
 const IMPERSONATION_PROTECTED_ROLES = ['bank_owner', 'admin', 'branch_manager'];
 // The only writes an impersonated session may perform.
-const IMPERSONATION_ALLOWED_WRITES = ['POST /impersonate/stop', 'POST /auth/logout'];
+// Plus POST routes that only read (the deposit number goes in the body, not the URL) so the owner can open a
+// member's earnings screen while viewing as them.
+const IMPERSONATION_ALLOWED_WRITES = ['POST /impersonate/stop', 'POST /auth/logout', 'POST /deposits/earnings'];
 
 // Called by the dispatcher before any handler. Fails closed: anything that is
 // not a plain read is refused unless it is explicitly allowed above.

@@ -231,6 +231,20 @@ function route_staff_member_lookup(array $d): void
 // Same pricing and booking logic as route_book_deposit, but for a member a teller is
 // serving at the counter rather than the logged-in customer -- the account is looked up
 // directly (as route_counter_deposit does) instead of scoped to current_user().
+// A double-click, a retry on a slow connection or a refresh after submitting each used to book the deposit again and
+// debit the account twice. An identical booking (same member, account, plan and amount) inside a minute of one that
+// already exists is refused. Called inside the booking transaction after the account row is locked, so two
+// simultaneous submits queue behind each other and the second sees the first.
+function reject_duplicate_booking(string $userId, string $accountNumber, float $principal, ?string $planCode): void
+{
+    if ((int)scalar('SELECT COUNT(*) FROM deposits WHERE user_id = ? AND source_account = ? AND principal_amount = ?
+            AND scheme_code <=> ? AND created_at >= ?',
+            [$userId, $accountNumber, $principal, $planCode, gmdate('Y-m-d H:i:s', time() - 60)]) > 0) {
+        fail(409, 'An identical deposit was booked a moment ago, so this one was not booked again. '
+            . 'Check Your Deposits; if you do want a second one, wait a minute and try again.');
+    }
+}
+
 function route_staff_book_deposit(array $d): void
 {
     global $pdo;
@@ -291,6 +305,7 @@ function route_staff_book_deposit(array $d): void
         fail(400, 'Insufficient funds in the member\'s selected savings account.');
     }
     $newBalance = round((float)$account['balance'] - $dueToday, 2);
+    reject_duplicate_booking($owner['id'], $account['account_number'], $principal, $planCode !== '' ? $planCode : null);
     $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$dueToday, $account['id']]);
 
     $number = 'DEP' . random_int(10000000, 99999999);
@@ -378,6 +393,7 @@ function route_book_deposit(array $d): void
     $pdo->beginTransaction();
     [$account, $newBalance] = debit_account($user, $d['account_number'], $dueToday,
         'Insufficient funds in selected savings account.');
+    reject_duplicate_booking($user['id'], $account['account_number'], $principal, $planCode !== '' ? $planCode : null);
     $number = 'DEP' . random_int(10000000, 99999999);
     $deposit = [
         'id' => uuid4(), 'user_id' => $user['id'], 'deposit_number' => $number, 'deposit_type' => $type,
@@ -420,23 +436,37 @@ function deposit_outcome_note(?string $interestPayout, float $maturity, float $p
     };
 }
 
-const PREMATURE_MIN_HOLD_DAYS = 30;
+// Days of interest a daily-plan deposit has earned but the daily job has not credited yet. Same day-by-day rule as
+// run_daily_interest_accrual (cron.php): interest starts the day after booking, runs to the day before maturity,
+// and stops at the term's 30-day-month total. Shown on the member's earnings screen, and paid out if the member
+// closes early before the job has caught up.
+function daily_pending_interest(array $dep): array
+{
+    if ($dep['interest_payout'] !== 'daily' || $dep['status'] !== 'active') {
+        return [];
+    }
+    $ist = new DateTimeZone(IST);
+    $started = (new DateTimeImmutable($dep['created_at'], new DateTimeZone('UTC')))->setTimezone($ist)->format('Y-m-d');
+    $perDay = round((float)$dep['principal_amount'] * (float)$dep['interest_rate'] / 100 / 365, 2);
+    $cap = round((float)$dep['principal_amount']
+        * round((float)$dep['interest_rate'] / 100 / 365 * 30 * (int)$dep['tenure_months'], 2), 2);
+    $day = new DateTimeImmutable($dep['last_payout_date'] ?? $started);
+    $end = min(new DateTimeImmutable((new DateTimeImmutable('now', $ist))->format('Y-m-d')),
+        new DateTimeImmutable($dep['maturity_date'] . ' -1 day'));
+    $left = round($cap - (float)$dep['interest_paid'] - (float)$dep['accrued_interest'], 2);
+    $pending = [];
+    for ($n = 0; $n < 400 && $left > 0; $n++) {
+        $day = $day->modify('+1 day');
+        if ($day > $end) {
+            break;
+        }
+        $earn = min($perDay, $left);
+        $pending[] = ['date' => $day->format('Y-m-d'), 'earned' => $earn];
+        $left = round($left - $earn, 2);
+    }
+    return $pending;
+}
 
-// Same principle as breaking a bank FD early: the deposit does not keep the
-// rate it was booked at, it drops to whatever a deposit of the time actually
-// held would have earned (deposit_tier_rate, capped at the deposit's own
-// contracted rate so a short-tenure tier can never pay MORE for leaving
-// early), minus a penalty on top. Interest already paid out along the way
-// (MIS monthly instalments, released daily-plan accruals) is never clawed
-// back -- this only ever pays what is still owed for the time held, floored
-// at zero, plus any daily-plan interest still sitting unreleased.
-//
-// ponytail: no automated test covers this route yet -- it needs a live API
-// server plus a deposit backdated past PREMATURE_MIN_HOLD_DAYS, which the
-// existing suites (api_test.sh's curl harness, cron_test.sh's cron.php
-// harness) are not set up to do together. Exercise it by hand against a
-// deposit whose created_at has been pushed back 30+ days before relying on
-// this in production.
 // What one deposit has earned, day by day from the day it started: every interest credit that reached the
 // member's account, plus the days earned but not credited yet (the daily job has not run for them). POST, with
 // the deposit number in the body, like the other deposit actions -- a deposit number does not belong in a URL.
@@ -465,22 +495,7 @@ function route_deposit_earnings(array $d): void
         ? round((float)$dep['principal_amount'] * (float)$dep['interest_rate'] / 100 / 365, 2) : 0.0;
     $termTotal = $perDay > 0 ? round((float)$dep['principal_amount']
         * round((float)$dep['interest_rate'] / 100 / 365 * 30 * (int)$dep['tenure_months'], 2), 2) : 0.0;
-    $pending = [];
-    if ($perDay > 0 && $dep['status'] === 'active') {
-        $day = new DateTimeImmutable($dep['last_payout_date'] ?? $started);
-        $end = min(new DateTimeImmutable((new DateTimeImmutable('now', $ist))->format('Y-m-d')),
-            new DateTimeImmutable($dep['maturity_date'] . ' -1 day'));
-        $left = round($termTotal - (float)$dep['interest_paid'] - (float)$dep['accrued_interest'], 2);
-        for ($n = 0; $n < 400 && $left > 0; $n++) {
-            $day = $day->modify('+1 day');
-            if ($day > $end) {
-                break;
-            }
-            $earn = min($perDay, $left);
-            $pending[] = ['date' => $day->format('Y-m-d'), 'earned' => $earn];
-            $left = round($left - $earn, 2);
-        }
-    }
+    $pending = daily_pending_interest($dep);
     respond([
         'deposit_number' => $dep['deposit_number'], 'plan' => $dep['scheme_code'], 'status' => $dep['status'],
         'principal' => (float)$dep['principal_amount'], 'interest_rate' => (float)$dep['interest_rate'],
@@ -492,6 +507,23 @@ function route_deposit_earnings(array $d): void
     ]);
 }
 
+const PREMATURE_MIN_HOLD_DAYS = 30;
+
+// Same principle as breaking a bank FD early: the deposit does not keep the
+// rate it was booked at, it drops to whatever a deposit of the time actually
+// held would have earned (deposit_tier_rate, capped at the deposit's own
+// contracted rate so a short-tenure tier can never pay MORE for leaving
+// early), minus a penalty on top. Interest already paid out along the way
+// (MIS monthly instalments, released daily-plan accruals) is never clawed
+// back -- this only ever pays what is still owed for the time held, floored
+// at zero, plus any daily-plan interest still sitting unreleased.
+//
+// ponytail: no automated test covers this route yet -- it needs a live API
+// server plus a deposit backdated past PREMATURE_MIN_HOLD_DAYS, which the
+// existing suites (api_test.sh's curl harness, cron_test.sh's cron.php
+// harness) are not set up to do together. Exercise it by hand against a
+// deposit whose created_at has been pushed back 30+ days before relying on
+// this in production.
 function route_premature_close(array $d): void
 {
     global $pdo;
@@ -556,7 +588,9 @@ function route_premature_close(array $d): void
     // formula above -- it is real interest already earned day by day, just
     // held back for the threshold -- so it goes out net of the same TDS a
     // scheduled release would have deducted, on top of $tierInterest.
-    $accrued = (float)$deposit['accrued_interest'];
+    // Plus the days earned that the daily job has not credited yet, so closing before it catches up loses nothing.
+    $accrued = round((float)$deposit['accrued_interest']
+        + array_sum(array_column(daily_pending_interest($deposit), 'earned')), 2);
     $tds = $accrued > 0 ? round($accrued * param_value('tds_rate_daily_interest', 10.0) / 100, 2) : 0.0;
     // interest_paid tracks the gross amount earned, same convention
     // cron.php uses -- tds_deducted is where the TDS itself is recorded, so

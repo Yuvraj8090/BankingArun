@@ -232,9 +232,10 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
     $due = rows("SELECT d.*, s.withdrawal_threshold FROM deposits d
         JOIN schemes s ON s.code = d.scheme_code
         WHERE d.status = 'active' AND d.interest_payout = 'daily' AND d.source_account IS NOT NULL
-          AND d.maturity_date > ?
-          AND (d.last_payout_date IS NULL OR d.last_payout_date < ?)
-        ORDER BY d.created_at LIMIT " . CRON_BATCH, [$today, $today]);
+          AND (d.last_payout_date IS NULL OR d.last_payout_date < LEAST(?, DATE_SUB(d.maturity_date, INTERVAL 1 DAY)))
+        ORDER BY d.created_at LIMIT " . CRON_BATCH, [$today]);
+    // Not "maturity_date > today": a run that was missed across the maturity date would otherwise skip the deposit
+    // and lose the last days of interest, because the maturity job (which runs after this one) closes it first.
 
     $ist = new DateTimeZone(IST);
     foreach ($due as $deposit) {
@@ -278,6 +279,12 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
             if ($dryRun) {
                 say("  would accrue $label");
                 $accrued++;
+                continue;
+            }
+            // Belt and braces for "one credit per day": the last_payout_date marker is what normally prevents a
+            // repeat, but if it is ever reset or edited, a day that already has its credit is skipped, not paid twice.
+            if (scalar("SELECT COUNT(*) FROM transactions WHERE ref_number = ? AND mode = 'DEPOSIT_INTEREST'",
+                    ['DINT-' . $locked['deposit_number'] . '-' . $day->format('Ymd')]) > 0) {
                 continue;
             }
             $total = round($held + $interest, 2);

@@ -33,6 +33,7 @@ function report_definitions(): array
     // against both.
     $instalment = "(d.scheme_code IS NOT NULL AND d.deposit_type = 'recurring')";
     $kind = "CASE WHEN $instalment THEN 'instalment' ELSE 'lump sum' END";
+    // The enquiry rows below skip a lead who has since booked that plan under the same mobile number.
     $dailyEarning = "CASE WHEN d.interest_payout = 'daily' AND d.status = 'active'
         THEN ROUND(d.principal_amount * d.interest_rate / 100 / 365, 2) ELSE 0 END";
     $collected = "CASE WHEN $instalment THEN
@@ -129,6 +130,10 @@ function report_definitions(): array
                     UNION ALL
                     SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, NULL, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, l.created_at
                     FROM crm_leads l WHERE l.scheme_code IS NOT NULL AND l.stage NOT IN ('enrolled', 'lost')
+                      AND NOT EXISTS (SELECT 1 FROM deposits d2 JOIN users u2 ON u2.id = d2.user_id
+                          WHERE d2.scheme_code = l.scheme_code
+                            AND RIGHT(REPLACE(REPLACE(REPLACE(u2.phone, ' ', ''), '-', ''), '+', ''), 10)
+                              = RIGHT(REPLACE(REPLACE(REPLACE(l.phone, ' ', ''), '-', ''), '+', ''), 10))
                     UNION ALL
                     SELECT u.name, u.phone,
                         (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at LIMIT 1),
