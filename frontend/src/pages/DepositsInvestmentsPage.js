@@ -545,12 +545,29 @@ export default function DepositsInvestmentsPage() {
               <tbody className="divide-y divide-slate-100">
                 {myDeposits.map(dep => (
                   <tr key={dep.id} data-testid={`my-deposit-${dep.deposit_number}`}>
-                    <td className="py-2 pr-3 font-mono text-slate-700">{dep.deposit_number}</td>
+                    <td className="py-2 pr-3 font-mono text-slate-700">
+                      {dep.deposit_number}
+                      {dep.scheme_code && <span className="block font-sans text-[10px] text-slate-500">Plan {dep.scheme_code}</span>}
+                    </td>
                     <td className="py-2 pr-3 text-right text-slate-900 font-semibold">
                       ₹{Number(dep.principal_amount).toLocaleString('en-IN')}
                     </td>
                     <td className="py-2 pr-3 text-slate-600">
                       {new Date(dep.maturity_date).toLocaleDateString('en-IN')}
+                      {dep.interest_payout === 'daily' ? (
+                        // A daily plan pays its interest as it goes and returns the principal at the end, so the
+                        // total over the term is the principal plus every day's interest from start to maturity.
+                        <span className="block text-[10px] text-slate-500" data-testid={`total-${dep.deposit_number}`}>
+                          ₹{Number(dep.principal_amount).toLocaleString('en-IN')} back + about ₹{Math.round(
+                            Number(dep.principal_amount) * Number(dep.interest_rate) / 100 / 365
+                            * (new Date(dep.maturity_date) - new Date(dep.created_at)) / 86400000).toLocaleString('en-IN')} interest,
+                          paid daily
+                        </span>
+                      ) : (
+                        <span className="block text-[10px] text-slate-500">
+                          Maturity value ₹{Number(dep.maturity_amount).toLocaleString('en-IN')}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3 text-right text-slate-700" data-testid={`interest-${dep.deposit_number}`}>
                       ₹{Number(dep.interest_paid || 0).toLocaleString('en-IN')}
