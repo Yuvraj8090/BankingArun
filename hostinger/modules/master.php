@@ -1037,6 +1037,7 @@ const CRON_JOB_LABELS = [
     'standing_instructions' => 'Standing instructions',
     'scheduled_payments' => 'Scheduled transfers',
     'deposit_interest' => 'Deposit interest (MIS monthly payouts)',
+    'daily_interest' => 'Daily interest (daily-plan accruals and payouts)',
     'deposit_maturities' => 'Maturities',
     'payment_rail' => 'Payment rail settlement',
 ];
@@ -1082,7 +1083,9 @@ function route_automation_status(array $d): void
     $decoded = $lastOk === null ? [] : (json_decode((string)$lastOk['jobs'], true) ?: []);
     foreach (CRON_JOB_LABELS as $key => $label) {
         $jobs[] = ['key' => $key, 'label' => $label,
-            'done' => (int)($decoded[$key]['done'] ?? 0),
+            // The daily-interest job reports accrued/released rather than one
+            // "done" count: both are interest it processed that night.
+            'done' => (int)($decoded[$key]['done'] ?? (($decoded[$key]['accrued'] ?? 0) + ($decoded[$key]['released'] ?? 0))),
             'failed' => (int)($decoded[$key]['failed'] ?? 0)];
     }
 
