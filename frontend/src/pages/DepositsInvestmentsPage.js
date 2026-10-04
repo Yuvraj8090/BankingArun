@@ -555,12 +555,13 @@ export default function DepositsInvestmentsPage() {
                     <td className="py-2 pr-3 text-slate-600">
                       {new Date(dep.maturity_date).toLocaleDateString('en-IN')}
                       {dep.interest_payout === 'daily' ? (
-                        // A daily plan pays its interest as it goes and returns the principal at the end, so the
-                        // total over the term is the principal plus every day's interest from start to maturity.
+                        // A daily plan pays its interest as it goes and returns the principal at the end; the interest
+                        // total is 30-day months x tenure (same cap run_daily_interest_accrual applies in cron.php).
                         <span className="block text-[10px] text-slate-500" data-testid={`total-${dep.deposit_number}`}>
                           ₹{Number(dep.principal_amount).toLocaleString('en-IN')} back + about ₹{Math.round(
-                            Number(dep.principal_amount) * Number(dep.interest_rate) / 100 / 365
-                            * (new Date(dep.maturity_date) - new Date(dep.created_at)) / 86400000).toLocaleString('en-IN')} interest,
+                            Number(dep.principal_amount)
+                            * (Math.round(Number(dep.interest_rate) / 100 / 365 * 30 * Number(dep.tenure_months) * 100) / 100)
+                          ).toLocaleString('en-IN')} interest,
                           paid daily
                         </span>
                       ) : (

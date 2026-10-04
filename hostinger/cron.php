@@ -238,6 +238,13 @@ function run_daily_interest_accrual(string $today, bool $dryRun, bool $verbose):
 
     foreach ($due as $deposit) {
         $interest = round((float)$deposit['principal_amount'] * (float)$deposit['interest_rate'] / 100 / 365, 2);
+        // A plan sold as "N months of 30 days" (40 months doubling the money) must not pay for the extra calendar
+        // days a month-based tenure holds -- 1217 days at 0.08333% would pay 101.4%, not 100%. Total interest is
+        // capped at the term's 30-day-month figure (ratio to 2dp: 1.00 for the 40-month plan).
+        // ponytail: the 2dp ratio is +-0.5% of principal for odd rates; store a per-deposit cap if that matters.
+        $cap = round((float)$deposit['principal_amount']
+            * round((float)$deposit['interest_rate'] / 100 / 365 * 30 * (int)$deposit['tenure_months'], 2), 2);
+        $interest = min($interest, round($cap - (float)$deposit['interest_paid'] - (float)$deposit['accrued_interest'], 2));
         if ($interest <= 0) {
             continue;
         }
