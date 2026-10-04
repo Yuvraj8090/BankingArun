@@ -917,7 +917,10 @@ function route_accounts(array $d): void
 {
     $user = current_user();
     $accounts = out_all(rows('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at, id', [$user['id']]));
-    $deposits = out_all(rows('SELECT * FROM deposits WHERE user_id = ? ORDER BY created_at, id', [$user['id']]));
+    // pending_interest: days a daily plan has earned that the daily job has not credited yet, so the row shows them.
+    $deposits = array_map(fn($d) => out($d) + ['pending_interest' =>
+            round(array_sum(array_column(daily_pending_interest($d), 'earned')), 2)],
+        rows('SELECT * FROM deposits WHERE user_id = ? ORDER BY created_at, id', [$user['id']]));
     $cards = array_map('public_card', rows('SELECT * FROM cards WHERE user_id = ? ORDER BY created_at, id', [$user['id']]));
     $savings = array_sum(array_column($accounts, 'balance'));
     $deposited = array_sum(array_column($deposits, 'principal_amount'));

@@ -586,13 +586,18 @@ export default function DepositsInvestmentsPage() {
               </p>
             </div>
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <p className="text-slate-600">Earning per day (active daily plans)</p>
-              <p data-testid="earning-per-day" className="text-lg font-extrabold text-slate-900">
-                ₹{myDeposits.filter(d => d.status === 'active' && d.interest_payout === 'daily')
-                  .reduce((sum, d) => sum + Number(d.principal_amount) * Number(d.interest_rate) / 100 / 365, 0)
+              <p className="text-slate-600">Interest earned till now</p>
+              {/* Same total as a deposit's earnings panel: paid out + held back + earned but not yet credited. */}
+              <p data-testid="earned-total" className="text-lg font-extrabold text-emerald-700">
+                ₹{myDeposits.reduce((sum, d) => sum + Number(d.interest_paid || 0) + Number(d.accrued_interest || 0)
+                  + Number(d.pending_interest || 0), 0)
                   .toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className="text-[10px] text-slate-500">Before TDS.</p>
+              <p data-testid="earning-per-day" className="text-[10px] text-slate-500">
+                Before TDS. Earning ₹{myDeposits.filter(d => d.status === 'active' && d.interest_payout === 'daily')
+                  .reduce((sum, d) => sum + Number(d.principal_amount) * Number(d.interest_rate) / 100 / 365, 0)
+                  .toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} a day from active daily plans.
+              </p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -642,6 +647,11 @@ export default function DepositsInvestmentsPage() {
                       {dep.status === 'active' && dep.interest_payout === 'daily' && (
                         <span className="block text-[10px] text-emerald-700">
                           earning ₹{(Number(dep.principal_amount) * Number(dep.interest_rate) / 100 / 365).toFixed(2)} a day
+                        </span>
+                      )}
+                      {Number(dep.pending_interest) > 0 && (
+                        <span className="block text-[10px] text-amber-700">
+                          + ₹{Number(dep.pending_interest).toLocaleString('en-IN')} earned, waiting for the daily run
                         </span>
                       )}
                       {Number(dep.accrued_interest) > 0 && (
