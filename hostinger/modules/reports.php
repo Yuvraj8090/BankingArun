@@ -19,6 +19,27 @@ const REPORT_EXPORT_MAX = 20000;   // rows in a single download
 // Column formats: 'text', 'money', 'date', 'datetime', 'int'.
 function report_definitions(): array
 {
+    // A scheme-priced instalment plan (Masik/Daily Yojana) stores the whole
+    // contracted total as principal_amount, but only the first instalment is
+    // debited from the member's account; the rest is collected in person by a
+    // field agent and logged in agent_collections against the account and the
+    // plan. So "committed" and "collected" differ, and a register that totals
+    // principal_amount overstates the money actually received. Anything else
+    // (a fixed deposit, an MIS, a plan-less deposit) is funded in full when
+    // booked, so for those the two are the same. scheme_deposit_terms() maps
+    // every by-instalment scheme to deposit_type 'recurring'.
+    // The agent log is per account and plan, not per deposit, so a member with
+    // two deposits on one instalment plan would have the agent total counted
+    // against both.
+    $instalment = "(d.scheme_code IS NOT NULL AND d.deposit_type = 'recurring')";
+    $kind = "CASE WHEN $instalment THEN 'instalment' ELSE 'lump sum' END";
+    $collected = "CASE WHEN $instalment THEN
+            COALESCE((SELECT SUM(b.amount) FROM transactions b
+                WHERE b.ref_number = d.deposit_number AND b.mode = 'DEPOSIT_BOOKING' AND b.type = 'debit'), 0)
+            + COALESCE((SELECT SUM(c.amount) FROM agent_collections c JOIN schemes cs ON cs.id = c.scheme_id
+                WHERE cs.code = d.scheme_code AND c.account_number = d.source_account
+                  AND c.collected_on >= DATE(d.created_at)), 0)
+        ELSE d.principal_amount END";
     return [
         // The statutory one: who the members are. The Nidhi Rules turn on this.
         'member_register' => [
@@ -44,10 +65,12 @@ function report_definitions(): array
         'deposit_register' => [
             'name' => 'Deposit register',
             'note' => 'Every deposit with its plan, rate, maturity, interest paid, interest still held back and TDS withheld. '
-                . 'Filter by plan code to list everyone enrolled in one plan.',
+                . 'Committed is what the deposit is for; collected is what has actually been received (an instalment '
+                . 'plan is collected a little at a time). Filter by plan code to list everyone enrolled in one plan.',
             'roles' => ['admin', 'branch_manager', 'bank_owner'],
             'sql' => "SELECT d.deposit_number, u.name AS member, d.source_account AS account, d.scheme_code AS plan,
-                    d.deposit_type, d.principal_amount,
+                    d.deposit_type, $kind AS kind, d.principal_amount AS committed_amount,
+                    $collected AS collected_amount,
                     d.interest_rate, d.tenure_months, d.interest_payout, d.maturity_amount, d.maturity_date,
                     d.interest_paid, d.accrued_interest, d.tds_deducted,
                     (SELECT MAX(t.timestamp) FROM transactions t
@@ -63,12 +86,14 @@ function report_definitions(): array
                 'to_date' => ['d.created_at <= ?', 'date_end']],
             'order' => 'd.maturity_date',
             'columns' => ['deposit_number' => 'text', 'member' => 'text', 'account' => 'text', 'plan' => 'text',
-                'deposit_type' => 'text',
-                'principal_amount' => 'money', 'interest_rate' => 'text', 'tenure_months' => 'int',
+                'deposit_type' => 'text', 'kind' => 'text',
+                'committed_amount' => 'money', 'collected_amount' => 'money',
+                'interest_rate' => 'text', 'tenure_months' => 'int',
                 'interest_payout' => 'text', 'maturity_amount' => 'money', 'maturity_date' => 'date',
                 'interest_paid' => 'money', 'accrued_interest' => 'money', 'tds_deducted' => 'money',
                 'last_credited' => 'datetime', 'last_accrued' => 'date', 'status' => 'text'],
-            'totals' => ['principal_amount', 'maturity_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
+            'totals' => ['committed_amount', 'collected_amount', 'maturity_amount', 'interest_paid',
+                'accrued_interest', 'tds_deducted'],
         ],
         // Everyone connected to a plan in one list, so "who took it" and "who is
         // still pending" are one question. Deposits are the people who booked
@@ -79,13 +104,16 @@ function report_definitions(): array
         'plan_enrolment' => [
             'name' => 'Plan enrolment',
             'note' => 'Members who took a plan, plus the people still pending: interest earned but not yet paid out, '
-                . 'enquiries that have not booked, and members waiting on KYC. Filter by plan code.',
+                . 'enquiries that have not booked, and members waiting on KYC. Committed is what a deposit is for; '
+                . 'collected is what has actually been received. Filter by plan code.',
             'roles' => ['admin', 'branch_manager', 'bank_owner'],
             'sql' => "SELECT * FROM (
                     SELECT u.name AS name, u.phone AS phone, d.source_account AS account, d.scheme_code AS plan,
                         CASE WHEN d.status = 'active' AND d.accrued_interest > 0 THEN 'interest pending'
                              WHEN d.status = 'active' THEN 'enrolled' ELSE d.status END AS state,
-                        d.deposit_number AS deposit_number, d.principal_amount AS principal_amount,
+                        $kind AS kind,
+                        d.deposit_number AS deposit_number, d.principal_amount AS committed_amount,
+                        $collected AS collected_amount,
                         d.interest_paid AS interest_paid, d.accrued_interest AS accrued_interest,
                         d.tds_deducted AS tds_deducted,
                         (SELECT MAX(t.timestamp) FROM transactions t
@@ -94,12 +122,12 @@ function report_definitions(): array
                         d.last_payout_date AS last_accrued, d.created_at AS since
                     FROM deposits d JOIN users u ON u.id = d.user_id
                     UNION ALL
-                    SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, 0, 0, 0, 0, NULL, NULL, l.created_at
+                    SELECT l.name, l.phone, NULL, l.scheme_code, 'enquired, not booked', NULL, NULL, 0, 0, 0, 0, 0, NULL, NULL, l.created_at
                     FROM crm_leads l WHERE l.scheme_code IS NOT NULL AND l.stage NOT IN ('enrolled', 'lost')
                     UNION ALL
                     SELECT u.name, u.phone,
                         (SELECT a.account_number FROM accounts a WHERE a.user_id = u.id ORDER BY a.created_at LIMIT 1),
-                        NULL, 'waiting KYC', NULL, 0, 0, 0, 0, NULL, NULL, u.created_at
+                        NULL, 'waiting KYC', NULL, NULL, 0, 0, 0, 0, 0, NULL, NULL, u.created_at
                     FROM users u WHERE u.role = 'retail' AND u.kyc_status = 'pending_approval'
                 ) p WHERE 1 = 1",
             'filters' => ['plan' => ["p.plan = ? OR p.state = 'waiting KYC'", 'exact'],
@@ -109,10 +137,11 @@ function report_definitions(): array
                 'to_date' => ['p.since <= ?', 'date_end']],
             'order' => 'p.since DESC',
             'columns' => ['name' => 'text', 'phone' => 'text', 'account' => 'text', 'plan' => 'text',
-                'state' => 'text', 'deposit_number' => 'text', 'principal_amount' => 'money',
+                'state' => 'text', 'kind' => 'text', 'deposit_number' => 'text',
+                'committed_amount' => 'money', 'collected_amount' => 'money',
                 'interest_paid' => 'money', 'accrued_interest' => 'money', 'tds_deducted' => 'money',
                 'last_credited' => 'datetime', 'last_accrued' => 'date', 'since' => 'date'],
-            'totals' => ['principal_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
+            'totals' => ['committed_amount', 'collected_amount', 'interest_paid', 'accrued_interest', 'tds_deducted'],
         ],
         'loan_register' => [
             'name' => 'Loan register',
