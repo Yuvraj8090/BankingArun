@@ -8,6 +8,15 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+# Site switch: while a SITE_DOWN file sits in the document root, everything
+# answers 503 and tells the browser to drop its cached copy of the app and any
+# saved sign-in. version.txt stays up because the deploy checks it. To bring the
+# site back, delete hostinger/SITE_DOWN and deploy.
+ErrorDocument 503 "<h1>Site not working</h1><p>This site is currently unavailable.</p>"
+RewriteCond %{DOCUMENT_ROOT}/SITE_DOWN -f
+RewriteCond %{REQUEST_URI} !^/version\.txt$
+RewriteRule ^ - [R=503,L,E=SITE_DOWN:1]
+
 # Server-side only: PHP modules and assets are never fetched over HTTP
 RewriteRule ^(modules|assets)/ - [F,L]
 
@@ -41,4 +50,6 @@ LimitRequestBody 8388608
     # Needs the frontend built with INLINE_RUNTIME_CHUNK=false (see INSTALL_HOSTINGER.md)
     Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://api.qrserver.com; connect-src 'self'; media-src 'self' blob:; frame-src https://maps.google.com https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     Header unset X-Powered-By
+    Header always set Clear-Site-Data "\"cache\", \"storage\"" env=SITE_DOWN
+    Header always set Cache-Control "no-store" env=SITE_DOWN
 </IfModule>

@@ -28,6 +28,10 @@ rm -rf .deploy/pyapi && cp -R pyapi .deploy/pyapi
 rm -rf .deploy/pyapi/.venv .deploy/pyapi/tests/__pycache__ .deploy/pyapi/app/__pycache__
 mkdir -p .deploy/pyapi/deploy
 cp scripts/ajspay-pyapi.service scripts/pyapi-proxy.conf scripts/ajspay-apply-proxy .deploy/pyapi/deploy/
+# Proxied routes never reach .htaccess, so the off switch there cannot stop
+# them. Shipping an empty map sends them back to api.php, where it can.
+[[ ! -f hostinger/SITE_DOWN ]] ||
+  echo '# Site is switched off (hostinger/SITE_DOWN): no routes are proxied.' > .deploy/pyapi/deploy/pyapi-proxy.conf
 ssh "$VPS_USER@$VPS_HOST" 'install -d -m 755 /srv/ajspay/pyapi'
 scp -r .deploy/pyapi/. "$VPS_USER@$VPS_HOST:/srv/ajspay/pyapi/"
 ssh "$VPS_USER@$VPS_HOST" bash -s -- "$revision" <<'REMOTE'
@@ -131,7 +135,11 @@ smoke_failed=""
 served=$(curl -fsS --retry 3 --retry-delay 2 https://ajspay.co.in/version.txt 2>&1 | head -c 80 || true)
 [[ "$served" == "$revision" ]] ||
   smoke_failed="$smoke_failed"$'\n'"  version.txt served '$served', expected '$revision'"
-for probe in "/api/auth/me 401 PHP" "/api/public/features 200 Python"; do
+# A release that is switched off must answer 503 on both, and anything else
+# means the switch did not take.
+php_want=401 py_want=200
+[[ ! -f "$release/SITE_DOWN" ]] || php_want=503 py_want=503
+for probe in "/api/auth/me $php_want PHP" "/api/public/features $py_want Python"; do
   read -r path want backend <<<"$probe"
   for attempt in $(seq 1 10); do
     got=$(curl -sS -o /tmp/smoke.body -w '%{http_code}' "https://ajspay.co.in$path" || echo 000)
