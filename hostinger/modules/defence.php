@@ -19,8 +19,9 @@ const SECURITY_READ_ROLES = ['bank_owner', 'admin'];
 // per-account lockouts — these stop the same attacker cycling many accounts.
 const RATE_GLOBAL = [600, 300];
 const RATE_ROUTES = [
+    'GET /public/captcha' => [120, 3600],
     'POST /auth/login' => [30, 300],
-    'POST /auth/register' => [10, 3600],
+    'POST /register/self' => [60, 3600],
     'POST /auth/login/totp' => [20, 900],
     'POST /totp/enable' => [20, 900],
     'POST /totp/disable' => [10, 900],
@@ -379,9 +380,6 @@ function captcha_image(string $code): string
 function route_public_captcha(array $d): void
 {
     global $pdo;
-    // Cheap to serve but not free: a bot should not be able to mint these endlessly.
-    rate_limit('captcha:' . client_ip(), 40, 3600, 'Too many attempts. Please try again later.');
-
     // Opportunistic cleanup, so the table cannot grow without bound.
     $pdo->prepare('DELETE FROM captcha_challenges WHERE expires_at < ?')->execute([now_utc()]);
 

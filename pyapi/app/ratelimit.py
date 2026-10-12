@@ -26,8 +26,9 @@ log = logging.getLogger("ajspay.ratelimit")
 # defence.php's RATE_GLOBAL and RATE_ROUTES, as [max, window_seconds].
 RATE_GLOBAL = (600, 300)
 RATE_ROUTES: dict[str, tuple[int, int]] = {
+    'GET /public/captcha': (120, 3600),
     'POST /auth/login': (30, 300),
-    'POST /auth/register': (10, 3600),
+    'POST /register/self': (60, 3600),
     'POST /auth/login/totp': (20, 900),
     'POST /totp/enable': (20, 900),
     'POST /totp/disable': (10, 900),

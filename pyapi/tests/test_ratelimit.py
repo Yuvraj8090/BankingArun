@@ -23,7 +23,9 @@ def test_global_budget_matches_the_php() -> None:
 
 def test_per_route_budgets_match_the_php() -> None:
     """Spot-checks on the ones that guard money and credentials."""
+    assert RATE_ROUTES['GET /public/captcha'] == (120, 3600)
     assert RATE_ROUTES['POST /auth/login'] == (30, 300)
+    assert RATE_ROUTES['POST /register/self'] == (60, 3600)
     assert RATE_ROUTES['POST /accounts/transfer'] == (60, 300)
     assert RATE_ROUTES['POST /accounts/bulk-transfer'] == (10, 300)
     assert RATE_ROUTES['POST /otp/send'] == (15, 3600)

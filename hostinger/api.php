@@ -751,10 +751,6 @@ function route_register(array $d): void
 function route_self_register(array $d): void
 {
     global $pdo;
-    // Unauthenticated and public, so it is rate limited by address like the
-    // enquiry form — otherwise it is free to flood the users table with junk.
-    rate_limit('self-register:' . client_ip(), 5, 3600,
-        'Too many sign-ups from this connection. Please try again later, or call us on 9105015464.');
     captcha_verify($d);
 
     need($d, 'name', 'phone', 'password');
