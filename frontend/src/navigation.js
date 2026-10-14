@@ -22,7 +22,7 @@ export const NAV_BY_ROLE = {
     { id: 'video-kyc', label: 'Video KYC', icon: Video, testId: 'tab-video-kyc' },
     { id: 'security', label: 'Security & Passkeys', icon: ShieldCheck, testId: 'tab-security' },
     { id: 'kyc', label: 'KYC / Profile', icon: FileBadge2, testId: 'tab-kyc' },
-    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
+    { id: 'branches', label: 'Branches', icon: MapPin, testId: 'tab-locator' }
   ],
   admin: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
@@ -39,7 +39,7 @@ export const NAV_BY_ROLE = {
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue' },
-    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
+    { id: 'branches', label: 'Branches', icon: MapPin, testId: 'tab-locator' }
   ],
   branch_manager: [
     { id: 'admin', label: 'Branch Overview', icon: ShieldAlert, testId: 'tab-admin' },
@@ -56,7 +56,7 @@ export const NAV_BY_ROLE = {
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue' },
-    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
+    { id: 'branches', label: 'Branches', icon: MapPin, testId: 'tab-locator' }
   ],
   bank_owner: [
     { id: 'owner', label: 'Executive Dashboard', icon: Crown, testId: 'tab-owner' },
@@ -72,7 +72,7 @@ export const NAV_BY_ROLE = {
     { id: 'grievance', label: 'Grievance Queue', icon: Gavel, testId: 'tab-grievance' },
     { id: 'schemes', label: 'Scheme Master', icon: Layers, testId: 'tab-schemes' },
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
-    { id: 'branch-admin', label: 'Branch & ATM Network', icon: MapPin, testId: 'tab-branch-admin' },
+    { id: 'branch-admin', label: 'Branch Network', icon: MapPin, testId: 'tab-branch-admin' },
     { id: 'public-pages', label: 'Public Pages', icon: FileText, testId: 'tab-public-pages' },
     { id: 'member-ranks', label: 'Member Standings', icon: Award, testId: 'tab-member-ranks' },
     { id: 'rails', label: 'Payment Rails', icon: Radio, testId: 'tab-rails' },
@@ -93,11 +93,11 @@ export const NAV_BY_ROLE = {
     { id: 'agents', label: 'Agents & Collections', icon: ClipboardList, testId: 'tab-agents' },
     { id: 'kyc', label: 'KYC Verification', icon: FileBadge2, testId: 'tab-kyc' },
     { id: 'transfer', label: 'Process Transfer', icon: ArrowRightLeft, testId: 'tab-transfer' },
-    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
+    { id: 'branches', label: 'Branches', icon: MapPin, testId: 'tab-locator' }
   ],
   collection_agent: [
     { id: 'collection', label: 'Collection Cases', icon: Wallet, testId: 'tab-collection' },
-    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
+    { id: 'branches', label: 'Branches', icon: MapPin, testId: 'tab-locator' }
   ],
   loan_officer: [
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },

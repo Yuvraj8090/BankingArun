@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 export default function LoansPage() {
   const { currentTheme } = useBankTheme();
-  const [loanType, setLoanType] = useState('personal');
+  const [loanType, setLoanType] = useState('gold');
   const [amount, setAmount] = useState(300000);
   const [tenure, setTenure] = useState(36);
   const [monthlyIncome, setMonthlyIncome] = useState(65000);
@@ -84,15 +84,15 @@ export default function LoansPage() {
       <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            Loans & EMI Eligibility Calculator
+            Loans & EMI Calculator
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Personal, Home, Car Loans | Instant Pre-Approval Assessment | Low Interest Rates
+            Secured loans for members: against gold jewellery or property
           </p>
         </div>
 
         <div className="flex items-center gap-2 p-1 rounded-xl bg-white border border-slate-200 text-xs">
-          {['personal', 'home', 'vehicle', 'gold'].map(t => (
+          {['gold', 'home'].map(t => (
             <button
               key={t}
               data-testid={`loan-type-${t}`}

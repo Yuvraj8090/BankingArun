@@ -80,7 +80,7 @@ export default function PublicHomePage() {
     ['Open Savings Account', '/personal/savings-account', null],
     ['Apply for a Loan', '/loans/gold-loan', 'loans'],
     ['Book a Fixed Deposit', '/personal/fixed-deposits', 'deposits'],
-    ['Branch & ATM Locator', '/branches', null],
+    ['Branch Locator', '/branches', null],
     ['Rates & Charges', '/rates', null]
   ];
   const quickLinks = ALL_QUICK_LINKS
@@ -339,7 +339,7 @@ export default function PublicHomePage() {
           {[
             savingsRate && { n: savingsRate, l: 'Savings interest', to: '/personal/savings-account' },
             seniorBonus && { n: seniorBonus, l: 'Senior citizen FD bonus', to: '/personal/fixed-deposits' },
-            { n: '24×7', l: 'IMPS & UPI transfers', to: '/personal/savings-account' },
+            { n: '24×7', l: 'Transfers between members', to: '/personal/savings-account' },
             { n: '₹0', l: 'Minimum balance', to: '/personal/salary-account' }
           ].filter(Boolean).map((s) => (
             <Link key={s.l} to={s.to} className="bg-white border border-slate-200 rounded-lg p-5 text-center hover:border-[#0b3b8c] transition">
@@ -376,7 +376,7 @@ export default function PublicHomePage() {
               <MapPin className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-semibold text-slate-900 group-hover:text-[#0b3b8c]">Find a branch or ATM</div>
+              <div className="font-semibold text-slate-900 group-hover:text-[#0b3b8c]">Find a branch</div>
               <div className="text-xs text-slate-600">Locations, timings and services</div>
             </div>
           </Link>

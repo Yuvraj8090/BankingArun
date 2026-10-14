@@ -62,7 +62,7 @@ export default function Dashboard({ onNavigate }) {
         beneficiary_name: quickBeneficiary,
         transfer_type: "IMPS",
         amount: parseFloat(quickAmount),
-        remarks: "Instant Quick Transfer",
+        remarks: canUpi ? "Instant Quick Transfer" : "Member transfer",
         transaction_password: quickTxnPwd
       });
       toast.success(res.message);
@@ -314,26 +314,26 @@ export default function Dashboard({ onNavigate }) {
 
           {/* Quick actions */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl space-y-2.5">
-            <h3 className="font-bold text-slate-900 text-xs pb-2 border-b border-slate-200">Quick Indian Banking Services</h3>
+            <h3 className="font-bold text-slate-900 text-xs pb-2 border-b border-slate-200">Shortcuts</h3>
             <button
               onClick={() => onNavigate('transfer')}
               className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs text-slate-600 transition"
             >
-              <span>NEFT / RTGS Transfer</span>
+              <span>Pay a member</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-[#0b3b8c]" />
             </button>
             <button
               onClick={() => onNavigate('loans')}
               className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs text-slate-600 transition"
             >
-              <span>Loan EMI Calculator & Eligibility</span>
+              <span>Loans and EMI calculator</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-[#0b3b8c]" />
             </button>
             <button
-              onClick={() => onNavigate('locator')}
+              onClick={() => onNavigate('branches')}
               className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs text-slate-600 transition"
             >
-              <span>Find ATM & Cash Deposit Machine</span>
+              <span>Find a branch</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-[#0b3b8c]" />
             </button>
           </div>
@@ -347,7 +347,7 @@ export default function Dashboard({ onNavigate }) {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-              <h3 className="font-bold text-slate-900 text-base">Instant Fund Transfer (IMPS)</h3>
+              <h3 className="font-bold text-slate-900 text-base">{canUpi ? 'Instant Fund Transfer (IMPS)' : 'Pay a member'}</h3>
               <button onClick={() => setShowQuickTransfer(false)} className="text-slate-500 hover:text-slate-900 text-sm">✕</button>
             </div>
 

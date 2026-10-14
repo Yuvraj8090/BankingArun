@@ -8,6 +8,7 @@ declare(strict_types=1);
 // modules/parameters.php and the Business Parameters screen), not here -- a
 // rate change is an admin-panel save, not a deploy.
 const LOAN_RATE_DEFAULTS = ['personal' => 10.50, 'home' => 8.40, 'vehicle' => 8.75, 'gold' => 7.90];
+const NIDHI_LOAN_TYPES = ['gold', 'home'];
 const DEPOSIT_RATE_DEFAULTS = ['under_1y' => 6.50, '1y_to_2y' => 7.25, '2y_to_3y' => 7.50, 'over_3y' => 7.10];
 const DEMAND_DRAFT_FEE_DEFAULT = 50.0;
 const CARD_LIMIT_MAX_DEFAULT = 1000000.0;
@@ -634,8 +635,12 @@ function route_apply_loan(array $d): void
     require_kyc_verified($user);
     need($d, 'loan_type', 'amount_requested', 'tenure_months', 'monthly_income', 'employment_type', 'purpose');
     $type = strtolower(clip($d['loan_type'], 30));
-    if (!array_key_exists($type, LOAN_RATE_DEFAULTS)) {
-        fail(422, 'loan_type must be personal, home, vehicle or gold.');
+    // Nidhi Rules, 2014 (Rule 15): a Nidhi lends only against gold, silver or diamond
+    // jewellery, immovable property, or deposits and securities the member holds, so
+    // unsecured personal loans and vehicle loans are not taken. Old applications of
+    // those types stay on record.
+    if (!in_array($type, NIDHI_LOAN_TYPES, true)) {
+        fail(422, 'We lend against gold or property only: loan_type must be gold or home.');
     }
     $amount = money($d['amount_requested']);
     $tenure = (int)$d['tenure_months'];

@@ -7,8 +7,6 @@ export default function BranchLocatorPage() {
   const { currentTheme } = useBankTheme();
   const [branches, setBranches] = useState([]);
   const [search, setSearch] = useState('');
-  const [filterAtm, setFilterAtm] = useState(false);
-  const [filterCdm, setFilterCdm] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -23,8 +21,6 @@ export default function BranchLocatorPage() {
                           b.address.toLowerCase().includes(search.toLowerCase()) ||
                           b.bank.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
-    if (filterAtm && !b.has_atm) return false;
-    if (filterCdm && !b.has_cdm) return false;
     return true;
   });
 
@@ -35,10 +31,10 @@ export default function BranchLocatorPage() {
       <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            Branch, ATM & Cash Deposit (CDM) Locator
+            Branch Locator
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Locate 24x7 Cash Dispensers, Locker Facilities, and Forex Desks Across India
+            Find a branch, its timings, and whether it offers lockers
           </p>
         </div>
 
@@ -54,28 +50,6 @@ export default function BranchLocatorPage() {
             className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-[#0b3b8c]"
           />
         </div>
-      </div>
-
-      {/* Filter Checkboxes */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={filterAtm}
-            onChange={(e) => setFilterAtm(e.target.checked)}
-            className="w-4 h-4 rounded text-[#0b3b8c]"
-          />
-          <span>24x7 ATM Available</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={filterCdm}
-            onChange={(e) => setFilterCdm(e.target.checked)}
-            className="w-4 h-4 rounded text-[#0b3b8c]"
-          />
-          <span>Cash Deposit Machine (CDM)</span>
-        </label>
       </div>
 
       {/* Branch Cards Grid */}
@@ -104,8 +78,6 @@ export default function BranchLocatorPage() {
             </div>
 
             <div className="flex flex-wrap gap-1.5 pt-1 text-[10px]">
-              {b.has_atm && <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">ATM 24x7</span>}
-              {b.has_cdm && <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">CDM Deposit</span>}
               {b.has_locker && <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">Lockers</span>}
             </div>
 

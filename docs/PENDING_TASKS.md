@@ -120,13 +120,22 @@ corporate (5), mutual funds, gold bonds, insurance, debit cards, and personal,
 vehicle and education loans. The public site now offers savings, salary, FD, RD,
 gold loan and home loan. The legacy bulk-payout route goes with item 9.
 
-### 7. Banking language still on member screens  ⬜
+### 7. Banking language still on member screens  ✅ done 15 Oct
 - Transfers: "IMPS (24x7) | NEFT | RTGS", "Corporate Payout Hub"
 - Dashboard: "Quick Indian Banking Services → NEFT / RTGS Transfer, Find ATM & Cash Deposit Machine"
 - Loans: "Personal, Home, Car Loans | Instant Pre-Approval". A Nidhi lends only against gold, property, FDs, NSC/KVP or insurance policies.
 - Standing Instructions: "Automate rent, SIPs, EMIs and insurance premiums"
 - Branch locator: "24x7 Cash Dispensers, Locker Facilities, CDM"
 - Owner dashboard heading "BANK OWNER"
+
+**Done:** without the payment-systems authorisation, Transfers is now "Pay a
+Member" with no IMPS/NEFT/RTGS mode, IFSC, UPI or bulk-payout controls, and the
+default remark is "Member transfer". Dashboard shortcuts, the locator (ATM/CDM
+filters and badges removed; lockers kept, since a Nidhi may offer them), Standing
+Instructions, the home page, chatbot prompts, "Branches" menu labels and the
+"DIRECTOR" badge are all updated. **Loans now accept gold and home only**, checked by
+the API (`NIDHI_LOAN_TYPES`). Also fixed: the dashboard's branch shortcut pointed
+to a tab that does not exist.
 
 ## Medium: guides and help (your request)
 

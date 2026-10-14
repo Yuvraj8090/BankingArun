@@ -485,6 +485,13 @@ for p in trade-finance current-account mutual-funds insurance debit-cards person
 done
 has "gold loan is still offered" "$PUB" "gold-loan"
 
+print "\n-- secured lending only --"
+call POST /loans/apply "$RETAIL" '{"loan_type":"personal","amount_requested":50000,"tenure_months":12,"monthly_income":40000,"employment_type":"salaried","purpose":"APITEST"}'
+ck "an unsecured personal loan is refused" 422 "$CODE"
+has "and the refusal says what we lend against" "$BODY" "gold or property"
+call POST /loans/apply "$RETAIL" '{"loan_type":"vehicle","amount_requested":50000,"tenure_months":12,"monthly_income":40000,"employment_type":"salaried","purpose":"APITEST"}'
+ck "a vehicle loan is refused" 422 "$CODE"
+
 print "\n-- KYC verification desk --"
 call GET /admin/kyc-pending "$STAFF"; ck "a teller can open the KYC queue" 200 "$CODE"
 call GET /kyc/documents/queue "$STAFF"; ck "and the document review queue" 200 "$CODE"

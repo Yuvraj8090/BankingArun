@@ -29,7 +29,7 @@ const NAV_GROUPS = [
 const TOP_LINKS = [
   ['Home', '/', 'public-nav-home'],
   ['Rates & Charges', '/rates', 'public-nav-rates'],
-  ['Branch & ATM', '/branches', 'public-nav-branches']
+  ['Branches', '/branches', 'public-nav-branches']
 ];
 
 const linkClass = ({ isActive }) =>

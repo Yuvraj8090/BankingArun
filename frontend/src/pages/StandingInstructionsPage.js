@@ -65,7 +65,7 @@ export default function StandingInstructionsPage() {
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] flex items-center justify-center"><Repeat className="w-5 h-5 text-slate-900" /></div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">Standing Instructions</h1>
-            <p className="text-xs text-slate-500">Automate rent, SIPs, EMIs and insurance premiums — pause, resume or edit anytime</p>
+            <p className="text-xs text-slate-500">Automate rent, loan EMIs and regular payments to members — pause, resume or edit anytime</p>
           </div>
         </div>
         <button data-testid="new-si-btn" onClick={() => { setEditId(null); setShowModal(true); }}

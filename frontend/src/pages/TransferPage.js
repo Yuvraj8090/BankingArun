@@ -7,9 +7,15 @@ import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
 import { txnMode, showsDetail } from '../utils/format';
+import { useAuth } from '../context/AuthContext';
 
 export default function TransferPage() {
   const { currentTheme } = useBankTheme();
+  // Without the payment-systems authorisation every transfer is a book entry
+  // between member accounts, so the page offers only that: no IMPS/NEFT/RTGS
+  // modes, no IFSC, no UPI, no bulk payout (see modules/compliance.php).
+  const { features } = useAuth();
+  const outside = Array.isArray(features) && features.includes('payment_systems');
   const [activeSubTab, setActiveSubTab] = useState('single'); // single, upi, bulk, scheduled
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -69,7 +75,7 @@ export default function TransferPage() {
         beneficiary_ifsc: ifsc,
         transfer_type: activeSubTab === 'upi' ? 'UPI' : transferType,
         amount: parseFloat(amount),
-        remarks: remarks || (activeSubTab === 'upi' ? 'UPI Payment' : `${transferType} Transfer`),
+        remarks: remarks || (activeSubTab === 'upi' ? 'UPI Payment' : outside ? `${transferType} Transfer` : 'Member transfer'),
         transaction_password: txnPwd,
         is_scheduled: isScheduled,
         schedule_date: isScheduled ? scheduleDate : null
@@ -145,15 +151,16 @@ export default function TransferPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-2xl shadow-xl">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            Fund Transfers & Corporate Payout Hub
+            {outside ? 'Fund Transfers' : 'Pay a Member'}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            IMPS (24x7 Instant) | NEFT (Batch Settlement) | RTGS (High Value) | UPI Integration
+            {outside ? 'IMPS | NEFT | RTGS | UPI'
+              : 'Transfers between member accounts settle instantly on our own books. Payments to other banks are not offered.'}
           </p>
         </div>
 
         {/* Transfer Subtabs */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white border border-slate-200 text-xs">
+        {outside && <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white border border-slate-200 text-xs">
           <button
             data-testid="subtab-single-transfer"
             onClick={() => setActiveSubTab('single')}
@@ -179,9 +186,9 @@ export default function TransferPage() {
               activeSubTab === 'bulk' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            Corporate Bulk Payout
+            Bulk Payout
           </button>
-        </div>
+        </div>}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -192,7 +199,7 @@ export default function TransferPage() {
           {activeSubTab === 'single' && (
             <form onSubmit={handleSingleTransfer} className="space-y-4 text-xs">
               <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">
-                <span>Inter-Bank & Intra-Bank Transfer</span>
+                <span>{outside ? 'Inter-Bank & Intra-Bank Transfer' : 'Transfer to a member account'}</span>
                 <span className="text-emerald-700 text-[11px] font-mono">256-Bit Encrypted UTR</span>
               </h2>
 
@@ -213,6 +220,7 @@ export default function TransferPage() {
                   </select>
                 </div>
 
+                {outside && (
                 <div>
                   <label className="block text-slate-500 mb-1">Payment Mode</label>
                   <select
@@ -226,6 +234,7 @@ export default function TransferPage() {
                     <option value="RTGS">RTGS (Real Time - Min ₹2 Lakh)</option>
                   </select>
                 </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -257,6 +266,7 @@ export default function TransferPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {outside && (
                 <div>
                   <label className="block text-slate-500 mb-1">Beneficiary Bank IFSC Code</label>
                   <input
@@ -269,6 +279,7 @@ export default function TransferPage() {
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono uppercase"
                   />
                 </div>
+                )}
 
                 <div>
                   <label className="block text-slate-500 mb-1">Amount to Transfer (₹)</label>
@@ -292,7 +303,7 @@ export default function TransferPage() {
                   type="text"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="e.g. Monthly Rent / Supplier Invoice #98"
+                  placeholder="e.g. Monthly rent"
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900"
                 />
               </div>

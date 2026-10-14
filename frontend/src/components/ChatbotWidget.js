@@ -11,8 +11,8 @@ export default function ChatbotWidget() {
   const quickPrompts = [
     "What are current FD interest rates?",
     "Where is the Chhutmalpur branch?",
-    "What are the IMPS & UPI transfer limits?",
-    "How to hotlist or block my debit card?"
+    "How do I pay another member?",
+    "What can I take a loan against?"
   ];
 
   const handleSend = async (textToSend) => {

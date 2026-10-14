@@ -25,7 +25,7 @@ export default function BankOwnerPanel() {
             <p className="text-xs text-slate-500">Enterprise-wide view · Policy control · Approvals</p>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded bg-white text-amber-700 text-[10px] font-bold">BANK OWNER</span>
+        <span className="px-2.5 py-1 rounded bg-white text-amber-700 text-[10px] font-bold">DIRECTOR</span>
       </div>
 
       {/* KPI Grid */}
@@ -84,8 +84,6 @@ export default function BankOwnerPanel() {
                   <td className="p-3">{b.name}<div className="text-[10px] text-slate-500">{b.address}</div></td>
                   <td className="p-3 font-mono">{b.code}</td>
                   <td className="p-3 text-[11px] text-slate-600">
-                    {b.has_atm && <span className="mr-2">ATM</span>}
-                    {b.has_cdm && <span className="mr-2">CDM</span>}
                     {b.has_locker && <span>Locker</span>}
                   </td>
                 </tr>
