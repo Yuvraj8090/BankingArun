@@ -471,6 +471,13 @@ ck "the introducer is paid nothing" "$BAL_BEFORE" "$(Q "SELECT balance FROM acco
 ck "nor is the new member" "0.00" "$(Q "SELECT balance FROM accounts WHERE account_number='AJSP0APITEST1'")"
 ck "no referral bonus transaction exists" "0" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='REFERRAL_BONUS' AND account_number IN ('$RETAIL_ACC','AJSP0APITEST1')")"
 
+print "\n-- statutory checks come from the books --"
+call GET /admin/rbi-reports "$OWNER"; ck "the compliance report loads" 200 "$CODE"
+hasnt "no typed-in NOF figure" "$BODY" "25.00 lakh"
+hasnt "no typed-in ratio" "$BODY" "1:18"
+call GET /panel/collection "$OWNER"
+hasnt "no made-up recovery target" "$BODY" "recovery_target_month"
+
 print "\n-- KYC verification desk --"
 call GET /admin/kyc-pending "$STAFF"; ck "a teller can open the KYC queue" 200 "$CODE"
 call GET /kyc/documents/queue "$STAFF"; ck "and the document review queue" 200 "$CODE"

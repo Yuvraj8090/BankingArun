@@ -72,8 +72,9 @@ function route_panel_collection(array $d): void
         'kpis' => ['total_cases' => (int)scalar('SELECT COUNT(*) FROM collection_cases'),
             'total_outstanding' => (float)scalar('SELECT COALESCE(SUM(outstanding), 0) FROM collection_cases'),
             'npa_risk_count' => (int)scalar("SELECT COUNT(*) FROM collection_cases
-                WHERE status = 'npa_risk' OR dpd_days >= 90"),
-            'recovery_target_month' => 12500000, 'recovered_month' => 4820000],
+                WHERE status = 'npa_risk' OR dpd_days >= 90")],
+        // No recovery target or recovered-this-month figure: nothing records a loan
+        // recovery yet, and the two numbers that used to sit here were typed in.
         'cases' => out_all($cases),
         'pagination' => $meta,
     ]);
@@ -321,6 +322,29 @@ function route_kyc_verify_and_fund(array $d): void
             : "KYC verified and {$terms['scheme_name']} booked. Maturity value: " . rupees($terms['maturity_amount'])]);
 }
 
+// Nidhi Rules, 2014: net owned funds of at least ₹20 lakh, deposits no more than 20
+// times NOF, and deposits from members only. NOF is not on this ledger, so the
+// director enters it in Business Parameters from the audited balance sheet.
+// ponytail: the 10% unencumbered term deposit rule needs the treasury book, which
+// this system does not keep, so it is reported as not tracked rather than guessed.
+function nidhi_statutory_checks(): array
+{
+    $nof = param_value('net_owned_funds', 0.0);
+    $deposits = (float)scalar("SELECT COALESCE(SUM(principal_amount), 0) FROM deposits WHERE status = 'active'")
+        + (float)scalar('SELECT COALESCE(SUM(balance), 0) FROM accounts');
+    $nonMembers = (int)scalar("SELECT COUNT(*) FROM deposits d WHERE d.status = 'active' AND NOT EXISTS
+        (SELECT 1 FROM member_register m WHERE m.user_id = d.user_id AND m.status = 'active')");
+    return [
+        'net_owned_funds' => $nof <= 0 ? 'Not entered. Set it in Business Parameters'
+            : rupees($nof) . ($nof < 2000000 ? ' (BELOW the ₹20 lakh minimum)' : ' (minimum ₹20 lakh)'),
+        'nof_to_deposits_ratio' => $nof <= 0 ? 'Needs net owned funds'
+            : sprintf('1:%.1f', $deposits / $nof) . ($deposits > 20 * $nof ? ' (ABOVE the 1:20 cap)' : ' (cap 1:20)'),
+        'unencumbered_term_deposits' => 'Not tracked here. Keep 10% of deposits in unencumbered term deposits',
+        'member_only_deposits' => $nonMembers === 0 ? 'Every active deposit belongs to a member on the register'
+            : "$nonMembers active deposit(s) held by people not on the member register",
+    ];
+}
+
 function route_rbi_reports(array $d): void
 {
     staff_user(ADMIN_ROLES);
@@ -334,12 +358,9 @@ function route_rbi_reports(array $d): void
         'guideline' => 'Prevention of Money-Laundering Act, 2002 (Section 12) & Nidhi Rules, 2014 (MCA)',
         'cash_transaction_report_ctr' => ['title' => 'Cash / High-Value Transaction Report (CTR)', 'count' => count($ctr), 'records' => $ctr],
         'suspicious_transaction_report_str' => ['title' => 'Suspicious Transaction Report (STR)', 'count' => count($str), 'records' => $str],
-        'statutory_compliance' => [
-            'net_owned_funds' => '₹25.00 lakh (Nidhi Rules minimum ₹20 lakh)',
-            'nof_to_deposits_ratio' => '1:18 (Nidhi Rules cap 1:20)',
-            'unencumbered_term_deposits' => '11.2% of outstanding deposits (minimum 10%)',
-            'member_only_deposits' => 'Compliant - deposits accepted from members only',
-        ],
+        // Worked out from the books, not typed in. These lines used to be fixed strings
+        // saying "Compliant" whatever the data said.
+        'statutory_compliance' => nidhi_statutory_checks(),
     ]);
 }
 

@@ -95,9 +95,16 @@ officer's "Applicant KYC" item is removed. Also fixed: Reject used to save the s
 reason "Incomplete document signature" and now asks for the real one, and the
 approve-and-fund plan list no longer offers over-cap plans.
 
-### 5. Collections dashboard shows fake numbers  ⬜
+### 5. Collections dashboard shows fake numbers  ✅ done 15 Oct
 `modules/staff.php:76` hardcodes the recovery target ₹1,25,00,000 and the
 recovered amount ₹48,20,000. Fix: compute them from `collection_cases` or remove the tile.
+
+**Done:** nothing records loan recoveries, so the tile is removed. The same
+problem was in the branch manager's **statutory compliance** box: "NOF ₹25 lakh",
+"1:18", "11.2%" and "Compliant" were all typed in. `nidhi_statutory_checks()` now
+works them out from the books. NOF comes from a new **Net owned funds** Business
+Parameter (enter it from the audited balance sheet). The ratio and the
+members-only check are computed. The 10% unencumbered rule says "not tracked".
 
 ### 6. Corporate role does not fit a Nidhi  ⬜
 Nidhi members must be individuals, and current accounts are prohibited. The

@@ -576,6 +576,8 @@ INSERT IGNORE INTO system_parameters
     'Flat fee charged in addition to the draft amount when a demand draft is issued.'),
 ('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
     'The highest online/ATM limit a member can set on a debit card.'),
+('param-net-owned-funds', 'net_owned_funds', 'Net owned funds', 'limits', 0.00, '₹', 0, 10000000000,
+    'Paid-up equity plus free reserves, less accumulated losses and intangibles, from the latest audited balance sheet. Drives the Nidhi Rules checks on the branch dashboard: at least ₹20 lakh, and deposits no more than 20 times this figure.'),
 ('param-tds-daily-interest', 'tds_rate_daily_interest', 'TDS on daily-interest payout', 'fees', 10.00, '%', 0, 30,
     'Deducted under Section 194A from a simple daily-interest plan''s payout each time it releases (threshold reached, or at maturity). Does not apply to FD/RD/MIS interest.'),
 ('param-premature-penalty', 'premature_withdrawal_penalty_pct', 'Premature withdrawal penalty', 'fees', 1.00, '%', 0, 10,

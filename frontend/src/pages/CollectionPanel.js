@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Wallet, AlertTriangle, Bell, FileWarning, Handshake, Phone, RefreshCw, TrendingUp, Target } from 'lucide-react';
+import { Wallet, AlertTriangle, Bell, FileWarning, Handshake, Phone, RefreshCw, TrendingUp } from 'lucide-react';
 import { api } from '../services/api';
 import Pagination from '../components/Pagination';
 import { toast } from 'sonner';
@@ -31,7 +31,6 @@ export default function CollectionPanel() {
   if (!data) return <div className="p-10 flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" /> Loading collection cases…</div>;
 
   const k = data.kpis;
-  const progress = k.recovery_target_month ? Math.round((k.recovered_month / k.recovery_target_month) * 100) : 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -42,21 +41,10 @@ export default function CollectionPanel() {
         <p className="text-xs text-slate-500 mt-1">Loan recovery · Follow-ups · Settlement negotiation · NPA monitoring</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Kpi label="Total Cases" value={k.total_cases} icon={FileWarning} />
         <Kpi label="Outstanding" value={`₹${k.total_outstanding.toLocaleString('en-IN')}`} icon={Wallet} color="text-[#c8102e]" />
         <Kpi label="NPA Risk (DPD ≥ 90)" value={k.npa_risk_count} icon={AlertTriangle} color="text-[#c8102e]" />
-        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Target className="w-3.5 h-3.5 text-emerald-700" />
-            <p className="text-[11px] text-slate-600">Monthly Recovery Target</p>
-          </div>
-          <p className="text-sm font-bold text-slate-900 mt-2">₹{Number(k.recovered_month).toLocaleString('en-IN')} / ₹{Number(k.recovery_target_month).toLocaleString('en-IN')}</p>
-          <div className="w-full h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
-            <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, progress)}%` }}></div>
-          </div>
-          <p className="text-[10px] text-emerald-700 font-semibold mt-1">{progress}% achieved</p>
-        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
