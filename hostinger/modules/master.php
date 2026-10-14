@@ -1048,6 +1048,7 @@ const CRON_STALE_HOURS = 26;
 const CRON_JOB_LABELS = [
     'standing_instructions' => 'Standing instructions',
     'scheduled_payments' => 'Scheduled transfers',
+    'cap_rerate' => 'Deposits brought down to the 12.5% cap',
     'deposit_interest' => 'Deposit interest (MIS monthly payouts)',
     'daily_interest' => 'Daily interest (daily-plan accruals and payouts)',
     'deposit_maturities' => 'Maturities',

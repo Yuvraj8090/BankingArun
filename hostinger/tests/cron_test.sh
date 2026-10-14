@@ -22,7 +22,7 @@ cleanup() {
      DELETE FROM scheduled_payments WHERE id LIKE 'crontest-%';
      DELETE FROM deposits WHERE deposit_number LIKE 'CRONTEST%';
      DELETE FROM schemes WHERE code LIKE 'CRONTEST%';
-     DELETE FROM audit_logs WHERE action IN ('SI_EXECUTED','SI_FAILED','SI_PAUSED','DEPOSIT_MATURED','SCHEDULED_TRANSFER_EXECUTED','SCHEDULED_TRANSFER_FAILED');
+     DELETE FROM audit_logs WHERE action IN ('SI_EXECUTED','SI_FAILED','SI_PAUSED','DEPOSIT_MATURED','SCHEDULED_TRANSFER_EXECUTED','SCHEDULED_TRANSFER_FAILED') OR (action='DEPOSIT_RERATED_TO_CAP' AND details LIKE '%CRONTEST%');
      UPDATE accounts SET balance=137800.00 WHERE account_number='$RETAIL_ACC';
      UPDATE accounts SET balance=1285000.00 WHERE account_number='$CORP_ACC';" >/dev/null
   if [[ -n "$CFG_BACKUP" ]]; then
@@ -51,29 +51,32 @@ INSERT INTO scheduled_payments (id,user_id,from_account_number,to_account_number
 INSERT INTO deposits (id,user_id,deposit_number,deposit_type,source_account,principal_amount,interest_rate,tenure_months,interest_payout,maturity_amount,maturity_date,status,created_at) VALUES
 ('crontest-dep-mat','retail-001','CRONTEST-MAT','fixed','$RETAIL_ACC',10000.00,7.25,12,'on_maturity',10725.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'active',DATE_SUB(NOW(),INTERVAL 13 MONTH)),
 ('crontest-dep-mon','retail-001','CRONTEST-MON','fixed','$RETAIL_ACC',120000.00,6.00,24,'monthly',134400.00,DATE_ADD(CURDATE(),INTERVAL 22 MONTH),'active',DATE_SUB(NOW(),INTERVAL 2 MONTH)),
-('crontest-dep-fut','retail-001','CRONTEST-FUT','fixed','$RETAIL_ACC',5000.00,7.00,12,'on_maturity',5350.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',NOW());
--- Simple daily-% plan (1%/day, ₹150 withdrawal threshold). Deposit A's
+('crontest-dep-fut','retail-001','CRONTEST-FUT','fixed','$RETAIL_ACC',5000.00,7.00,12,'on_maturity',5350.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',NOW()),
+-- Sold above the 12.5% Nidhi cap: one paying 30% a month-by-month, one that doubles in a year.
+('crontest-dep-over','retail-001','CRONTEST-OVER','fixed','$RETAIL_ACC',10000.00,30.00,60,'monthly',25000.00,DATE_ADD(CURDATE(),INTERVAL 58 MONTH),'active',DATE_SUB(NOW(),INTERVAL 2 MONTH)),
+('crontest-dep-overfd','retail-001','CRONTEST-OVERFD','fixed','$RETAIL_ACC',10000.00,100.00,12,'on_maturity',20000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 6 MONTH));
+-- Simple daily-% plan (0.02%/day = 7.3% a year: ₹10 a day on ₹50,000; ₹150 withdrawal threshold). Deposit A's
 -- accrued total stays under the threshold today (₹100 + ₹10 = ₹110), so it
 -- should only accrue. Deposit B's crosses it (₹145 + ₹10 = ₹155), so it
 -- should release in full and reset to zero.
 INSERT INTO schemes (id,code,name,scheme_type,tenure_months,principal_amount,total_deposit,maturity_amount,
     payout_type,daily_rate_percent,withdrawal_threshold,status) VALUES
-('crontest-scheme-daily','CRONTEST-DAILY','CRONTEST Daily Plan','fixed',12,1000.00,1000.00,1000.00,
-    'daily',1.000,150.00,'active');
+('crontest-scheme-daily','CRONTEST-DAILY','CRONTEST Daily Plan','fixed',12,50000.00,50000.00,50000.00,
+    'daily',0.020,150.00,'active');
 INSERT INTO deposits (id,user_id,deposit_number,deposit_type,scheme_code,source_account,principal_amount,
     interest_rate,tenure_months,interest_payout,maturity_amount,maturity_date,status,created_at,
     accrued_interest,last_payout_date) VALUES
-('crontest-dep-daily-a','retail-001','CRONTEST-DAILY-A','fixed','CRONTEST-DAILY','$RETAIL_ACC',1000.00,365.00,12,
-    'daily',1000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 1 MONTH),
+('crontest-dep-daily-a','retail-001','CRONTEST-DAILY-A','fixed','CRONTEST-DAILY','$RETAIL_ACC',50000.00,7.30,12,
+    'daily',50000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 1 MONTH),
     100.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY)),
-('crontest-dep-daily-b','retail-001','CRONTEST-DAILY-B','fixed','CRONTEST-DAILY','$RETAIL_ACC',1000.00,365.00,12,
-    'daily',1000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 1 MONTH),
+('crontest-dep-daily-b','retail-001','CRONTEST-DAILY-B','fixed','CRONTEST-DAILY','$RETAIL_ACC',50000.00,7.30,12,
+    'daily',50000.00,DATE_ADD(CURDATE(),INTERVAL 6 MONTH),'active',DATE_SUB(NOW(),INTERVAL 1 MONTH),
     145.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY)),
 -- Matures today with ₹50 still accrued below the threshold -- that leftover
 -- rides out with the principal, net of the same 10% TDS a normal release
--- would deduct (₹1000 + ₹45 = ₹1045).
-('crontest-dep-daily-c','retail-001','CRONTEST-DAILY-C','fixed','CRONTEST-DAILY','$RETAIL_ACC',1000.00,365.00,12,
-    'daily',1000.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'active',DATE_SUB(NOW(),INTERVAL 13 MONTH),
+-- would deduct (₹50000 + ₹45 = ₹50045).
+('crontest-dep-daily-c','retail-001','CRONTEST-DAILY-C','fixed','CRONTEST-DAILY','$RETAIL_ACC',50000.00,7.30,12,
+    'daily',50000.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'active',DATE_SUB(NOW(),INTERVAL 13 MONTH),
     50.00,DATE_SUB(CURDATE(),INTERVAL 1 DAY));
 SQL
 
@@ -111,6 +114,16 @@ ck "monthly interest = 120000 x 6%/12" "600.00" "$(Q "SELECT amount FROM transac
 ck "monthly deposit stays active" "active" "$(Q "SELECT status FROM deposits WHERE deposit_number='CRONTEST-MON'")"
 ck "undue deposit untouched" "active|0.00" "$(Q "SELECT CONCAT_WS('|',status,interest_paid) FROM deposits WHERE deposit_number='CRONTEST-FUT'")"
 
+print "\n-- deposits above the 12.5% cap --"
+ck "monthly payout re-rated to the cap" "12.50" "$(Q "SELECT interest_rate FROM deposits WHERE deposit_number='CRONTEST-OVER'")"
+ck "and this month's interest is paid at it, not at 30%" "104.17" \
+  "$(Q "SELECT amount FROM transactions WHERE ref_number LIKE 'INT-CRONTEST-OVER-%'")"
+ck "pay-at-maturity deposit gets the cap-compliant maturity" "12.50|11250.00" \
+  "$(Q "SELECT CONCAT_WS('|',interest_rate,maturity_amount) FROM deposits WHERE deposit_number='CRONTEST-OVERFD'")"
+ck "a deposit inside the cap is left alone" "6.00|134400.00" \
+  "$(Q "SELECT CONCAT_WS('|',interest_rate,maturity_amount) FROM deposits WHERE deposit_number='CRONTEST-MON'")"
+ck "each re-rate is audited" "2" "$(Q "SELECT COUNT(*) FROM audit_logs WHERE action='DEPOSIT_RERATED_TO_CAP' AND details LIKE '%CRONTEST-OVER%'")"
+
 print "\n-- daily interest accrual --"
 ck "under threshold: accrues, no payout" "110.00|active" \
   "$(Q "SELECT CONCAT_WS('|',accrued_interest,status) FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"
@@ -123,18 +136,18 @@ ck "over threshold: net of TDS credited, not the gross total" "139.50" \
   "$(Q "SELECT amount FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-B%'")"
 ck "matures with leftover accrued interest: gross tracked, TDS withheld" "matured|50.00|5.00" \
   "$(Q "SELECT CONCAT_WS('|',status,interest_paid,tds_deducted) FROM deposits WHERE deposit_number='CRONTEST-DAILY-C'")"
-ck "matures with leftover: principal + net interest paid out" "1045.00" \
+ck "matures with leftover: principal + net interest paid out" "50045.00" \
   "$(Q "SELECT amount FROM transactions WHERE ref_number='MAT-CRONTEST-DAILY-C'")"
 
 print "\n-- balance reconciles --"
 # out: 100 daily + 300 clamp + 250 scheduled + 400 external scheduled = 1050
-# in: 10725 maturity + 600 interest + 139.50 daily interest released (155 - 10% TDS)
-#     + 1045 daily-plan maturity (1000 principal + 50 accrued - 10% TDS) = 12509.50
-ck "balance = 137800 - 1050 + 12509.50" "149259.50" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+# in: 10725 maturity + 600 interest + 104.17 re-rated interest + 139.50 daily interest released
+#     (155 - 10% TDS) + 50045 daily-plan maturity (50000 principal + 50 accrued - 10% TDS) = 61613.67
+ck "balance = 137800 - 1050 + 61613.67" "198363.67" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 
 print "\n-- a second run the same day is a no-op --"
 CRON >/dev/null 2>&1
-ck "nothing paid twice" "149259.50" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "nothing paid twice" "198363.67" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 ck "maturity credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number='MAT-CRONTEST-MAT'")"
 ck "interest credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='DEPOSIT_INTEREST' AND ref_number LIKE 'INT-CRONTEST-MON%'")"
 ck "daily interest not accrued twice" "110.00" "$(Q "SELECT accrued_interest FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"

@@ -162,6 +162,58 @@ function credit(string $accountNumber, float $amount, string $mode, string $coun
 // Monthly-payout deposits pay simple interest on the principal each month; every
 // deposit pays out its maturity value on or after its maturity date. Both are
 // idempotent: a deposit is paid at most once per month and matures exactly once.
+// Deposits sold on a plan above the Nidhi Rules' 12.5% ceiling are brought down to
+// it. Nothing already credited is taken back. A daily or monthly payout deposit
+// earns from its stored interest_rate, so lowering that rate makes every credit
+// from today on run at the cap. A pay-at-maturity deposit has had nothing
+// credited yet, so its maturity figure is recomputed at the cap for its term.
+// Runs every night ahead of the interest jobs, so a deposit that slips in above
+// the cap any other way is caught the next morning, not at maturity.
+function run_cap_rerate(string $today, bool $dryRun, bool $verbose): int
+{
+    global $pdo;
+    $done = 0;
+    $over = rows("SELECT d.*, s.scheme_type, s.contribution_months FROM deposits d
+        LEFT JOIN schemes s ON s.code = d.scheme_code
+        WHERE d.status = 'active' AND d.interest_rate > ?", [NIDHI_MAX_DEPOSIT_RATE]);
+    foreach ($over as $d) {
+        $update = ['interest_rate' => NIDHI_MAX_DEPOSIT_RATE];
+        if (!in_array($d['interest_payout'], ['daily', 'monthly'], true)) {
+            $terms = ['tenure_months' => $d['tenure_months'], 'total_deposit' => $d['principal_amount'],
+                'maturity_amount' => $d['maturity_amount'], 'payout_type' => 'maturity',
+                'scheme_type' => $d['scheme_type'] ?? $d['deposit_type'],
+                'contribution_months' => $d['contribution_months']];
+            $capped = cap_compliant_maturity($terms);
+            if ($capped !== null && $capped['maturity_amount'] < (float)$d['maturity_amount']) {
+                $update['maturity_amount'] = $capped['maturity_amount'];
+            }
+        } elseif ($d['interest_payout'] === 'monthly') {
+            // Shown to the member as "total received by maturity": what is already paid, plus the rest at the cap.
+            $left = (new DateTimeImmutable($today))->diff(new DateTimeImmutable($d['maturity_date']));
+            $monthsLeft = $left->invert ? 0 : $left->y * 12 + $left->m;
+            $update['maturity_amount'] = round((float)$d['principal_amount'] + (float)$d['interest_paid']
+                + (float)$d['principal_amount'] * NIDHI_MAX_DEPOSIT_RATE / 100 / 12 * $monthsLeft, 2);
+        }
+        $label = "Deposit {$d['deposit_number']} re-rated from {$d['interest_rate']}% to " . NIDHI_MAX_DEPOSIT_RATE . '%'
+            . (isset($update['maturity_amount']) ? ', maturity ' . rupees((float)$update['maturity_amount']) : '');
+        $done++;
+        if ($dryRun) {
+            say("  would set  $label");
+            continue;
+        }
+        $pdo->prepare('UPDATE deposits SET interest_rate = ?, maturity_amount = COALESCE(?, maturity_amount)
+            WHERE id = ? AND status = ?')
+            ->execute([$update['interest_rate'], $update['maturity_amount'] ?? null, $d['id'], 'active']);
+        if ($owner = row('SELECT * FROM users WHERE id = ?', [$d['user_id']])) {
+            audit($owner, 'DEPOSIT_RERATED_TO_CAP', $label);
+        }
+        if ($verbose) {
+            say("  re-rated   $label");
+        }
+    }
+    return $done;
+}
+
 function run_deposit_interest(string $today, bool $dryRun, bool $verbose): array
 {
     global $pdo;
@@ -580,6 +632,7 @@ $pdo->prepare('INSERT INTO cron_runs (id, dry_run, status) VALUES (?, ?, ?)')
 try {
     [$siDone, $siFailed] = run_standing_instructions($today, $dryRun, $verbose);
     [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
+    $capped = run_cap_rerate($today, $dryRun, $verbose);
     [$intDone, $intFailed] = run_deposit_interest($today, $dryRun, $verbose);
     [$dailyAccrued, $dailyReleased, $dailyFailed] = run_daily_interest_accrual($today, $dryRun, $verbose);
     [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
@@ -601,6 +654,7 @@ try {
 scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
 say("Standing instructions: $siDone run, $siFailed failed. "
     . "Scheduled transfers: $payDone run, $payFailed failed. "
+    . "Re-rated to the 12.5% cap: $capped. "
     . "Deposit interest: $intDone paid, $intFailed failed. "
     . "Daily interest: $dailyAccrued accrued, $dailyReleased released, $dailyFailed failed. "
     . "Maturities: $matDone paid, $matFailed failed. "
@@ -613,6 +667,7 @@ $pdo->prepare('UPDATE cron_runs SET finished_at = NOW(), status = ?, jobs = ? WH
     ->execute([$problems > 0 ? 'attention' : 'ok', json_encode([
         'standing_instructions' => ['done' => $siDone, 'failed' => $siFailed],
         'scheduled_payments' => ['done' => $payDone, 'failed' => $payFailed],
+        'cap_rerate' => ['done' => $capped, 'failed' => 0],
         'deposit_interest' => ['done' => $intDone, 'failed' => $intFailed],
         'daily_interest' => ['accrued' => $dailyAccrued, 'released' => $dailyReleased, 'failed' => $dailyFailed],
         'deposit_maturities' => ['done' => $matDone, 'failed' => $matFailed],
