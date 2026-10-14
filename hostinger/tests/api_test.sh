@@ -364,6 +364,10 @@ hasnt "a gated feature is left out of the tour" "$BODY" "tab-cards"
 call GET /tutorial/state "$OWNER"
 has "the owner gets their own wording" "$BODY" "the management console"
 has "the owner tour covers the security centre" "$BODY" "tab-security-center"
+has "every tour points at the page guide" "$BODY" "page-guide-btn"
+COLL=$(login collections@ajspay.in "$(sed -n "/collections@ajspay.in/,/Password/p" "$AJSPAY_ROOT/../memory/test_credentials.md" | grep -m1 -o 'Password: `[^`]*`' | cut -d'`' -f2)")
+call GET /tutorial/state "$COLL"
+has "collection agents get a real tour" "$BODY" "tab-collection"
 call POST /tutorial/progress "$RETAIL" '{"step":3}'
 ck "progress is saved" "in_progress|3" "$(Q "SELECT CONCAT_WS('|',tutorial_status,tutorial_step) FROM users WHERE email='rahul.sharma@example.com'")"
 call GET /tutorial/state "$RETAIL"

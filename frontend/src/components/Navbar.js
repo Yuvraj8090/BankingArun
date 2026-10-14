@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Compass} from 'lucide-react';
+  Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Compass, HelpCircle } from 'lucide-react';
 import Brand from './Brand';
 import GlobalSearch from './GlobalSearch';
+import { GuideButton } from './HelpGuide';
 import { ROLE_HOME } from '../navigation';
 
 const ROLE_BADGE = {
@@ -52,6 +53,7 @@ export default function Navbar({ onNavigate, activeTab }) {
 
           {/* Right */}
           <div className="flex items-center gap-2">
+            {user && activeTab && <GuideButton tab={activeTab} role={user.role} onOpenHelp={() => onNavigate('help')} />}
             <div className="relative">
               <button
                 data-testid="notification-bell-btn"
@@ -127,6 +129,13 @@ export default function Navbar({ onNavigate, activeTab }) {
                         className="w-full text-left px-3 py-2 rounded hover:bg-slate-50 text-slate-700 text-xs flex items-center gap-2"
                       >
                         <Compass className="w-3.5 h-3.5 text-[#0b3b8c]" /> Restart the tour
+                      </button>
+                      <button
+                        data-testid="profile-help-btn"
+                        onClick={() => { onNavigate('help'); setShowMenu(false); }}
+                        className="w-full text-left px-3 py-2 rounded hover:bg-slate-50 text-slate-700 text-xs flex items-center gap-2"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5 text-[#0b3b8c]" /> Help Centre
                       </button>
                     </div>
                     <div className="pt-1 border-t border-slate-100">

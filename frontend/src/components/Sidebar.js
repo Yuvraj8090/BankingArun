@@ -1,5 +1,5 @@
 import React from 'react';
-import { HeadphonesIcon } from 'lucide-react';
+import { HeadphonesIcon, HelpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { navFor, ROLE_LABEL } from '../navigation';
 
@@ -54,6 +54,10 @@ export default function Sidebar({ activeTab, onSelectTab }) {
         </div>
         <p className="text-slate-600">Helpline: <strong className="text-slate-900">9105015464</strong></p>
         <p className="text-slate-600">Cyber Fraud: <strong className="text-[#c8102e]">1930</strong></p>
+        <button type="button" data-testid="sidebar-help-btn" onClick={() => onSelectTab('help')}
+          className="flex items-center gap-1.5 text-[#0b3b8c] font-semibold hover:underline">
+          <HelpCircle className="w-3.5 h-3.5" /> Help Centre &amp; guides
+        </button>
         <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
           <span>Session Active</span>
           <span className="flex items-center gap-1 text-emerald-700">

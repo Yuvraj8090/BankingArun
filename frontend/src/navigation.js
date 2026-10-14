@@ -107,7 +107,7 @@ export const NAV_BY_ROLE = {
 };
 
 // Reachable from the profile menu rather than the sidebar.
-export const ALWAYS_ALLOWED = ['kyc', 'security'];
+export const ALWAYS_ALLOWED = ['kyc', 'security', 'help'];
 
 export const ROLE_HOME = {
   retail: 'dashboard', corporate: 'dashboard', admin: 'admin', branch_manager: 'admin',

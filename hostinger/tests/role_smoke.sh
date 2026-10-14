@@ -47,6 +47,20 @@ NAV=$(node -e '
   for (const [role, items] of Object.entries(nav)) console.log(role + " " + items.filter(i => !i.requires).map(i => i.id).join(" "));
 ' "$ROOT/../frontend/src/navigation.js")
 
+# Every menu page must have a guide (frontend/src/data/help.js), or the Guide button shows nothing.
+MISSING=$(node -e '
+  const fs = require("fs");
+  const src = fs.readFileSync(process.argv[1], "utf8").replace(/export const /g, "const ");
+  const guideFor = new Function(src + "; return guideFor;")();
+  const out = [];
+  for (const line of process.argv[2].split("\n")) {
+    const [role, ...tabs] = line.split(" ");
+    for (const t of tabs.concat("kyc")) if (t && !guideFor(t, role)) out.push(role + ":" + t);
+  }
+  console.log(out.join(" "));
+' "$ROOT/../frontend/src/data/help.js" "$NAV")
+if [[ -z $MISSING ]]; then ok; else bad "pages without a guide: $MISSING"; fi
+
 # email password role
 USERS=(
   rahul.sharma@example.com Banking@123 retail

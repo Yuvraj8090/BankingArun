@@ -24,6 +24,7 @@ import LoansPage from './pages/LoansPage';
 import KycAccountPage from './pages/KycAccountPage';
 import BranchLocatorPage from './pages/BranchLocatorPage';
 import AdminPortal, { PendingKycPanel } from './pages/AdminPortal';
+import { HelpCentre, PublicHelpPage } from './components/HelpGuide';
 import BankOwnerPanel from './pages/BankOwnerPanel';
 import StaffPanel from './pages/StaffPanel';
 import CollectionPanel from './pages/CollectionPanel';
@@ -199,7 +200,8 @@ function AppShell() {
     grievance: <GrievancePage />,
     reports: <ReportsPage />,
     'security-center': <SecurityCenterPage />,
-    'support-view': <SupportViewPage />
+    'support-view': <SupportViewPage />,
+    help: <HelpCentre role={user.role} features={features} />
   };
 
   return (
@@ -254,8 +256,9 @@ function PublicFooter() {
     {
       heading: 'Support',
       links: [
+        ['Help', '/help'],
         ['Rates & Charges', '/rates'],
-        ['Branch & ATM Locator', '/branches'],
+        ['Branch Locator', '/branches'],
         ['Grievance Redressal', '/support/grievance-redressal']
       ]
     }
@@ -316,6 +319,7 @@ export default function App() {
             <Route element={<PublicLayout />}>
               <Route path="/" element={<HomeRoute />} />
               <Route path="/rates" element={<PublicRatesPage />} />
+              <Route path="/help" element={<PublicHelpPage />} />
               <Route path="/branches" element={<div className="pt-6 bg-slate-50"><BranchLocatorPage /></div>} />
               <Route path="/:group" element={<GroupPage />} />
               <Route path="/:group/:slug" element={<ProductPage />} />

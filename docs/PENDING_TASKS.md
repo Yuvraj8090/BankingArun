@@ -139,7 +139,7 @@ to a tab that does not exist.
 
 ## Medium: guides and help (your request)
 
-### 8. Help Centre and per-page guide for every role  ⬜
+### 8. Help Centre and per-page guide for every role  ✅ done 15 Oct
 What exists now: a first-sign-in tour (`modules/tutorial.php`) for members,
 staff and the director. **Loan officers and collection agents get an empty
 tour** (welcome and finish only). There is **no Help page** and no per-page
@@ -149,6 +149,19 @@ help. Plan:
   reusing the existing tour engine
 - Tours for loan officer and collections
 - A public `/help` page with member FAQs (before sign-in)
+
+**Done:**
+- **Guide button** in the top bar on every page. It opens that page's guide: what
+  the page is for, the steps, and what each form field wants.
+- **Help Centre** at `/app/help`, from the profile menu and the sidebar. It holds the
+  guide for every page your role can open, plus FAQs for members, staff and the
+  Director.
+- **Public `/help`**, with membership FAQs, linked in the footer.
+- **Tours** for loan officers and collection agents. Every tour now ends on the
+  Guide button.
+
+All the content lives in `frontend/src/data/help.js`. `role_smoke.sh` fails if
+any menu page has no guide.
 
 ## Low: cleanup
 

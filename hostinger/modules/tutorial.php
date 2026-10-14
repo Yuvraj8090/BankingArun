@@ -26,6 +26,10 @@ function tutorial_steps(string $role): array
         'body' => 'A short tour — about a minute. You can skip it now and restart it any time from your '
             . 'profile menu.',
     ];
+    // Every tour ends by pointing at the per-page guide, so nobody has to remember the tour.
+    $guide = ['anchor' => 'page-guide-btn', 'title' => 'Help on every page',
+        'body' => 'Not sure what a page or a form field is for? Click Guide in the top bar. The Help Centre '
+            . 'in your profile menu has every page and the common questions.'];
     $finish = [
         'anchor' => null,
         'title' => 'That is the tour',
@@ -88,12 +92,37 @@ function tutorial_steps(string $role): array
         $finish,
     ];
 
+    $loanTour = [
+        $welcome,
+        ['anchor' => 'tab-loan-dept', 'title' => 'The loan pipeline',
+         'body' => 'Every application with its EMI, the applicant\'s income and a risk grade. We lend against gold '
+            . 'or property only, so check the security before you decide.'],
+        ['anchor' => 'tab-reports', 'title' => 'Reports',
+         'body' => 'The loan register and the applications list, filtered and exported. Exports are audited.'],
+        ['anchor' => 'tab-loans', 'title' => 'EMI calculator',
+         'body' => 'The same calculator members see, for quoting an EMI across the desk.'],
+        $finish,
+    ];
+
+    $collectionTour = [
+        $welcome,
+        ['anchor' => 'tab-collection', 'title' => 'Your cases',
+         'body' => 'Loans in arrears, worst first by days past due. Record every follow-up on the case, so the '
+            . 'next person knows what was said.'],
+        ['anchor' => 'tab-locator', 'title' => 'Branches',
+         'body' => 'Addresses and timings, for telling a borrower where to pay.'],
+        $finish,
+    ];
+
     $tour = match ($role) {
         'retail', 'corporate' => $member,
         'bank_owner' => $ownerTour,
         'admin', 'branch_manager', 'staff' => $staffTour,
+        'loan_officer' => $loanTour,
+        'collection_agent' => $collectionTour,
         default => [$welcome, $finish],
     };
+    array_splice($tour, -1, 0, [$guide]);
 
     // Drop any step whose feature is switched off, so the tour never points at
     // something that is not on the screen.
