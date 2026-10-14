@@ -295,16 +295,16 @@ const ASSISTANT_INTENTS = [
     'balance' => ['balance', 'how much', 'available', 'funds', 'paisa', 'kitna'],
     'transactions' => ['transaction', 'statement', 'history', 'last payment', 'recent', 'spent', 'debited', 'credited'],
     'spend' => ['spend', 'spending', 'expense', 'outgoing', 'this month'],
-    'cards' => ['card', 'debit', 'atm', 'pin', 'hotlist', 'freeze', 'block'],
+    // Not Nidhi business: a Nidhi issues no cards and runs no UPI, cheques or investments.
+    'not_offered' => ['card', 'atm', 'hotlist', 'upi', 'vpa', 'qr', 'scan', 'cheque', 'check book', 'chequebook',
+        'demand draft', 'mutual fund', 'sip', 'insurance'],
     'deposits' => ['deposit', 'fd', 'fixed deposit', 'rd', 'recurring', 'maturity', 'matures'],
     'loans' => ['loan', 'emi', 'borrow', 'instalment', 'installment'],
     'standing' => ['standing instruction', 'auto pay', 'autopay', 'recurring payment', 'si '],
-    'upi' => ['upi', 'vpa', 'qr', 'scan'],
     'transfer_help' => ['transfer', 'send money', 'neft', 'imps', 'rtgs', 'limit'],
     'kyc' => ['kyc', 'aadhaar', 'pan', 'verify', 'document'],
     'ifsc' => ['ifsc', 'branch code', 'branch', 'address'],
     'rates' => ['rate', 'interest', 'scheme', 'yojana'],
-    'cheque' => ['cheque', 'check book', 'chequebook'],
     'security' => ['passkey', 'password', 'otp', 'secure', 'fraud', 'phishing'],
 ];
 
@@ -382,22 +382,6 @@ function assistant_answer(string $message, ?array $user): array
                 return ['reply' => $reply, 'intent' => $intent,
                     'suggestions' => ['Show my last 5 transactions', 'What is my balance?']];
 
-            case 'cards':
-                $cards = rows('SELECT card_number, card_type, network, status, is_virtual, online_limit, atm_limit
-                    FROM cards WHERE user_id = ? ORDER BY is_virtual DESC', [$user['id']]);
-                if ($cards === []) {
-                    break;
-                }
-                // Only the last four digits, never the full number, CVV or PIN.
-                $lines = array_map(fn($c) => sprintf('- %s %s ending %s — **%s** (online limit %s)',
-                    $c['network'], $c['is_virtual'] ? 'virtual' : 'physical',
-                    substr(str_replace(' ', '', $c['card_number']), -4), $c['status'],
-                    rupees((float)$c['online_limit'])), $cards);
-                return ['reply' => "Your cards:\n" . implode("\n", $lines)
-                    . "\n\nYou can freeze, hotlist or change limits under **Cards & UPI**. "
-                    . "If a card is lost, hotlist it — that cannot be undone — or call 1800 11 2211.",
-                    'intent' => $intent, 'suggestions' => ['How do I block my card?', 'What is my balance?']];
-
             case 'deposits':
                 $deposits = rows('SELECT principal_amount, interest_rate, maturity_amount, maturity_date, status
                     FROM deposits WHERE user_id = ? ORDER BY maturity_date', [$user['id']]);
@@ -439,16 +423,6 @@ function assistant_answer(string $message, ?array $user): array
                 return ['reply' => "Your standing instructions:\n" . implode("\n", $lines),
                     'intent' => $intent, 'suggestions' => ['What is my balance?']];
 
-            case 'upi':
-                $upi = row('SELECT upi_id FROM accounts WHERE user_id = ? AND upi_id IS NOT NULL LIMIT 1',
-                    [$user['id']]);
-                if ($upi) {
-                    return ['reply' => "Your UPI ID is **{$upi['upi_id']}**. You can show your QR code or link a "
-                        . 'card to UPI from **Cards & UPI**. UPI payments are capped at ₹1,00,000 a day.',
-                        'intent' => $intent, 'suggestions' => ['Show my QR code', 'What is my balance?']];
-                }
-                break;
-
             case 'kyc':
                 $status = $user['kyc_status'] ?? 'pending';
                 $reply = "Your KYC status is **$status**.";
@@ -468,33 +442,30 @@ function assistant_answer(string $message, ?array $user): array
         'transactions' => 'Sign in and I can list your recent transactions. Full statements are available as PDF '
             . 'or Excel under **Statements**.',
         'spend' => 'Sign in and I can total up what you have paid out this month.',
-        'cards' => 'Manage debit cards under **Cards & UPI**: freeze temporarily, hotlist permanently if lost, set '
-            . 'online and ATM limits, or request a physical card. Our 24x7 helpline is **1800 11 2211**.',
+        'not_offered' => 'Aadhunik Jeewan Sanchay Nidhi Limited is a Nidhi company, not a bank, so it does not offer '
+            . 'cards, UPI, cheque books, demand drafts, mutual funds or insurance. You can pay another member under '
+            . '**Pay a Member**, and keep savings, fixed and recurring deposits with us.',
         'deposits' => "Current deposit rates:\n- 7 to 365 days: **6.50% p.a.**\n- 1 to 2 years: **7.25% p.a.**\n"
             . "- 2 to 3 years: **7.50% p.a.**\n- Above 3 years: **7.10% p.a.**\n\nDeposits are accepted from "
             . 'members only, and the Nidhi Rules cap deposit interest at 12.5% a year.',
-        'loans' => 'Loans are available to members: personal from **10.50%**, home from **8.40%**, vehicle from '
-            . '**8.75%**. Apply under **Loans** and the loan desk reviews it with an affordability check.',
-        'standing' => 'Standing instructions automate rent, EMIs, SIPs and premiums. Set one up under **Standing '
-            . 'Instructions** and it runs on your chosen day until you pause it.',
-        'upi' => 'UPI lets you pay by ID or QR, capped at ₹1,00,000 a day. Link a card and see your QR under '
-            . '**Cards & UPI**.',
-        'transfer_help' => "Transfer limits:\n- **IMPS**: up to ₹5,00,000, instant, 24x7\n- **NEFT**: up to "
-            . "₹10,00,000 per transaction\n- **RTGS**: ₹2,00,000 minimum, up to ₹25,00,000\n- **UPI**: ₹1,00,000 "
-            . 'a day\n\nEvery transfer needs your transaction password.',
+        'loans' => 'We lend to members against gold jewellery (from **' . number_format(loan_rate('gold'), 2)
+            . '%**) or property (home loans from **' . number_format(loan_rate('home'), 2) . '%**). Apply under '
+            . '**Loans** and the loan desk reviews it. Unsecured personal and vehicle loans are not offered.',
+        'standing' => 'Standing instructions automate rent, loan EMIs and regular payments to other members. Set one '
+            . 'up under **Standing Instructions** and it runs on your chosen day until you pause it.',
+        'transfer_help' => 'Transfers go between member accounts and settle at once on our own books. You can send '
+            . 'up to your available balance, and every transfer needs your transaction password. Payments to other '
+            . 'banks (IMPS, NEFT, RTGS) are not offered.',
         'kyc' => 'KYC needs a valid PAN plus one official valid document — Aadhaar, passport or voter ID. You can '
             . 'complete it by video under **Video KYC**, without visiting a branch.',
-        'ifsc' => "Our branch IFSC codes:\n- Nariman Point: **AJSP0000042**\n- Bandra Kurla Complex: "
-            . "**AJSP0000001**\n- Connaught Place: **AJSP0000007**\n- Koramangala: **AJSP0004081**\n\nUse **Branch "
-            . '& ATM** to find the nearest branch.',
+        'ifsc' => 'A Nidhi is not part of the bank clearing system, so there are no IFSC codes. Use **Branches** to '
+            . 'find a branch\'s address, phone and timings.',
         'rates' => "Deposit rates run from **6.50%** to **7.50% p.a.** depending on term; loans start at "
             . '**8.40%**. The Nidhi Rules, 2014 cap deposit interest at 12.5% a year, so treat any promise above '
             . 'that as a warning sign.',
-        'cheque' => 'Request a 25, 50 or 100-leaf CTS-2010 cheque book under **Cards & Cheques**; it arrives in '
-            . 'about 3 working days. You can also stop a cheque there.',
         'security' => 'Keep your account safe: set a passkey or biometric sign-in under **Security & Passkeys**, '
             . 'never share an OTP or your transaction password, and remember we will never ask for them by phone '
-            . 'or message. Report anything suspicious on **1800 11 2211**.',
+            . 'or message. Report anything suspicious on **9105015464**, or call the cyber-fraud line **1930**.',
     ];
 
     if (isset($general[$intent])) {
@@ -507,13 +478,13 @@ function assistant_answer(string $message, ?array $user): array
     $name = $signedIn ? ' ' . explode(' ', (string)$user['name'])[0] : '';
     return [
         'reply' => "Hello$name — I am the AJSPay assistant." . ($signedIn
-            ? ' I can look up your balances, recent transactions, spending, cards, deposits, loans and standing '
+            ? ' I can look up your balances, recent transactions, spending, deposits, loans and standing '
             . 'instructions, and answer questions about rates, limits, KYC and branches.'
-            : ' I can answer questions about deposit rates, transfer limits, loans, KYC, cards and branches. '
+            : ' I can answer questions about deposit rates, transfer limits, loans, KYC and branches. '
             . 'Sign in and I can also read your own balances and transactions.'),
         'intent' => 'help',
         'suggestions' => $signedIn
-            ? ['What is my balance?', 'How much did I spend this month?', 'Show my cards']
+            ? ['What is my balance?', 'How much did I spend this month?', 'Show my deposits']
             : ['What are your deposit rates?', 'What are the transfer limits?', 'What do I need for KYC?'],
     ];
 }

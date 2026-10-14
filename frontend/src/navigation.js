@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, ArrowRightLeft, CreditCard, PiggyBank, Banknote,
+  LayoutDashboard, ArrowRightLeft, PiggyBank, Banknote,
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
   GanttChartSquare, Building2, Video, ShieldCheck, FileText, Repeat, Settings2,
   Layers, ClipboardList, Contact2, BarChart3, BookUser, FileLock2, Gavel, Award, Radio,
@@ -13,7 +13,6 @@ export const NAV_BY_ROLE = {
   retail: [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, testId: 'tab-dashboard' },
     { id: 'transfer', label: 'Transfers', icon: ArrowRightLeft, testId: 'tab-transfer' },
-    { id: 'cards', label: 'Cards & UPI', icon: CreditCard, testId: 'tab-cards', requires: 'debit_cards' },
     { id: 'deposits', label: 'Deposits', icon: PiggyBank, testId: 'tab-deposits' },
     { id: 'loans', label: 'Loans', icon: Banknote, testId: 'tab-loans' },
     { id: 'standing-instructions', label: 'Standing Instructions', icon: Repeat, testId: 'tab-si' },

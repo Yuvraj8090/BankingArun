@@ -18,7 +18,6 @@ import ProductPage from './pages/ProductPage';
 import GroupPage from './pages/GroupPage';
 import Dashboard from './pages/Dashboard';
 import TransferPage from './pages/TransferPage';
-import CardsChequesPage from './pages/CardsChequesPage';
 import DepositsInvestmentsPage from './pages/DepositsInvestmentsPage';
 import LoansPage from './pages/LoansPage';
 import KycAccountPage from './pages/KycAccountPage';
@@ -164,7 +163,6 @@ function AppShell() {
   const pages = {
     dashboard: <Dashboard onNavigate={go} />,
     transfer: <TransferPage />,
-    cards: <CardsChequesPage />,
     deposits: <DepositsInvestmentsPage />,
     loans: <LoansPage />,
     // Members manage their own KYC here; the counter roles get the queue they verify.

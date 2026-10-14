@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  PiggyBank, TrendingUp, ShieldCheck, Calculator, CheckCircle2, 
-  ArrowRight, Shield, Award, Landmark 
-} from 'lucide-react';
+import { Calculator } from 'lucide-react';
 import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
-import { useAuth } from '../context/AuthContext';
 
 const inr = (n) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const day = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -62,14 +58,11 @@ function DepositEarnings({ e }) {
 
 export default function DepositsInvestmentsPage() {
   const { currentTheme } = useBankTheme();
-  const [activeTab, setActiveTab] = useState('fd'); // fd, mf, insurance
   const [accounts, setAccounts] = useState([]);
   const [myDeposits, setMyDeposits] = useState([]);
   const [earnings, setEarnings] = useState(null); // the deposit whose day-by-day earnings are open
   const [interestReceived, setInterestReceived] = useState({ day: 0, total: 0 });
   const [closingNumber, setClosingNumber] = useState('');
-  const [catalog, setCatalog] = useState({ mutual_funds: [], insurance_plans: [] });
-  const [myInvestments, setMyInvestments] = useState([]);
 
   // FD Booking Form
   const [fdAmount, setFdAmount] = useState(50000);
@@ -78,7 +71,6 @@ export default function DepositsInvestmentsPage() {
   const [fdNominee, setFdNominee] = useState('Registered Nominee');
   const [selectedAcc, setSelectedAcc] = useState('');
   const [booking, setBooking] = useState(false);
-  const [insuring, setInsuring] = useState('');
   // Monthly Income Scheme: a published plan, priced by its own printed slabs
   // rather than the generic tenure tiers, so it books against a fixed
   // denomination instead of a freeform amount.
@@ -95,10 +87,6 @@ export default function DepositsInvestmentsPage() {
   // picked from a dropdown of printed denominations.
   const [misAmount, setMisAmount] = useState('');
   const isDailyMis = fdType === 'mis' && misScheme?.daily_rate_percent != null;
-  // Which of the three things this page offers are actually authorised.
-  const { features } = useAuth();
-  const canInvest = !!features?.includes('mutual_funds');
-  const canInsure = !!features?.includes('insurance');
 
   const loadAccounts = async () => {
     const accRes = await api.getAccounts();
@@ -129,20 +117,9 @@ export default function DepositsInvestmentsPage() {
         // The plan-priced schemes are a bonus on this page, not the page's
         // reason to exist — fixed/recurring booking still works without it.
       }
-      // Mutual funds need a SEBI/AMFI registration. When that capability is off
-      // the endpoints refuse, which is correct — so don't call them, and don't
-      // report a refusal as a failure.
-      if (!canInvest) return;
-      try {
-        setCatalog(await api.getInvestmentCatalog());
-        const myRes = await api.getMyPortfolio();
-        setMyInvestments(myRes.mutual_funds || []);
-      } catch (err) {
-        toast.error('Could not load investment services');
-      }
     };
     init();
-  }, [canInvest]);
+  }, []);
 
   const misSlab = fdType === 'mis' && !isDailyMis
     ? (misScheme?.slabs || []).find(s => String(s.unit) === String(misUnit)) : null;
@@ -261,40 +238,6 @@ export default function DepositsInvestmentsPage() {
     }
   };
 
-  const handleInvestMutualFund = async (scheme) => {
-    if (!selectedAcc) return;
-    try {
-      const res = await api.investMutualFund({
-        account_number: selectedAcc,
-        scheme_id: scheme.id,
-        scheme_name: scheme.name,
-        investment_type: "SIP",
-        amount: scheme.min_sip
-      });
-      toast.success(res.message);
-      const myRes = await api.getMyPortfolio();
-      setMyInvestments(myRes.mutual_funds || []);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Investment order failed");
-    }
-  };
-
-  const handleApplyInsurance = async (plan) => {
-    if (!selectedAcc) {
-      toast.error('Select an account to debit, on the Deposits tab');
-      return;
-    }
-    setInsuring(plan.id);
-    try {
-      const res = await api.buyInsurance({ account_number: selectedAcc, plan_id: plan.id });
-      toast.success(res.message);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Could not apply for this policy');
-    } finally {
-      setInsuring('');
-    }
-  };
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       
@@ -302,51 +245,16 @@ export default function DepositsInvestmentsPage() {
       <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            {canInvest || canInsure ? 'Deposits, Mutual Funds & Insurance' : 'Member Deposits'}
+            Member Deposits
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            {canInvest || canInsure
-              ? 'Fixed and recurring deposits, mutual funds and term cover'
-              : 'Fixed and recurring deposits for members · interest credited automatically'}
+            Fixed and recurring deposits for members · interest credited automatically
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-1 rounded-xl bg-white border border-slate-200 text-xs">
-          <button
-            data-testid="tab-fd-rd"
-            onClick={() => setActiveTab('fd')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeTab === 'fd' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Fixed & Recurring Deposits
-          </button>
-          {canInvest && (
-            <button
-              data-testid="tab-mutual-funds"
-              onClick={() => setActiveTab('mf')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                activeTab === 'mf' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              Mutual Funds
-            </button>
-          )}
-          {canInsure && (
-            <button
-              data-testid="tab-insurance"
-              onClick={() => setActiveTab('insurance')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                activeTab === 'insurance' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              Insurance Products
-            </button>
-          )}
-        </div>
       </div>
 
-      {activeTab === 'fd' && (
+      {(
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Booking Form */}
@@ -568,7 +476,7 @@ export default function DepositsInvestmentsPage() {
         </div>
       )}
 
-      {activeTab === 'fd' && myDeposits.length > 0 && (
+      {myDeposits.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl mt-6">
           <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 mb-3">Your Deposits</h3>
           <div data-testid="interest-summary" className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 text-xs">
@@ -711,91 +619,6 @@ export default function DepositsInvestmentsPage() {
         </div>
       )}
 
-      {activeTab === 'mf' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {catalog.mutual_funds?.map(mf => (
-              <div key={mf.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xl space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">{mf.name}</h3>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 mt-1 inline-block">
-                      {mf.category}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-500">3Y CAGR</p>
-                    <p className="font-bold text-emerald-700 text-sm">{mf.cagr_3yr}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-[11px] p-2.5 rounded-xl bg-white border border-slate-200">
-                  <div>
-                    <p className="text-slate-500">NAV</p>
-                    <p className="font-semibold text-slate-700">₹{mf.nav}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Min SIP</p>
-                    <p className="font-semibold text-slate-700">₹{mf.min_sip}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Risk</p>
-                    <p className="font-semibold text-amber-600">{mf.risk}</p>
-                  </div>
-                </div>
-
-                <button
-                  data-testid={`invest-mf-btn-${mf.id}`}
-                  onClick={() => handleInvestMutualFund(mf)}
-                  className={`w-full py-2 rounded-xl ${currentTheme.buttonTheme} text-xs font-semibold`}
-                >
-                  Start SIP (₹{mf.min_sip}/mo)
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'insurance' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {catalog.insurance_plans?.map(ins => (
-            <div key={ins.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xl space-y-4">
-              <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-[#c8102e]">
-                <Shield className="w-5 h-5" />
-              </div>
-
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">{ins.name}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{ins.type}</p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Sum Assured:</span>
-                  <span className="font-bold text-emerald-700">{ins.cover}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Annual Premium:</span>
-                  <span className="font-bold text-slate-900">₹{ins.annual_premium.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Claim Settlement:</span>
-                  <span className="font-semibold text-[#0b3b8c]">{ins.claim_ratio}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleApplyInsurance(ins)}
-                disabled={insuring === ins.id}
-                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] font-semibold text-xs border border-slate-200 disabled:opacity-50"
-              >
-                {insuring === ins.id ? 'Applying…' : 'Apply for Policy Cover'}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
     </div>
   );

@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ArrowRightLeft, Send, Upload, Clock, CheckCircle2, 
-  ShieldAlert, Layers, Smartphone, Building, RefreshCw 
-} from 'lucide-react';
+
 import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
@@ -13,10 +10,9 @@ export default function TransferPage() {
   const { currentTheme } = useBankTheme();
   // Without the payment-systems authorisation every transfer is a book entry
   // between member accounts, so the page offers only that: no IMPS/NEFT/RTGS
-  // modes, no IFSC, no UPI, no bulk payout (see modules/compliance.php).
+  // modes and no IFSC (see modules/compliance.php).
   const { features } = useAuth();
   const outside = Array.isArray(features) && features.includes('payment_systems');
-  const [activeSubTab, setActiveSubTab] = useState('single'); // single, upi, bulk, scheduled
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   
@@ -31,14 +27,6 @@ export default function TransferPage() {
   const [txnPwd, setTxnPwd] = useState('');
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
-
-  // UPI State
-  const [upiId, setUpiId] = useState('');
-
-  // Bulk Upload State
-  const [bulkText, setBulkText] = useState(
-    "Rajesh Kumar,AJSP00918273645,AJSP0000042,12500,June Vendor Payout\nAnkita Sen,AJSP00998811223,AJSP0000001,8400,Design Freelance Stipend\nVikram Mehta,AJSP00112233445,AJSP0000007,15000,Cloud Hosting Invoice"
-  );
 
   const [transactions, setTransactions] = useState([]);
 
@@ -61,7 +49,7 @@ export default function TransferPage() {
 
   const handleSingleTransfer = async (e) => {
     e.preventDefault();
-    if (!amount || !txnPwd || (!toAcc && !upiId)) {
+    if (!amount || !txnPwd || !toAcc) {
       toast.error("Please fill in all mandatory transfer parameters.");
       return;
     }
@@ -70,12 +58,12 @@ export default function TransferPage() {
     try {
       const payload = {
         from_account_number: fromAcc,
-        to_account_number: activeSubTab === 'upi' ? upiId : toAcc,
-        beneficiary_name: beneficiaryName || (activeSubTab === 'upi' ? 'UPI Payee' : 'Registered Payee'),
+        to_account_number: toAcc,
+        beneficiary_name: beneficiaryName || 'Registered Payee',
         beneficiary_ifsc: ifsc,
-        transfer_type: activeSubTab === 'upi' ? 'UPI' : transferType,
+        transfer_type: transferType,
         amount: parseFloat(amount),
-        remarks: remarks || (activeSubTab === 'upi' ? 'UPI Payment' : outside ? `${transferType} Transfer` : 'Member transfer'),
+        remarks: remarks || (outside ? `${transferType} Transfer` : 'Member transfer'),
         transaction_password: txnPwd,
         is_scheduled: isScheduled,
         schedule_date: isScheduled ? scheduleDate : null
@@ -85,7 +73,6 @@ export default function TransferPage() {
       toast.success(res.message);
       setAmount('');
       setToAcc('');
-      setUpiId('');
       setRemarks('');
       setTxnPwd('');
       
@@ -93,52 +80,6 @@ export default function TransferPage() {
       setTransactions(txnRes.transactions || []);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Transfer request rejected");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBulkTransfer = async (e) => {
-    e.preventDefault();
-    if (!bulkText || !txnPwd) {
-      toast.error("Please provide CSV data and Transaction Password.");
-      return;
-    }
-
-    const lines = bulkText.trim().split('\n');
-    const transfers = [];
-
-    for (const line of lines) {
-      const parts = line.split(',').map(s => s.trim());
-      if (parts.length >= 4) {
-        transfers.push({
-          beneficiary_name: parts[0],
-          account_number: parts[1],
-          ifsc: parts[2] || 'AJSP0000042',
-          amount: parseFloat(parts[3]),
-          remarks: parts[4] || 'Corporate Payout'
-        });
-      }
-    }
-
-    if (transfers.length === 0) {
-      toast.error("Invalid CSV format. Use: Name,AccountNumber,IFSC,Amount,Remarks");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.bulkTransfer({
-        from_account_number: fromAcc,
-        transfers,
-        transaction_password: txnPwd
-      });
-      toast.success(`Batch processed! ${res.transfers_count} payouts executed successfully.`);
-      setTxnPwd('');
-      const txnRes = await api.getTransactions();
-      setTransactions(txnRes.transactions || []);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Bulk transfer execution failed");
     } finally {
       setLoading(false);
     }
@@ -154,41 +95,11 @@ export default function TransferPage() {
             {outside ? 'Fund Transfers' : 'Pay a Member'}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            {outside ? 'IMPS | NEFT | RTGS | UPI'
+            {outside ? 'IMPS | NEFT | RTGS'
               : 'Transfers between member accounts settle instantly on our own books. Payments to other banks are not offered.'}
           </p>
         </div>
 
-        {/* Transfer Subtabs */}
-        {outside && <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white border border-slate-200 text-xs">
-          <button
-            data-testid="subtab-single-transfer"
-            onClick={() => setActiveSubTab('single')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeSubTab === 'single' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Intra/Inter-Bank
-          </button>
-          <button
-            data-testid="subtab-upi-transfer"
-            onClick={() => setActiveSubTab('upi')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeSubTab === 'upi' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            UPI Transfer
-          </button>
-          <button
-            data-testid="subtab-bulk-transfer"
-            onClick={() => setActiveSubTab('bulk')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition ${
-              activeSubTab === 'bulk' ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            Bulk Payout
-          </button>
-        </div>}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -196,7 +107,7 @@ export default function TransferPage() {
         {/* Transfer Form Box */}
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl">
           
-          {activeSubTab === 'single' && (
+          {(
             <form onSubmit={handleSingleTransfer} className="space-y-4 text-xs">
               <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">
                 <span>{outside ? 'Inter-Bank & Intra-Bank Transfer' : 'Transfer to a member account'}</span>
@@ -356,127 +267,6 @@ export default function TransferPage() {
             </form>
           )}
 
-          {activeSubTab === 'upi' && (
-            <form onSubmit={handleSingleTransfer} className="space-y-4 text-xs">
-              <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">
-                <span>Unified Payments Interface (UPI 2.0)</span>
-                <span className="text-[#0b3b8c] font-mono">NPCI Verified</span>
-              </h2>
-
-              <div>
-                <label className="block text-slate-500 mb-1">Virtual Payment Address (VPA / UPI ID)</label>
-                <input
-                  data-testid="upi-id-input"
-                  type="text"
-                  required
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="e.g. merchant@ajspay, friend@ajspay"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-500 mb-1">Debit From Account</label>
-                  <select
-                    value={fromAcc}
-                    onChange={(e) => setFromAcc(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono"
-                  >
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.account_number}>
-                        {a.account_name} ({a.account_number})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-500 mb-1">Amount (₹)</label>
-                  <input
-                    data-testid="upi-amount-input"
-                    type="number"
-                    step="0.01"
-                    required
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="e.g. 1500"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-rose-300 font-semibold mb-1">Transaction Password / UPI PIN</label>
-                <input
-                  data-testid="upi-txnpwd-input"
-                  type="password"
-                  required
-                  value={txnPwd}
-                  onChange={(e) => setTxnPwd(e.target.value)}
-                  placeholder="Enter Transaction Password"
-                  className="w-full bg-white border border-rose-500/40 rounded-xl px-3 py-2.5 text-slate-900"
-                />
-              </div>
-
-              <button
-                data-testid="execute-upi-transfer-btn"
-                type="submit"
-                disabled={loading}
-                className={`w-full py-3 rounded-xl ${currentTheme.buttonTheme} font-bold text-sm shadow-xl`}
-              >
-                {loading ? 'Routing to NPCI UPI Switch...' : 'Instant Pay via UPI'}
-              </button>
-            </form>
-          )}
-
-          {activeSubTab === 'bulk' && (
-            <form onSubmit={handleBulkTransfer} className="space-y-4 text-xs">
-              <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">
-                <span>Corporate Multi-Beneficiary Bulk Batch Upload</span>
-                <span className="text-amber-600 font-mono">AJSPay Corporate CMS</span>
-              </h2>
-
-              <p className="text-slate-500 text-[11px]">
-                Format: <strong className="text-slate-700">BeneficiaryName, AccountNumber, IFSC, Amount, Remarks</strong> (one per line)
-              </p>
-
-              <div>
-                <textarea
-                  data-testid="bulk-transfer-textarea"
-                  rows={6}
-                  value={bulkText}
-                  onChange={(e) => setBulkText(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-3 text-slate-700 font-mono text-xs leading-relaxed focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-rose-300 font-semibold mb-1">
-                  Corporate Authorized Transaction Password
-                </label>
-                <input
-                  data-testid="bulk-txnpwd-input"
-                  type="password"
-                  required
-                  value={txnPwd}
-                  onChange={(e) => setTxnPwd(e.target.value)}
-                  placeholder="Enter Corporate Transaction Password"
-                  className="w-full bg-white border border-rose-500/40 rounded-xl px-3 py-2.5 text-slate-900"
-                />
-              </div>
-
-              <button
-                data-testid="execute-bulk-transfer-btn"
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold text-sm shadow-xl"
-              >
-                {loading ? 'Batch Execution in Progress...' : 'Execute Corporate Payout Batch'}
-              </button>
-            </form>
-          )}
 
         </div>
 
@@ -484,9 +274,10 @@ export default function TransferPage() {
         <div className="space-y-5">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl text-xs space-y-3">
             <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200">
-              Daily Transfer Limits
+              {outside ? 'Daily Transfer Limits' : 'How transfers work'}
             </h3>
             
+            {outside ? (
             <div className="space-y-2.5 text-slate-600">
               <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
                 <span className="font-medium text-[#0b3b8c]">IMPS (Instant)</span>
@@ -500,11 +291,13 @@ export default function TransferPage() {
                 <span className="font-medium text-purple-400">RTGS (High Value)</span>
                 <span className="font-mono text-slate-900">Min ₹2 Lakh</span>
               </div>
-              <div className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
-                <span className="font-medium text-emerald-700">UPI (NPCI)</span>
-                <span className="font-mono text-slate-900">₹1,00,000 / day</span>
-              </div>
             </div>
+            ) : (
+              <p className="text-slate-600">
+                Member transfers settle at once on our own books, up to your available balance.
+                Payments to other banks are not offered.
+              </p>
+            )}
 
             <div className="p-3 rounded-xl bg-blue-50/40 border border-slate-200 text-[11px] text-[#0b3b8c] space-y-1">
               <p className="font-semibold">Security Note:</p>

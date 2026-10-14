@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, ShieldCheck, 
-  CreditCard, Lock, RefreshCw, Send, PlusCircle, CheckCircle, FileText, Download
+import {
+  Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, ShieldCheck, RefreshCw, Send, CheckCircle
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useBankTheme } from '../context/BankThemeContext';
-import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { txnMode, showsDetail } from '../utils/format';
 
@@ -13,9 +11,6 @@ export default function Dashboard({ onNavigate }) {
   const { currentTheme } = useBankTheme();
   // Services this institution is not yet authorised to offer must not appear
   // on the dashboard either (see hostinger/modules/compliance.php).
-  const { features } = useAuth();
-  const canCards = features?.includes('debit_cards');
-  const canUpi = features?.includes('upi');
   const [data, setData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +57,7 @@ export default function Dashboard({ onNavigate }) {
         beneficiary_name: quickBeneficiary,
         transfer_type: "IMPS",
         amount: parseFloat(quickAmount),
-        remarks: canUpi ? "Instant Quick Transfer" : "Member transfer",
+        remarks: "Member transfer",
         transaction_password: quickTxnPwd
       });
       toast.success(res.message);
@@ -91,7 +86,6 @@ export default function Dashboard({ onNavigate }) {
   }
 
   const primaryAcc = selectedAcc || data?.accounts?.[0];
-  const primaryCard = data?.cards?.[0];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -121,7 +115,7 @@ export default function Dashboard({ onNavigate }) {
             onClick={() => setShowQuickTransfer(true)}
             className={`px-4 py-2 rounded-xl text-xs font-semibold ${currentTheme.buttonTheme} flex items-center gap-2 shadow-lg`}
           >
-            <Send className="w-3.5 h-3.5" /> {canUpi ? 'Quick Pay (IMPS/UPI)' : 'Pay a member'}
+            <Send className="w-3.5 h-3.5" /> Pay a member
           </button>
         </div>
       </div>
@@ -183,7 +177,7 @@ export default function Dashboard({ onNavigate }) {
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-            <span>{canUpi ? <>UPI ID: <strong className="text-slate-600">{primaryAcc?.upi_id}</strong></> : 'Member account'}</span>
+            <span>Member account</span>
             <span className="text-emerald-700 flex items-center gap-1">
               <CheckCircle className="w-3 h-3" /> Member deposits
             </span>
@@ -254,64 +248,9 @@ export default function Dashboard({ onNavigate }) {
           </div>
         </div>
 
-        {/* Virtual Debit Card Widget & Quick Actions */}
+        {/* Quick Actions */}
         <div className="space-y-6">
           
-          {/* Card Preview — hidden until card issuance is authorised */}
-          {canCards && <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <h3 className="font-bold text-slate-900 text-xs">Primary Debit Card</h3>
-              <button onClick={() => onNavigate('cards')} className="text-xs text-[#0b3b8c] hover:underline">
-                Manage Limits
-              </button>
-            </div>
-
-            {primaryCard ? (
-              <div className="mt-4 p-5 rounded-2xl bg-gradient-to-tr from-[#0b3b8c] via-[#123f86] to-[#0e4aa8] border border-blue-200 shadow-2xl relative text-white space-y-4">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-blue-100">
-                    {primaryCard.card_type}
-                  </span>
-                  <div className="w-8 h-6 rounded bg-amber-400/80"></div>
-                </div>
-
-                <div className="font-mono text-base tracking-widest text-slate-700 pt-2" data-testid="virtual-card-number">
-                  {primaryCard.card_number}
-                </div>
-
-                <div className="flex justify-between items-end text-[11px] pt-2">
-                  <div>
-                    <p className="text-[9px] text-slate-500 uppercase">Card Holder</p>
-                    <p className="font-semibold text-slate-700">{primaryCard.card_holder}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] text-slate-500 uppercase">Expires</p>
-                    <p className="font-semibold font-mono text-slate-700">{primaryCard.expiry_date}</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-slate-500 text-xs py-4">No active card issued.</p>
-            )}
-
-            <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-              <button
-                data-testid="quick-block-card-btn"
-                onClick={() => onNavigate('cards')}
-                className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-100 text-slate-700 border border-slate-200 text-center font-medium transition"
-              >
-                Hotlist / Freeze
-              </button>
-              <button
-                data-testid="quick-request-cheque-btn"
-                onClick={() => onNavigate('cards')}
-                className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-100 text-slate-700 border border-slate-200 text-center font-medium transition"
-              >
-                Cheque Book
-              </button>
-            </div>
-          </div>}
-
           {/* Quick actions */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl space-y-2.5">
             <h3 className="font-bold text-slate-900 text-xs pb-2 border-b border-slate-200">Shortcuts</h3>
@@ -347,7 +286,7 @@ export default function Dashboard({ onNavigate }) {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-              <h3 className="font-bold text-slate-900 text-base">{canUpi ? 'Instant Fund Transfer (IMPS)' : 'Pay a member'}</h3>
+              <h3 className="font-bold text-slate-900 text-base">Pay a member</h3>
               <button onClick={() => setShowQuickTransfer(false)} className="text-slate-500 hover:text-slate-900 text-sm">✕</button>
             </div>
 

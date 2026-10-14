@@ -19,13 +19,8 @@ CAPABILITIES: dict[str, dict[str, Any]] = {
     'internal_transfers': {'default': True},
     'deposits': {'default': True},
     'loans': {'default': True},
-    'debit_cards': {'default': False},
     'upi': {'default': False},
     'payment_systems': {'default': False},
-    'cheque_book': {'default': False},
-    'demand_draft': {'default': False},
-    'mutual_funds': {'default': False},
-    'insurance': {'default': False},
     # Prohibited outright to a Nidhi. No switch turns this on.
     'current_accounts': {'default': False, 'never': True},
     'summary': {'default': False},

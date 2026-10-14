@@ -133,9 +133,10 @@ Q "INSERT INTO system_config (id,data,updated_by) VALUES ('global','{}','api_tes
      '$.capabilities.upi.enabled', false,
      '$.capabilities.mutual_funds.enabled', false,
      '$.capabilities.payment_systems.enabled', false), updated_by='api_test';" >/dev/null
-call GET /cards "$RETAIL";               ck "debit cards gated" 403 "$CODE"
-call GET /upi/status "$RETAIL";          ck "UPI gated" 403 "$CODE"
-call GET /investments/catalog "$RETAIL"; ck "mutual funds gated" 403 "$CODE"
+# Not Nidhi business at all, so the routes are gone rather than switched off.
+for r in /cards /upi/status /investments/catalog; do call GET $r "$RETAIL"; ck "no route for $r" 404 "$CODE"; done
+call POST /services/cheque-book "$RETAIL" '{}'; ck "no cheque books" 404 "$CODE"
+call GET /accounts "$RETAIL"; hasnt "accounts carry no cards" "$BODY" '"cards"'
 call GET /accounts "$RETAIL";            ck "member accounts permitted" 200 "$CODE"
 call GET /loans/my-applications "$RETAIL"; ck "loans permitted" 200 "$CODE"
 call POST /accounts/transfer "$RETAIL" "{\"from_account_number\":\"$RETAIL_ACC\",\"to_account_number\":\"HDFC0009998887\",\"beneficiary_name\":\"Outside\",\"amount\":100,\"transfer_type\":\"NEFT\",\"transaction_password\":\"Txn@1234\"}"

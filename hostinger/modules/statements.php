@@ -132,7 +132,7 @@ function statement_pdf(array $user, array $account, array $txns, ?string $start,
     $y -= 28;
     foreach ([
         'Customer: ' . $user['name'],
-        'Account Type: ' . ucfirst($account['account_type']) . ' | IFSC: ' . $account['ifsc_code'],
+        'Account Type: ' . ucfirst($account['account_type']) . ' | Branch code: ' . $account['ifsc_code'],
         'Period: ' . ($start ?? 'All') . ' to ' . ($end ?? 'today') . ' | Generated: ' . gmdate('d-M-Y H:i') . ' UTC',
     ] as $line) {
         $ops .= pdf_line('F1', 8.5, PDF_M, $y, $line, [0.2, 0.25, 0.33]);
@@ -281,7 +281,7 @@ function statement_xlsx(array $user, array $account, array $txns, ?string $start
     $rows = [
         [['Aadhunik Jeewan Sanchay Nidhi Limited', 1]],
         [['Account Statement — ' . $account['account_number'], 2]],
-        [['Customer: ' . $user['name'] . ' · Type: ' . ucfirst($account['account_type']) . ' · IFSC: ' . $account['ifsc_code'], 0]],
+        [['Customer: ' . $user['name'] . ' · Type: ' . ucfirst($account['account_type']) . ' · Branch code: ' . $account['ifsc_code'], 0]],
         [['Period: ' . ($start ?? 'All') . ' → ' . ($end ?? 'today') . ' · Generated: ' . gmdate('d-M-Y H:i') . ' UTC', 0]],
         [],
         array_map(fn($h) => [$h, 3], ['Date', 'Ref No', 'Mode', 'Description', 'Debit (INR)', 'Credit (INR)', 'Balance (INR)']),

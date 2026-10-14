@@ -49,14 +49,3 @@ def impersonation_state(actor: dict[str, Any] | None) -> dict[str, Any] | None:
         'notice': "Support session — read only. Nothing you do here can change this member's account.",
     }
 
-
-def public_card(card: dict[str, Any]) -> dict[str, Any]:
-    """A card, without the PIN.
-
-    The PIN is stored as a bcrypt hash and never leaves the server. There is no
-    CVV to remove: it is not written down at all, because PCI DSS forbids
-    keeping it after authorisation.
-    """
-    shaped = dict(card)
-    shaped.pop('pin_hash', None)
-    return out(shaped)

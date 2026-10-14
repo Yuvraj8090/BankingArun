@@ -46,17 +46,10 @@ const CAPABILITIES = [
             . 'property, deposits and specified securities — to members only, within the prescribed limits.',
     ],
 
-    // Everything below needs an authorisation a Nidhi does not hold by default.
-    'debit_cards' => [
-        'name' => 'Debit cards',
-        'default' => false,
-        'authority' => 'Reserve Bank of India',
-        'summary' => 'Issuing virtual or physical debit cards, limits, PIN and CVV.',
-        'requires' => 'Authorisation to issue payment cards. Under the RBI Master Direction on Credit Card '
-            . 'and Debit Card issuance, debit cards may be issued only by banks, and by certain NBFCs that '
-            . 'the RBI has specifically permitted. A Nidhi company is neither, and a card programme also '
-            . 'needs a sponsor bank and a card network arrangement.',
-    ],
+    // Everything below needs an authorisation a Nidhi does not hold by default. Cards,
+// cheque books, demand drafts, mutual funds and insurance were here too; they are
+// not Nidhi business at all, so their code was deleted (15 Oct 2026) rather than
+// kept behind a switch.
     'upi' => [
         'name' => 'UPI',
         'default' => false,
@@ -74,36 +67,6 @@ const CAPABILITIES = [
         'requires' => 'Membership of the relevant RBI payment system, or a sponsor bank arrangement. '
             . 'Without it, money can move between member accounts on our own books but cannot be sent out.',
     ],
-    'cheque_book' => [
-        'name' => 'Cheque books and stop payment',
-        'default' => false,
-        'authority' => 'Reserve Bank of India',
-        'summary' => 'Issuing cheque books and stopping cheques.',
-        'requires' => 'Cheques are drawn on a bank. Issuing them needs banking status and membership of '
-            . 'CTS clearing.',
-    ],
-    'demand_draft' => [
-        'name' => 'Demand drafts',
-        'default' => false,
-        'authority' => 'Reserve Bank of India',
-        'summary' => 'Issuing demand drafts.',
-        'requires' => 'A demand draft is a banker\'s instrument and can only be issued by a bank.',
-    ],
-    'mutual_funds' => [
-        'name' => 'Mutual fund distribution',
-        'default' => false,
-        'authority' => 'SEBI / AMFI',
-        'summary' => 'Offering or selling mutual fund schemes.',
-        'requires' => 'An AMFI Registration Number (ARN) after passing the NISM certification, and the '
-            . 'Nidhi Rules separately restrict what business a Nidhi may carry on.',
-    ],
-    'insurance' => [
-        'name' => 'Insurance distribution',
-        'default' => false,
-        'authority' => 'IRDAI',
-        'summary' => 'Offering or selling insurance policies.',
-        'requires' => 'Registration as a corporate agent or intermediary with the IRDAI.',
-    ],
     'current_accounts' => [
         'name' => 'Current accounts',
         'default' => false,
@@ -119,20 +82,8 @@ const CAPABILITIES = [
 // not here: they are checked inside the handler, because an internal transfer
 // stays permitted while an outward one does not.
 const ROUTE_CAPABILITIES = [
-    'GET /cards' => 'debit_cards',
-    'POST /cards/manage' => 'debit_cards',
-    'POST /cards/request-physical' => 'debit_cards',
-    'GET /upi/status' => 'upi',
-    'POST /upi/link-card' => 'upi',
-    'GET /upi/qr' => 'upi',
     // Pulling money in over UPI is a payment-system transaction like any other.
     'POST /rails/collect' => 'upi',
-    'POST /services/cheque-book' => 'cheque_book',
-    'POST /services/stop-cheque' => 'cheque_book',
-    'POST /services/demand-draft' => 'demand_draft',
-    'GET /investments/catalog' => 'mutual_funds',
-    'POST /investments/invest' => 'mutual_funds',
-    'GET /investments/my-portfolio' => 'mutual_funds',
 ];
 
 function capability_state(string $key): array

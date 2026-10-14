@@ -165,10 +165,24 @@ any menu page has no guide.
 
 ## Low: cleanup
 
-### 9. Dead regulated features still in the code  ⬜
+### 9. Dead regulated features still in the code  ✅ done 15 Oct
 Cards, UPI, cheque book, demand draft and mutual funds are gated off but still
 fully built, both front and back. Choose: delete them (smaller and safer), or
 keep them gated.
+
+**Done (your decision: delete):**
+- **Removed:** the routes, handlers, Cards page, dashboard card widget, UPI and
+  bulk-payout tabs, the mutual-fund and insurance sections, API client methods, and
+  their capability switches (PHP and pyapi).
+- **Also found and removed:** account opening still **issued a virtual debit card to
+  every new member**, and `/accounts` returned cards.
+- **Chatbot:** it now gives one honest "not offered" answer for these, and its
+  wrong answers are fixed (IMPS/NEFT limits, personal and vehicle loans, bank IFSC
+  codes, and a helpline that did not match the app's).
+- **Statements:** they say "Branch code" instead of "IFSC".
+- **Kept:** Payment Rails and the `upi` / `payment_systems` switches for a future
+  sponsor-bank tie-up. The database tables (cards, investments and so on) and
+  their old rows are kept; dropping them is a separate call.
 
 ### 10. Stale .md files  ✅ done 15 Oct
 - `memory/PRD.md`, `test_result.md`, `auth_testing.md`: Emergent-era, describe

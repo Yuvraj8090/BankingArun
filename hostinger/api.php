@@ -1,7 +1,7 @@
 <?php
 // AJSPay: Hostinger PHP/MySQL REST API (front controller).
 // Serves the same /api/* routes and JSON shapes the React app expects. Core
-// banking (auth, accounts, transfers, cards, UPI) lives here; the other feature
+// banking (auth, accounts, transfers) lives here; the other feature
 // areas live in modules/.
 declare(strict_types=1);
 
@@ -35,11 +35,6 @@ const IST = 'Asia/Kolkata';
 // Checked when an email is unknown, so response times don't reveal which emails exist.
 const DUMMY_HASH = '$2y$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-const VIRTUAL_DEBIT_CARD = ['bin' => '4532', 'type' => 'Visa Platinum Debit', 'network' => 'Visa',
-    'status' => 'active', 'virtual' => true, 'online_limit' => 50000, 'atm_limit' => 40000, 'international' => false];
-const PHYSICAL_DEBIT_CARD = ['bin' => '5241', 'type' => 'RuPay / Mastercard Global Debit', 'network' => 'RuPay',
-    'status' => 'dispatch_queued', 'virtual' => false, 'online_limit' => 75000, 'atm_limit' => 50000,
-    'international' => true];
 
 // --- Sessions --------------------------------------------------------------------
 // Stateless HMAC-SHA256 tokens, verified on every request. The `ver` claim must
@@ -203,14 +198,6 @@ function public_user(array $user): array
     return out($user);
 }
 
-// The PIN is never stored in the clear. There is no CVV to hide: PCI DSS
-// forbids keeping it after authorisation, so it is never written down.
-function public_card(array $card): array
-{
-    unset($card['pin_hash']);
-    return out($card);
-}
-
 // --- Brute-force protection ------------------------------------------------------
 function recent_fails(string $identifier): int
 {
@@ -283,24 +270,6 @@ function insert_txn(array $t): void
             $t['balance_after'], $t['counterparty_name'], $t['counterparty_acc'], $t['ref_number'],
             $t['batch_ref'] ?? null, $t['status'] ?? 'SUCCESS', mb_substr($t['description'], 0, 255),
             $t['timestamp'] ?? now_utc()]);
-}
-
-// New cards get a random PIN nobody knows: the cardholder sets their own via "Set PIN".
-function insert_card(string $userId, string $accountNumber, string $holder, array $spec): string
-{
-    global $pdo;
-    $id = uuid4();
-    $pdo->prepare('INSERT INTO cards (id, user_id, account_number, card_number, card_holder, card_type, network,
-            expiry_date, pin_hash, status, is_virtual, issued_by, online_limit, atm_limit, international_enabled)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([
-            $id, $userId, $accountNumber, $spec['bin'] . ' ' . digits(4) . ' ' . digits(4) . ' ' . digits(4),
-            mb_strtoupper($holder), $spec['type'], $spec['network'], gmdate('m/y', strtotime('+5 years')),
-            password_hash(digits(4), PASSWORD_BCRYPT), $spec['status'],
-            (int)$spec['virtual'], 'AJSPay (Issuer Only)', $spec['online_limit'], $spec['atm_limit'],
-            (int)$spec['international'],
-        ]);
-    return $id;
 }
 
 function owned_account(array $user, mixed $accountNumber, bool $forUpdate = false): ?array
@@ -623,7 +592,6 @@ function route_register(array $d): void
             // email to build it from, so it stays unique either way.
             ($email === '' ? strtolower($accountNumber) : strstr($email, '@', true)) . '@ajspay',
             $branch, (int)$isJoint]);
-    insert_card($userId, $accountNumber, $name, VIRTUAL_DEBIT_CARD);
     // Opening can write three ledger rows at once, and now_utc() only resolves to
     // the second, so they would tie and a statement could show the deposit debit
     // above the credit that funded it. Each step is stamped a second apart, in
@@ -913,7 +881,6 @@ function route_accounts(array $d): void
     $deposits = array_map(fn($d) => out($d) + ['pending_interest' =>
             round(array_sum(array_column(daily_pending_interest($d), 'earned')), 2)],
         rows('SELECT * FROM deposits WHERE user_id = ? ORDER BY created_at, id', [$user['id']]));
-    $cards = array_map('public_card', rows('SELECT * FROM cards WHERE user_id = ? ORDER BY created_at, id', [$user['id']]));
     $savings = array_sum(array_column($accounts, 'balance'));
     $deposited = array_sum(array_column($deposits, 'principal_amount'));
     // Interest actually received into the account (net of any TDS -- the credit
@@ -923,7 +890,7 @@ function route_accounts(array $d): void
         "SELECT COALESCE(SUM(amount), 0) FROM transactions
          WHERE user_id = ? AND type = 'credit' AND mode = 'DEPOSIT_INTEREST' AND timestamp >= ?",
         [$user['id'], $since]);
-    respond(['accounts' => $accounts, 'deposits' => $deposits, 'cards' => $cards, 'net_worth' => $savings + $deposited,
+    respond(['accounts' => $accounts, 'deposits' => $deposits, 'net_worth' => $savings + $deposited,
         'total_savings_balance' => $savings, 'total_deposits_balance' => $deposited,
         'interest_received_24h' => $received(gmdate('Y-m-d H:i:s', time() - 86400)),
         'interest_received_total' => $received('1970-01-01 00:00:00')]);
@@ -1125,194 +1092,6 @@ function route_transfer(array $d): void
     ]);
 }
 
-function route_bulk_transfer(array $d): void
-{
-    global $pdo;
-    $user = current_user();
-    if ($user['role'] !== 'corporate') {
-        fail(403, 'Bulk payouts are available to corporate customers only.');
-    }
-    need($d, 'from_account_number', 'transaction_password');
-    $items = $d['transfers'] ?? null;
-    if (!is_array($items) || !array_is_list($items) || count($items) < 1 || count($items) > 500) {
-        fail(422, 'transfers must be a list of 1 to 500 payouts.');
-    }
-    $payouts = [];
-    foreach ($items as $item) {
-        if (!is_array($item)) {
-            fail(422, 'Each payout must be an object.');
-        }
-        need($item, 'beneficiary_name', 'account_number', 'ifsc', 'amount');
-        $amount = money($item['amount']);
-        // A negative line would otherwise credit the payer.
-        if ($amount <= 0) {
-            fail(400, 'Every payout amount must be greater than ₹0.');
-        }
-        $payouts[] = ['name' => clip($item['beneficiary_name'], 150), 'account' => clip($item['account_number'], 50),
-            'amount' => $amount, 'remarks' => clip($item['remarks'] ?? 'Corporate payout', 150)];
-    }
-    $total = round(array_sum(array_column($payouts, 'amount')), 2);
-    check_txn_password($user, $d['transaction_password'], 'Invalid Transaction Password.');
-
-    $pdo->beginTransaction();
-    [$sender, $newBalance] = debit_account($user, $d['from_account_number'], $total,
-        'Insufficient corporate balance. Total batch requires ' . rupees($total));
-    $batch = 'BATCH-CORP-' . gmdate('Ymd') . '-' . random_int(1000, 9999);
-    $processed = [];
-    foreach ($payouts as $p) {
-        $ref = 'UTR-BULK-' . random_int(10000000, 99999999);
-        insert_txn(['user_id' => $user['id'], 'account_number' => $sender['account_number'], 'type' => 'debit',
-            'mode' => 'CORPORATE_BULK', 'amount' => $p['amount'], 'balance_after' => $newBalance,
-            'counterparty_name' => $p['name'], 'counterparty_acc' => $p['account'], 'ref_number' => $ref,
-            'batch_ref' => $batch, 'description' => "Bulk Payout: {$p['remarks']} ({$p['name']})"]);
-        $processed[] = ['name' => $p['name'], 'amount' => $p['amount'], 'ref' => $ref];
-    }
-    audit($user, 'BULK_TRANSFER', count($payouts) . ' payouts totalling ' . rupees($total) . " ($batch)");
-    $pdo->commit();
-    respond(['status' => 'SUCCESS', 'batch_ref' => $batch, 'transfers_count' => count($processed),
-        'total_amount' => $total, 'remaining_balance' => $newBalance, 'processed_list' => $processed]);
-}
-
-// --- Cards -----------------------------------------------------------------------------
-function route_cards(array $d): void
-{
-    $user = current_user();
-    respond(['cards' => array_map('public_card',
-        rows('SELECT * FROM cards WHERE user_id = ? ORDER BY created_at, id', [$user['id']]))]);
-}
-
-// route_reveal_cvv is deliberately gone. A CVV may not be stored after
-// authorisation (PCI DSS), so there is nothing to reveal; a real card programme
-// shows it once at issuance and never again.
-
-function route_manage_card(array $d): void
-{
-    global $pdo;
-    $user = current_user();
-    need($d, 'card_id', 'action');
-    $card = row('SELECT * FROM cards WHERE id = ? AND user_id = ?', [clip($d['card_id'], 36), $user['id']]);
-    if (!$card) {
-        fail(404, 'Debit card not found.');
-    }
-    // Hotlisting is permanent.
-    if ($card['status'] === 'hotlisted') {
-        fail(400, 'This card is permanently hotlisted and can no longer be changed.');
-    }
-    $action = $d['action'];
-    $updates = [];
-    if ($action === 'freeze') {
-        $updates['status'] = 'frozen';
-        $message = 'Card temporarily frozen. ATM & Online transactions disabled.';
-    } elseif ($action === 'unfreeze') {
-        $updates['status'] = 'active';
-        $message = 'Card unblocked and activated successfully.';
-    } elseif ($action === 'hotlist') {
-        $updates['status'] = 'hotlisted';
-        $message = 'Card permanently hotlisted & blocked. A replacement card has been queued.';
-    } elseif ($action === 'update_limits') {
-        $limitMax = card_limit_max();
-        foreach (['online_limit', 'atm_limit'] as $key) {
-            if (isset($d[$key])) {
-                $updates[$key] = money($d[$key]);
-                if ($updates[$key] < 0 || $updates[$key] > $limitMax) {
-                    fail(422, "$key must be between ₹0 and " . rupees($limitMax) . '.');
-                }
-            }
-        }
-        foreach (['international_enabled', 'contactless_enabled', 'ecom_enabled'] as $key) {
-            if (isset($d[$key])) {
-                $updates[$key] = (int)(bool)$d[$key];
-            }
-        }
-        $message = 'Card limits and usage settings updated.';
-    } elseif ($action === 'set_pin') {
-        $pin = $d['new_pin'] ?? null;
-        if (!is_string($pin) || !preg_match('/\A\d{4}\z/', $pin)) {
-            fail(400, 'PIN must be a 4-digit number.');
-        }
-        $updates['pin_hash'] = password_hash($pin, PASSWORD_BCRYPT);
-        $message = 'Card ATM/POS PIN regenerated successfully.';
-    } else {
-        fail(422, 'Unknown card action.');
-    }
-    if ($updates) {
-        // Column names come from the fixed keys above; only the values are user input.
-        $set = implode(', ', array_map(fn($column) => "$column = ?", array_keys($updates)));
-        $pdo->prepare("UPDATE cards SET $set WHERE id = ?")->execute([...array_values($updates), $card['id']]);
-    }
-    audit($user, 'CARD_' . strtoupper($action), 'Card ending ' . substr($card['card_number'], -4));
-    respond(['status' => 'SUCCESS', 'message' => $message,
-        'card' => public_card(row('SELECT * FROM cards WHERE id = ?', [$card['id']]))]);
-}
-
-// The account number travels in the JSON body, never the URL, so it stays out of logs.
-function route_request_physical_card(array $d): void
-{
-    $user = current_user();
-    $account = owned_account($user, $d['account_number'] ?? '');
-    if (!$account) {
-        fail(404, 'Account not found.');
-    }
-    $id = insert_card($user['id'], $account['account_number'], $user['name'], PHYSICAL_DEBIT_CARD);
-    audit($user, 'CARD_REQUEST_PHYSICAL', 'For account ' . $account['account_number']);
-    respond(['status' => 'SUCCESS',
-        'message' => 'Physical Card order placed! Will be delivered to registered address in 3-5 working days.',
-        'card' => public_card(row('SELECT * FROM cards WHERE id = ?', [$id]))]);
-}
-
-// --- UPI on debit card -----------------------------------------------------------------
-function route_upi_status(array $d): void
-{
-    $user = current_user();
-    $account = row('SELECT upi_id FROM accounts WHERE user_id = ? ORDER BY created_at, id', [$user['id']]);
-    $cards = [];
-    foreach (rows('SELECT id, card_number, network, status, upi_linked FROM cards WHERE user_id = ? ORDER BY created_at, id',
-        [$user['id']]) as $card) {
-        $card['network'] ??= 'Visa';
-        $cards[] = out($card);
-    }
-    respond([
-        'launch_date' => '2026-02-15',
-        'status_headline' => 'UPI on Debit Card — Pending Final NPCI Approval',
-        'status_detail' => 'Feature is live in shadow mode. Final NPCI go-live approval expected within 24 hours. '
-            . 'Link now to receive priority activation.',
-        'primary_upi_id' => $account['upi_id'] ?? null,
-        'linkable_cards' => $cards,
-    ]);
-}
-
-function route_upi_link_card(array $d): void
-{
-    global $pdo;
-    $user = current_user();
-    need($d, 'card_id');
-    $card = row('SELECT * FROM cards WHERE id = ? AND user_id = ?', [clip($d['card_id'], 36), $user['id']]);
-    if (!$card) {
-        fail(404, 'Card not found');
-    }
-    if (!in_array($card['status'], ['active', 'dispatch_queued'], true)) {
-        fail(400, "Card in '{$card['status']}' state cannot be linked to UPI.");
-    }
-    $pdo->prepare('UPDATE cards SET upi_linked = 1 WHERE id = ?')->execute([$card['id']]);
-    $last4 = substr($card['card_number'], -4);
-    audit($user, 'UPI_LINK_CARD', "Card ending $last4");
-    respond(['status' => 'SUCCESS', 'message' => "UPI linked to card ending $last4. You will be notified when NPCI activates."]);
-}
-
-function route_upi_qr(array $d): void
-{
-    $user = current_user();
-    $account = row('SELECT upi_id FROM accounts WHERE user_id = ? ORDER BY created_at, id', [$user['id']]);
-    if (!$account || !$account['upi_id']) {
-        fail(404, 'No linked account');
-    }
-    // Encode both values, so a name containing "&" or "=" can't inject extra UPI parameters.
-    $uri = 'upi://pay?pa=' . str_replace('%40', '@', rawurlencode($account['upi_id']))
-        . '&pn=' . rawurlencode($user['name']) . '&aid=uPfKMDXhs2SDy&mc=0000';
-    respond(['upi_id' => $account['upi_id'], 'account_holder' => $user['name'], 'upi_uri' => $uri, 'qr_data' => $uri,
-        'limits' => ['per_txn' => 100000, 'daily' => 500000]]);
-}
-
 // --- Router ------------------------------------------------------------------------------
 $routes = [
     // Auth & accounts
@@ -1329,7 +1108,6 @@ $routes = [
     'GET /accounts' => 'route_accounts',
     'GET /accounts/transactions' => 'route_transactions',
     'POST /accounts/transfer' => 'route_transfer',
-    'POST /accounts/bulk-transfer' => 'route_bulk_transfer',
     // Staff-only: crediting cash/cheque a member hands over at the counter
     // (modules/banking.php). Not to be confused with /collections, which only
     // logs what a field agent collected and never touches the ledger.
@@ -1337,13 +1115,6 @@ $routes = [
     // Staff-assisted FD/RD/MIS booking for a member at the counter (modules/banking.php).
     'GET /deposits/staff-member-lookup' => 'route_staff_member_lookup',
     'POST /deposits/staff-book' => 'route_staff_book_deposit',
-    // Cards & UPI
-    'GET /cards' => 'route_cards',
-    'POST /cards/manage' => 'route_manage_card',
-    'POST /cards/request-physical' => 'route_request_physical_card',
-    'GET /upi/status' => 'route_upi_status',
-    'POST /upi/link-card' => 'route_upi_link_card',
-    'GET /upi/qr' => 'route_upi_qr',
     // Payment rails (modules/rails.php). The webhook is the partner's callback
     // and authenticates by signature, not by session, so it is deliberately not
     // behind the member login.
@@ -1356,18 +1127,11 @@ $routes = [
     'GET /rails/transactions' => 'route_rail_transactions',
     'POST /rails/reconcile' => 'route_rail_reconcile_one',
     // Banking services (modules/banking.php)
-    'POST /services/cheque-book' => 'route_cheque_book',
-    'POST /services/stop-cheque' => 'route_stop_cheque',
-    'POST /services/demand-draft' => 'route_demand_draft',
     'POST /deposits/book' => 'route_book_deposit',
     'POST /deposits/premature-close' => 'route_premature_close',
     'POST /deposits/earnings' => 'route_deposit_earnings',
     'POST /loans/apply' => 'route_apply_loan',
     'GET /loans/my-applications' => 'route_my_loans',
-    'GET /investments/catalog' => 'route_investment_catalog',
-    'POST /investments/invest' => 'route_invest',
-    'POST /investments/insure' => 'route_insure',
-    'GET /investments/my-portfolio' => 'route_portfolio',
     'POST /support/complaint' => 'route_complaint',
     'GET /support/my-tickets' => 'route_my_tickets',
     'POST /support/chat' => 'route_chat',

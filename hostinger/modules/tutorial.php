@@ -46,8 +46,6 @@ function tutorial_steps(string $role): array
         ['anchor' => 'tab-deposits', 'title' => 'Deposits',
          'body' => 'Open a fixed or recurring deposit and see what it matures to. Interest is credited '
             . 'automatically.'],
-        ['anchor' => 'tab-cards', 'title' => 'Cards and UPI', 'requires' => 'debit_cards',
-         'body' => 'Manage your card limits, freeze it instantly, and see your UPI address.'],
         ['anchor' => 'tab-statements', 'title' => 'Statements',
          'body' => 'Download any period as PDF or Excel. Filter by date, type or a search term first.'],
         ['anchor' => 'tab-security', 'title' => 'Protect your account',

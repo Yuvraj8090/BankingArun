@@ -66,29 +66,8 @@ export const api = {
     return (await axios.get(url, getAuthHeaders())).data;
   },
   transferFunds: async (payload) => (await axios.post(`${API}/accounts/transfer`, payload, getAuthHeaders())).data,
-  bulkTransfer: async (payload) => (await axios.post(`${API}/accounts/bulk-transfer`, payload, getAuthHeaders())).data,
   // Staff-only: crediting a member's account for cash/cheque handed over at the counter.
   counterDeposit: async (payload) => (await axios.post(`${API}/accounts/counter-deposit`, payload, getAuthHeaders())).data,
-
-  // Cards
-  getCards: async () => (await axios.get(`${API}/cards`, getAuthHeaders())).data,
-  manageCard: async (payload) => (await axios.post(`${API}/cards/manage`, payload, getAuthHeaders())).data,
-  requestPhysicalCard: async (accountNumber) =>
-    (await axios.post(`${API}/cards/request-physical`, { account_number: accountNumber }, getAuthHeaders())).data,
-  // The CVV is released only against the transaction password, and every reveal is logged.
-  revealCvv: async (cardId, transactionPassword) =>
-    (await axios.post(`${API}/cards/reveal-cvv`, { card_id: cardId, transaction_password: transactionPassword },
-      getAuthHeaders())).data,
-
-  // UPI
-  upiStatus: async () => (await axios.get(`${API}/upi/status`, getAuthHeaders())).data,
-  upiLinkCard: async (payload) => (await axios.post(`${API}/upi/link-card`, payload, getAuthHeaders())).data,
-  upiQr: async () => (await axios.get(`${API}/upi/qr`, getAuthHeaders())).data,
-
-  // Services
-  requestChequeBook: async (payload) => (await axios.post(`${API}/services/cheque-book`, payload, getAuthHeaders())).data,
-  stopCheque: async (payload) => (await axios.post(`${API}/services/stop-cheque`, payload, getAuthHeaders())).data,
-  issueDemandDraft: async (payload) => (await axios.post(`${API}/services/demand-draft`, payload, getAuthHeaders())).data,
 
   // Deposits
   bookDeposit: async (payload) => (await axios.post(`${API}/deposits/book`, payload, getAuthHeaders())).data,
@@ -108,12 +87,6 @@ export const api = {
   // Loans
   applyLoan: async (payload) => (await axios.post(`${API}/loans/apply`, payload, getAuthHeaders())).data,
   getMyLoans: async () => (await axios.get(`${API}/loans/my-applications`, getAuthHeaders())).data,
-
-  // Investments
-  getInvestmentCatalog: async () => (await axios.get(`${API}/investments/catalog`, getAuthHeaders())).data,
-  investMutualFund: async (payload) => (await axios.post(`${API}/investments/invest`, payload, getAuthHeaders())).data,
-  buyInsurance: async (payload) => (await axios.post(`${API}/investments/insure`, payload, getAuthHeaders())).data,
-  getMyPortfolio: async () => (await axios.get(`${API}/investments/my-portfolio`, getAuthHeaders())).data,
 
   // Support & Branches
   registerComplaint: async (payload) => (await axios.post(`${API}/support/complaint`, payload, getAuthHeaders())).data,
