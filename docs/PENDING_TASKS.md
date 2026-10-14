@@ -45,11 +45,17 @@ time as well, so the database state cannot bypass it, and move these plans to
 draft. **Your decision is needed:** what happens to deposits already booked on
 them (they keep being credited daily).
 
-### 2. Referral bonus pays ₹500 cash to both people  ⬜
+### 2. Referral bonus pays ₹500 cash to both people  ✅ done 15 Oct
 `modules/banking.php` credits `REFERRAL_BONUS` to the referrer and to the new
 member. This is an incentive for bringing in members and deposits, which Rule
 6 prohibits. The code comments even say "no code here moves money", but this
 code does. Fix: stop the credit and rename "Refer & Earn" to "Invite a member".
+
+**Done:** `record_referral()` replaces the bonus. It records the introduction (the
+tree and the ladder still work) and credits nobody. The `referral_reward_amount`
+parameter is removed (migrate.sql), and the menu item, page, sign-up and CRM copy
+no longer promise money. Bonuses paid before today are left as they were; reversing
+them is your decision.
 
 ### 3. MLM structure already exists in the member app  ⬜
 - **Refer & Earn** shows a 12-level commission % table, a downline "tree" and

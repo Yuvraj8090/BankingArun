@@ -287,7 +287,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
                 <div data-testid="register-referral-banner"
                   className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">
                   <Gift className="w-3.5 h-3.5 shrink-0" />
-                  Referral code <b className="font-mono">{referralCode}</b> applied — you and your friend each get ₹500 once your KYC is verified.
+                  Referral code <b className="font-mono">{referralCode}</b> applied — you will be recorded as introduced by them once your KYC is verified.
                 </div>
               )}
               <Field icon={User} label="Full name">

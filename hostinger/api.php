@@ -637,10 +637,10 @@ function route_register(array $d): void
         'timestamp' => $step(0)]);
     // Opening against a lead carries its referral code through, which is the
     // join the chain was missing: the code arrived with the enquiry, and the
-    // bonus is paid here, but nothing connected the two and a shared link paid
-    // nobody unless a teller happened to retype the code.
+    // introduction is recorded here, but nothing connected the two and a shared
+    // link credited nobody unless a teller happened to retype the code.
     $code = strtoupper(clip($d['referral_code'] ?? ($lead['referral_code'] ?? ''), 12));
-    $bonus = $code === '' ? null : apply_referral_bonus($userId, $name, $email, $accountNumber, $initial, $code);
+    $introduced = $code !== '' && record_referral($userId, $name, $email, $code);
     // The enquiry is closed out here rather than left for someone to tidy later,
     // so the pipeline shows what actually happened to it.
     // A lump-sum plan is funded at the counter: the money is paid in with the
@@ -650,10 +650,8 @@ function route_register(array $d): void
     // collection, and booking it as paid today would be a lie on the statement.
     $deposit = null;
     if ($terms !== null) {
-        // Relative, and read back, never computed from $initial. An absolute
-        // "SET balance = opening + plan" silently erased the referral bonus
-        // credited a few lines above: the member's statement showed the bonus
-        // and their balance did not contain it.
+        // Relative, and read back, never computed from $initial, so nothing
+        // credited earlier in this transaction can be silently overwritten.
         $balanceOf = fn() => (float)scalar('SELECT balance FROM accounts WHERE account_number = ?',
             [$accountNumber]);
         $balance = $balanceOf();
@@ -697,7 +695,7 @@ function route_register(array $d): void
     if ($lead !== null) {
         $pdo->prepare('UPDATE crm_leads SET stage = ?, converted_user_id = ?, referral_status = ? WHERE id = ?')
             ->execute(['enrolled', $userId,
-                $lead['referral_code'] === null ? null : ($bonus === null ? 'not_paid' : 'paid'),
+                $lead['referral_code'] === null ? null : ($introduced ? 'paid' : 'not_paid'),
                 $lead['id']]);
         // The scans follow the person. Left on the enquiry they would be
         // stranded behind a closed pipeline row, and the member would be asked
@@ -723,7 +721,7 @@ function route_register(array $d): void
     $user = row('SELECT * FROM users WHERE id = ?', [$userId]);
     audit($opener, 'ACCOUNT_OPENED', "$accountNumber for {$user['email']}"
         . ($lead === null ? '' : " from enquiry {$lead['id']}")
-        . ($bonus === null ? '' : " · referral $code paid " . rupees($bonus)));
+        . ($introduced ? " · introduced via $code" : ''));
     $pdo->commit();
 
     // No session is started. The teller who opened the account must stay
@@ -734,7 +732,7 @@ function route_register(array $d): void
     // rather than left for the teller to explain.
     respond(['status' => 'SUCCESS', 'user' => public_user($user),
         'account_number' => $accountNumber, 'user_id' => $accountNumber,
-        'referral_bonus' => $bonus, 'plan' => $plan === null ? null : out($plan),
+        'plan' => $plan === null ? null : out($plan),
         'deposit' => $deposit,
         'kyc_status' => $user['kyc_status'],
         'message' => "Account $accountNumber opened for {$user['name']}."
@@ -776,9 +774,8 @@ function route_self_register(array $d): void
     if (row('SELECT id FROM users WHERE phone = ?', [$phone])) {
         fail(400, 'An account already exists for this phone number. Please sign in instead.');
     }
-    // The reward is not paid here -- an unverified account moves no money, same
-    // as everything else on this route -- just held until KYC is verified (see
-    // apply_referral_bonus and its callers in modules/staff.php). An unknown
+    // The introduction is not recorded here, only held until KYC is verified (see
+    // pay_pending_referral and its callers in modules/staff.php). An unknown
     // code is dropped rather than blocking the sign-up over a typo.
     $referredBy = strtoupper(clip($d['referral_code'] ?? '', 12));
     if ($referredBy !== '' && !row('SELECT id FROM users WHERE referral_code = ?', [$referredBy])) {

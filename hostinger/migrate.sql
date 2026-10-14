@@ -576,8 +576,6 @@ INSERT IGNORE INTO system_parameters
     'Self-service fixed/recurring deposit, tenure 25-36 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
 ('param-dep-over-3y', 'deposit_rate_over_3y', 'Deposit rate, over 3 years', 'deposit_rates', 7.10, '% p.a.', 0, 12.5,
     'Self-service fixed/recurring deposit, tenure over 36 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
-('param-referral-reward', 'referral_reward_amount', 'Refer & Earn reward', 'program', 500.00, '₹', 0, 10000,
-    'Paid to both the referrer and the new member when an account opens via a referral code.'),
 ('param-face-threshold', 'face_match_auto_threshold', 'Face-match auto-approval threshold', 'program', 92.00, '%', 50, 100,
     'Video KYC face-match score at or above which a review is auto-approved.'),
 ('param-dd-fee', 'demand_draft_fee', 'Demand draft issuing fee', 'fees', 50.00, '₹', 0, 1000,
@@ -1370,3 +1368,8 @@ UPDATE schemes SET name = 'Niyamit Aay 40 Month MIS', scheme_type = 'mis', tenur
     slabs = NULL, status = 'active',
     notes = 'Plan book: ₹10,000 minimum, doubles in 40 months, paid out daily (~₹8.33/day on ₹10,000) -- above the Nidhi cap on its own numbers.'
     WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL AND daily_rate_percent IS NULL;
+
+-- No referral bonus any more: the Nidhi Rules, 2014 forbid an incentive for
+-- bringing in members or deposits, so record_referral() credits nothing and the
+-- parameter that set the amount has nothing left to set.
+DELETE FROM system_parameters WHERE id = 'param-referral-reward' OR param_key = 'referral_reward_amount';

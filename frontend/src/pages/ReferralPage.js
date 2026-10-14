@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Gift, Share2, Copy, Users, Wallet, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info, Award } from 'lucide-react';
+import { Gift, Share2, Copy, Users, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info, Award } from 'lucide-react';
 import { api } from '../services/api';
 import BoosterCard from '../components/BoosterCard';
 import { inr } from '../utils/format';
@@ -357,7 +357,7 @@ export default function ReferralPage() {
 
   const shareTo = (channel) => {
     if (!data) return;
-    const msg = encodeURIComponent(`Open a free savings account with AJSPay and we both get ₹${data.reward_amount}! ${data.referral_link}`);
+    const msg = encodeURIComponent(`Become a member of Aadhunik Jeewan Sanchay Nidhi (AJSPay): ${data.referral_link}`);
     const urls = {
       whatsapp: `https://wa.me/?text=${msg}`,
       twitter: `https://twitter.com/intent/tweet?text=${msg}`,
@@ -385,12 +385,12 @@ export default function ReferralPage() {
         <div className="flex items-start gap-3">
           <div className="w-11 h-11 rounded-md bg-white/10 flex items-center justify-center"><Gift className="w-6 h-6 text-white" /></div>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">Refer &amp; Earn</h1>
-            <p className="text-sm text-white/85 mt-1">{data.reward_note}</p>
+            <h1 className="text-2xl font-bold">Invite a member</h1>
+            <p className="text-sm text-white/85 mt-1">{data.note}</p>
           </div>
           <div className="text-right">
-            <div className="text-xs text-white/70">Total earned</div>
-            <div className="text-2xl font-bold">₹{(history?.total_earned || 0).toLocaleString('en-IN')}</div>
+            <div className="text-xs text-white/70">Introduced</div>
+            <div className="text-2xl font-bold">{history?.count || 0}</div>
           </div>
         </div>
       </div>
@@ -445,7 +445,7 @@ export default function ReferralPage() {
           {[
             { i: Share2, t: 'Share your link', d: 'Send your unique link over WhatsApp, email or social media.' },
             { i: Users, t: 'Friend joins & completes KYC', d: 'They open a new AJSPay account using your code.' },
-            { i: Wallet, t: 'Both get ₹500', d: `You and your friend each receive ₹${data.reward_amount} instantly.` }
+            { i: Award, t: 'Counted as your introduction', d: 'They show in your list and network below. No money is paid for an introduction.' }
           ].map((s, i) => (
             <div key={i} className="p-4 rounded-md border border-slate-200 bg-slate-50">
               <div className="w-8 h-8 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><s.i className="w-4 h-4" /></div>
@@ -460,7 +460,6 @@ export default function ReferralPage() {
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Your referrals ({history?.count || 0})</h2>
-          <span className="text-[11px] text-slate-500">Earned ₹{(history?.total_earned || 0).toLocaleString('en-IN')} so far</span>
         </div>
         <div className="overflow-x-auto">
           {history?.referrals?.length ? (
@@ -471,7 +470,6 @@ export default function ReferralPage() {
                   <th className="p-3 font-semibold">Contact</th>
                   <th className="p-3 font-semibold">Joined</th>
                   <th className="p-3 font-semibold">Status</th>
-                  <th className="p-3 font-semibold text-right">Credit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -498,11 +496,8 @@ export default function ReferralPage() {
                             : 'bg-amber-50 text-amber-700 border-amber-200'
                         }`}>
                           {paid ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Info className="w-2.5 h-2.5" />}
-                          {paid ? 'paid' : 'pending KYC'}
+                          {paid ? 'joined' : 'pending KYC'}
                         </span>
-                      </td>
-                      <td className={`p-3 text-right font-bold ${paid ? 'text-emerald-700' : 'text-slate-500'}`}>
-                        {paid ? `₹${r.credit_amount.toLocaleString('en-IN')}` : 'After KYC'}
                       </td>
                     </tr>
                   );
@@ -511,7 +506,7 @@ export default function ReferralPage() {
             </table>
           ) : (
             <div className="p-10 text-center text-xs text-slate-500">
-              No one has joined via your link yet. Share above to start earning!
+              No one has joined via your link yet.
             </div>
           )}
         </div>

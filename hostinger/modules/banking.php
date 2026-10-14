@@ -9,7 +9,6 @@ declare(strict_types=1);
 // rate change is an admin-panel save, not a deploy.
 const LOAN_RATE_DEFAULTS = ['personal' => 10.50, 'home' => 8.40, 'vehicle' => 8.75, 'gold' => 7.90];
 const DEPOSIT_RATE_DEFAULTS = ['under_1y' => 6.50, '1y_to_2y' => 7.25, '2y_to_3y' => 7.50, 'over_3y' => 7.10];
-const REFERRAL_REWARD_DEFAULT = 500.0;
 const DEMAND_DRAFT_FEE_DEFAULT = 50.0;
 const CARD_LIMIT_MAX_DEFAULT = 1000000.0;
 const SI_FREQUENCIES = ['daily', 'weekly', 'monthly', 'quarterly'];
@@ -846,11 +845,6 @@ function route_branches(array $d): void
 // signed-in member's own data instead of a fixed list of replies.
 
 // --- Refer & earn ------------------------------------------------------------------------
-function referral_reward(): float
-{
-    return param_value('referral_reward_amount', REFERRAL_REWARD_DEFAULT);
-}
-
 function ensure_referral_code(array $user): string
 {
     global $pdo;
@@ -870,43 +864,30 @@ function ensure_referral_code(array $user): string
     return $code;
 }
 
-// Called inside the registration transaction: credits both new customer and referrer.
-function apply_referral_bonus(string $userId, string $name, string $email, string $accountNumber, float $openingBalance,
-    string $code): ?float
+// Records who introduced a new member. Nothing is credited to either of them: the
+// Nidhi Rules, 2014 (Rule 6) forbid any brokerage or incentive for mobilising
+// members or deposits, so this used to be a ₹500 bonus each and is now only the
+// row the network tree and the standing ladder read. status 'paid' is kept as the
+// stored value for "introduction completed" because the ladder counts on it.
+function record_referral(string $userId, string $name, string $email, string $code): bool
 {
     global $pdo;
     $referrer = row('SELECT * FROM users WHERE referral_code = ?', [$code]);
-    $reward = referral_reward();
-    if (!$referrer || $referrer['id'] === $userId || $reward <= 0) {
-        return null;
-    }
-    $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE account_number = ?')->execute([$reward, $accountNumber]);
-    insert_txn(['user_id' => $userId, 'account_number' => $accountNumber, 'type' => 'credit', 'mode' => 'REFERRAL_BONUS',
-        'amount' => $reward, 'balance_after' => round($openingBalance + $reward, 2),
-        'counterparty_name' => 'Refer & Earn Bonus', 'counterparty_acc' => 'AJSPAY-REWARDS',
-        'ref_number' => 'RRB-' . random_int(1000000, 9999999), 'description' => "Welcome bonus via referral $code"]);
-    $referrerAccount = row('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at, id LIMIT 1 FOR UPDATE',
-        [$referrer['id']]);
-    if ($referrerAccount) {
-        $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?')->execute([$reward, $referrerAccount['id']]);
-        insert_txn(['user_id' => $referrer['id'], 'account_number' => $referrerAccount['account_number'],
-            'type' => 'credit', 'mode' => 'REFERRAL_BONUS', 'amount' => $reward,
-            'balance_after' => round((float)$referrerAccount['balance'] + $reward, 2),
-            'counterparty_name' => 'Refer & Earn Payout', 'counterparty_acc' => 'AJSPAY-REWARDS',
-            'ref_number' => 'RRP-' . random_int(1000000, 9999999), 'description' => "Reward for referring $name"]);
+    if (!$referrer || $referrer['id'] === $userId) {
+        return false;
     }
     $pdo->prepare('INSERT INTO referrals (id, referrer_id, referrer_email, referee_id, referee_name, referee_email, code,
             credit_amount, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([uuid4(), $referrer['id'], $referrer['email'], $userId, $name, $email, $code, $reward, 'paid']);
-    return $reward;
+        ->execute([uuid4(), $referrer['id'], $referrer['email'], $userId, $name, $email, $code, 0, 'paid']);
+    return true;
 }
 
 // A self-registered member's referral is on hold in users.referred_by_code
 // until this moment: KYC verification is the point route_self_register's own
-// message promised the bonus for ("as soon as they open an account and
-// complete KYC"), and the first point this account is allowed to hold a
-// referral credit at all. Called from inside the caller's own KYC-approval
+// message promised the introduction would count from ("as soon as they open an
+// account and complete KYC"), and the first point this account is allowed to hold a
+// recorded introduction at all. Called from inside the caller's own KYC-approval
 // transaction, so it never runs outside one. Safe to call on every KYC
 // approval, verified-to-verified included: the referrals row it checks for
 // is the guard against paying the same referee twice.
@@ -919,13 +900,7 @@ function pay_pending_referral(array $user): void
     if (row('SELECT id FROM referrals WHERE referee_id = ?', [$user['id']])) {
         return;
     }
-    $account = row('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at, id LIMIT 1 FOR UPDATE',
-        [$user['id']]);
-    if (!$account) {
-        return;
-    }
-    apply_referral_bonus($user['id'], $user['name'], $user['email'] ?? '', $account['account_number'],
-        (float)$account['balance'], $code);
+    record_referral($user['id'], $user['name'], $user['email'] ?? '', $code);
 }
 
 function route_referral_code(array $d): void
@@ -933,12 +908,10 @@ function route_referral_code(array $d): void
     global $config;
     $user = current_user();
     $code = ensure_referral_code($user);
-    $reward = referral_reward();
     respond(['referral_code' => $code,
         'referral_link' => rtrim($config['public_app_url'], '/') . '/open-account?ref=' . rawurlencode($code),
-        'reward_amount' => $reward,
-        'reward_note' => 'You and your friend each get ₹' . (int)$reward
-            . ' credited as soon as they open an account and complete KYC.']);
+        'note' => 'Anyone who opens a member account with your link and completes KYC is recorded as '
+            . 'introduced by you. No bonus or commission is paid for introductions (Nidhi Rules, 2014).']);
 }
 
 function route_referral_history(array $d): void
@@ -946,7 +919,7 @@ function route_referral_history(array $d): void
     $user = current_user();
     // referee_name is a snapshot taken when the referral was recorded. It goes
     // stale when a member's name is corrected, and it is empty for referrals
-    // written by anything other than the bonus path. The live name wins where
+    // written by anything other than record_referral(). The live name wins where
     // there is one; the snapshot is the fallback, so an account that has since
     // been removed still shows who it was.
     $paidRows = rows("SELECT r.id, COALESCE(u.name, r.referee_name) AS referee_name,
@@ -1216,8 +1189,8 @@ function route_referral_structure(array $d): void
         'is_paid' => false,
         'notice' => 'These are the figures printed in the plan book. Aadhunik Jeewan Sanchay Nidhi '
             . 'Limited does not pay them: the Nidhi Rules, 2014 do not allow a Nidhi to pay brokerage '
-            . 'or incentive for bringing in deposits. What you do earn for an introduction is the '
-            . 'Refer & Earn bonus shown on this page, and your standing on the member ladder.',
+            . 'or incentive for bringing in deposits. An introduction earns nothing but your standing '
+            . 'on the member ladder, which is recognition only.',
         'stages' => REFERRAL_STAGES,
         'instalment' => ['columns' => REFERRAL_STAGES, 'levels' => $instalment],
         'one_time' => ['columns' => array_column(REFERRAL_ONE_TIME_FAMILIES, 'label'), 'levels' => $oneTime],

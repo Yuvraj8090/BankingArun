@@ -624,9 +624,6 @@ function LeadsTab() {
         await api.crmLeadUpdate(opening.id, { scheme_code: account.scheme_code || '' });
       }
       const r = await api.openAccount({ ...account, lead_id: opening.id });
-      if (r.referral_bonus) {
-        toast.success(`Referral bonus of ₹${r.referral_bonus} paid to both sides.`);
-      }
       setOpening(null);
       // account is kept (not cleared) until the "opened" modal is dismissed —
       // the printable preview below reads introducer/opening-deposit fields
@@ -857,9 +854,9 @@ function LeadsTab() {
                             <span className={`text-[10px] font-semibold ${
                               l.referral_status === 'paid' ? 'text-emerald-700'
                                 : l.referral_status === 'not_paid' ? 'text-[#c8102e]' : 'text-amber-700'}`}>
-                              {l.referral_status === 'paid' ? 'bonus paid'
+                              {l.referral_status === 'paid' ? 'introduction recorded'
                                 : l.referral_status === 'not_paid' ? 'code did not match'
-                                : 'pays on enrolment'}
+                                : 'counts on enrolment'}
                             </span>
                           </div>
                         ) : <span className="text-slate-500">—</span>}

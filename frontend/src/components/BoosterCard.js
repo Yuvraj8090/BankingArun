@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowRight, Zap } from 'lucide-react';
 import { inr } from '../utils/format';
 
-// Shared by the standing page and Refer & Earn. The member asks the same
+// Shared by the standing page and Invite a Member. The member asks the same
 // question in both places -- what am I on, and what gets me to the next one --
 // so the answer had better not be two different components drifting apart.
 function BoosterCard({ booster }) {

@@ -460,6 +460,16 @@ Q "DELETE FROM referrals WHERE referee_id='apitest-ref-pending';
 call GET /referrals/history "$RETAIL"
 has "pending referred sign-up appears before KYC" "$BODY" "APITEST Pending Referral"
 has "pending referred sign-up is labelled pending" "$BODY" "pending_kyc"
+# Verifying their KYC records the introduction and pays nobody (Nidhi Rules, Rule 6).
+Q "INSERT INTO accounts (id, user_id, account_number, account_type, account_name, balance, branch, ifsc_code, status)
+   VALUES ('apitest-ref-acc', 'apitest-ref-pending', 'AJSP0APITEST1', 'Savings', 'APITEST', 0, 'AJSP-MUM-042', 'AJSP0000042', 'active');" >/dev/null
+BAL_BEFORE=$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")
+call POST /admin/kyc-action "$OWNER" '{"user_id":"apitest-ref-pending","status":"verified"}'
+ck "KYC approval goes through" 200 "$CODE"
+ck "the introduction is recorded" "1|0.00" "$(Q "SELECT CONCAT_WS('|',COUNT(*),COALESCE(MAX(credit_amount),0)) FROM referrals WHERE referee_id='apitest-ref-pending'")"
+ck "the introducer is paid nothing" "$BAL_BEFORE" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "nor is the new member" "0.00" "$(Q "SELECT balance FROM accounts WHERE account_number='AJSP0APITEST1'")"
+ck "no referral bonus transaction exists" "0" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='REFERRAL_BONUS' AND account_number IN ('$RETAIL_ACC','AJSP0APITEST1')")"
 
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
@@ -471,6 +481,7 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
    DELETE FROM kyc_documents WHERE lead_id IN (SELECT id FROM crm_leads WHERE phone='+91 90222 33444')
       OR user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
    DELETE FROM referrals WHERE referee_id='apitest-ref-pending';
+   DELETE FROM accounts WHERE id='apitest-ref-acc';
    DELETE FROM users WHERE id='apitest-ref-pending' OR email='apitest.pending.referral@example.com';
    DELETE FROM cards WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');
    DELETE FROM transactions WHERE user_id IN (SELECT id FROM users WHERE phone='+91 90222 33444');

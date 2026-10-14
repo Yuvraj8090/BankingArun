@@ -198,7 +198,7 @@ function route_admin_kyc_action(array $d): void
     $pdo->prepare('UPDATE users SET kyc_status = ?, kyc_reason = ? WHERE id = ?')
         ->execute([$d['status'], clip($d['rejection_reason'] ?? '', 255) ?: null, $customer['id']]);
     // Newly verified is the earliest point a self-registered sign-up is allowed
-    // to hold a referral credit -- see pay_pending_referral (modules/banking.php).
+    // to count as an introduction -- see pay_pending_referral (modules/banking.php).
     if ($d['status'] === 'verified') {
         pay_pending_referral($customer);
     }
@@ -257,7 +257,7 @@ function route_kyc_verify_and_fund(array $d): void
     $pdo->prepare('UPDATE users SET kyc_status = ?, kyc_reason = NULL WHERE id = ?')
         ->execute(['verified', $customer['id']]);
     // Newly verified is the earliest point a self-registered sign-up is allowed
-    // to hold a referral credit -- see pay_pending_referral (modules/banking.php).
+    // to count as an introduction -- see pay_pending_referral (modules/banking.php).
     pay_pending_referral($customer);
 
     $deposit = null;
