@@ -190,9 +190,17 @@ README has the correct pyapi status and how to run the tests.
 **demo** passwords only; production must never use them, and Security Centre checks
 for that.
 
-### 11. Shares on auto-admission are not paid for  ⬜
+### 11. Shares on auto-admission are not paid for  ✅ done 15 Oct
 A first deposit auto-admits the member with 10 shares (₹100), but no ₹100 is
 collected or posted.
+
+**Done:** auto-admission takes the ₹100 from the member's account in the same
+transaction as the folio. It appears on their statement as "Share Allotment"
+("Shares" in the PDF). Admission now happens only after the plan and the amount have
+passed, and only if the account covers both the deposit and the ₹100, so a refused
+booking charges nothing. Counter admissions are unchanged (the teller takes cash).
+**Your decision:** members auto-admitted before today got their shares without
+paying. Collecting that ₹100 from them retroactively is not done.
 
 ### 12. The API test suite wipes development data  ⬜
 Its cleanup deletes the **whole** member register, all CRM data and the agents.

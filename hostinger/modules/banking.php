@@ -269,7 +269,6 @@ function route_staff_book_deposit(array $d): void
     }
     $owner = row('SELECT * FROM users WHERE id = ?', [$account['user_id']]);
     require_kyc_verified($owner);
-    require_membership($owner);
 
     $planCode = strtoupper(clip($d['scheme_code'] ?? '', 20));
     if ($planCode !== '') {
@@ -298,6 +297,9 @@ function route_staff_book_deposit(array $d): void
         $dueToday = $amount;
         $principal = $amount;
     }
+    // After the plan and amount are known to be good, so a booking that is going
+    // to be refused anyway never admits (and charges) anybody first.
+    require_membership($owner, $dueToday);
 
     $pdo->beginTransaction();
     $account = row('SELECT * FROM accounts WHERE id = ? FOR UPDATE', [$account['id']]);
@@ -353,11 +355,6 @@ function route_book_deposit(array $d): void
     if ($amount <= 0) {
         fail(400, 'Deposit amount must be greater than ₹0.');
     }
-    // Nidhi Rules, 2014: deposits may be accepted from members only, and a
-    // member must hold at least ten equity shares. require_membership() admits
-    // the depositor on the spot if they are not on the register yet, so this
-    // never turns away someone who is otherwise clear to deposit.
-    require_membership($user);
 
     // A plan code (e.g. the Monthly Income Scheme) prices the deposit from the
     // published scheme's own slabs instead of the generic tenure tiers below --
@@ -389,6 +386,13 @@ function route_book_deposit(array $d): void
         $dueToday = $amount;
         $principal = $amount;
     }
+
+    // Nidhi Rules, 2014: deposits may be accepted from members only, and a
+    // member must hold at least ten equity shares. require_membership() admits
+    // the depositor on the spot if they are not on the register yet, so this
+    // never turns away someone who is otherwise clear to deposit. Called once the
+    // plan and amount have passed, so a refused booking charges nothing.
+    require_membership($user, $dueToday);
 
     $pdo->beginTransaction();
     [$account, $newBalance] = debit_account($user, $d['account_number'], $dueToday,

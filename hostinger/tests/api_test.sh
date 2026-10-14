@@ -93,6 +93,7 @@ Q "UPDATE schemes SET status='active' WHERE code='ZZ-CAP-1'" >/dev/null
 call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"scheme_code\":\"ZZ-CAP-1\",\"amount\":1000}"
 ck "an active over-cap plan cannot be booked" 422 "$CODE"
 has "and the refusal says it is closed" "$BODY" "closed to new deposits"
+ck "a refused booking admits and charges nobody" "0|0" "$(Q "SELECT CONCAT_WS('|',(SELECT COUNT(*) FROM member_register WHERE user_id='retail-001'),(SELECT COUNT(*) FROM transactions WHERE mode='SHARE_ALLOTMENT' AND user_id='retail-001'))")"
 hasnt "nor is it on the public plan list" "$(curl -s "$API/public/schemes")" "ZZ-CAP-1"
 Q "UPDATE schemes SET status='draft' WHERE code='ZZ-CAP-1'" >/dev/null
 
@@ -391,6 +392,8 @@ reset_balances
 call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
 ck "a non-member's first deposit is booked" 200 "$CODE"
 ck "and admits them with ten shares" "10" "$(Q "SELECT shares_held FROM member_register WHERE user_id='retail-001' AND status='active'")"
+ck "the ten shares are paid for from their account" "100.00" "$(Q "SELECT amount FROM transactions WHERE mode='SHARE_ALLOTMENT' AND user_id='retail-001'")"
+ck "so the balance is less the deposit and the share money" "132700.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
 ck "an identical booking a moment later is refused" 409 "$CODE"
 call POST /register/admit "$RETAIL" '{"user_id":"corp-001","shares":10}'
@@ -532,6 +535,7 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
    DELETE FROM transactions WHERE ref_number IN (SELECT deposit_number FROM deposits WHERE principal_amount IN (1000,5000));
    DELETE FROM deposits WHERE principal_amount IN (1000,5000);
    DELETE FROM screening_hits; DELETE FROM watchlist_entries;
+   DELETE FROM transactions WHERE mode='SHARE_ALLOTMENT' AND user_id IN ('retail-001','corp-001');
    DELETE FROM share_allotments; DELETE FROM member_register;
    DELETE FROM audit_logs WHERE action LIKE 'MEMBER_%' OR action LIKE 'SHARES_%'
      OR action LIKE 'SCREENING_%' OR action LIKE 'WATCHLIST_%' OR action='DEPOSIT_BOOKED';" >/dev/null

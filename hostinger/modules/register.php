@@ -208,7 +208,9 @@ function membership_of(string $userId): ?array
     return row("SELECT * FROM member_register WHERE user_id = ? AND status = 'active'", [$userId]);
 }
 
-function require_membership(array $user): array
+// $alsoDue is the deposit about to be taken, so a first deposit the account cannot
+// cover is refused before anybody is admitted or charged for shares.
+function require_membership(array $user, float $alsoDue = 0.0): array
 {
     $member = membership_of($user['id']);
     if (!$member) {
@@ -216,8 +218,19 @@ function require_membership(array $user): array
         // turned away for a real reason -- they self-registered and no teller
         // has admitted them yet. Admit them here, on the spot, with the
         // statutory minimum shares, rather than block the deposit they came to
-        // make and send them off to ask for the same ten shares at a desk.
-        admit_member($user, MIN_SHARES, [], $user);
+        // make and send them off to ask for the same ten shares at a desk. The
+        // shares are paid for from their own account (see admit_member).
+        $account = row('SELECT id, balance FROM accounts WHERE user_id = ? AND status = ? ORDER BY created_at, id LIMIT 1',
+            [$user['id'], 'active']);
+        if (!$account) {
+            fail(400, 'Becoming a member needs an active account to pay for the ' . MIN_SHARES . ' shares from.');
+        }
+        $shareMoney = MIN_SHARES * SHARE_FACE_VALUE;
+        if ((float)$account['balance'] < $shareMoney + $alsoDue) {
+            fail(400, 'Your first deposit also makes you a member, which costs ' . rupees($shareMoney) . ' for '
+                . MIN_SHARES . ' shares. This account needs ' . rupees($shareMoney + $alsoDue) . ' in all.');
+        }
+        admit_member($user, MIN_SHARES, ['pay_from' => $account['id'], 'reference' => 'Paid from account'], $user);
         $member = membership_of($user['id']);
     }
     if ((int)$member['shares_held'] < MIN_SHARES) {
@@ -269,6 +282,23 @@ function admit_member(array $user, int $shares, array $extra, array $actor): arr
         ->execute([uuid4(), $memberId, $user['id'], 'allotment', $shares, SHARE_FACE_VALUE,
             $shares * SHARE_FACE_VALUE, $certificate, $today, clip($extra['reference'] ?? '', 100) ?: 'Admission',
             $actor['id']]);
+    // At a counter the teller collects the share money in cash. Admitted from a
+    // deposit route there is nobody to hand it to, so it comes out of the member's
+    // account in this same transaction: a folio never exists without being paid for.
+    if (!empty($extra['pay_from'])) {
+        $price = $shares * SHARE_FACE_VALUE;
+        $acc = row('SELECT * FROM accounts WHERE id = ? FOR UPDATE', [$extra['pay_from']]);
+        if (!$acc || (float)$acc['balance'] < $price) {
+            $pdo->rollBack();
+            fail(400, 'Becoming a member costs ' . rupees($price) . " for $shares shares of " . rupees(SHARE_FACE_VALUE)
+                . ' each (Nidhi Rules, 2014), and this account does not hold that much.');
+        }
+        $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$price, $acc['id']]);
+        insert_txn(['user_id' => $user['id'], 'account_number' => $acc['account_number'], 'type' => 'debit',
+            'mode' => 'SHARE_ALLOTMENT', 'amount' => $price, 'balance_after' => round((float)$acc['balance'] - $price, 2),
+            'counterparty_name' => 'Share capital', 'counterparty_acc' => $folio, 'ref_number' => $certificate,
+            'description' => "$shares equity shares, folio $folio"]);
+    }
     $pdo->commit();
 
     // Screen and rate on admission — that is the point at which it is useful.
