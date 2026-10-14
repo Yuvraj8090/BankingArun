@@ -23,7 +23,7 @@ import DepositsInvestmentsPage from './pages/DepositsInvestmentsPage';
 import LoansPage from './pages/LoansPage';
 import KycAccountPage from './pages/KycAccountPage';
 import BranchLocatorPage from './pages/BranchLocatorPage';
-import AdminPortal from './pages/AdminPortal';
+import AdminPortal, { PendingKycPanel } from './pages/AdminPortal';
 import BankOwnerPanel from './pages/BankOwnerPanel';
 import StaffPanel from './pages/StaffPanel';
 import CollectionPanel from './pages/CollectionPanel';
@@ -166,7 +166,10 @@ function AppShell() {
     cards: <CardsChequesPage />,
     deposits: <DepositsInvestmentsPage />,
     loans: <LoansPage />,
-    kyc: <KycAccountPage />,
+    // Members manage their own KYC here; the counter roles get the queue they verify.
+    kyc: ['staff', 'admin', 'branch_manager', 'bank_owner'].includes(user.role)
+      ? <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto"><PendingKycPanel /></div>
+      : <KycAccountPage />,
     branches: <BranchLocatorPage />,
     admin: <AdminPortal />,
     owner: <BankOwnerPanel />,

@@ -85,9 +85,15 @@ and `reward_slabs` tables are now unused and can be dropped later.
 
 ## High: wrong or misleading in the app
 
-### 4. "KYC Verification" (staff) and "Applicant KYC" (loan officer) open the officer's own KYC page  ⬜
+### 4. "KYC Verification" (staff) and "Applicant KYC" (loan officer) open the officer's own KYC page  ✅ done 15 Oct
 They show "Upload Verified KYC Documents" for the signed-in officer instead
 of a queue of members to verify.
+
+**Done:** for staff, managers and the Director the KYC tab is now the verification
+queue, and tellers may use the queue and document review (`CRM_ROLES`). The loan
+officer's "Applicant KYC" item is removed. Also fixed: Reject used to save the stock
+reason "Incomplete document signature" and now asks for the real one, and the
+approve-and-fund plan list no longer offers over-cap plans.
 
 ### 5. Collections dashboard shows fake numbers  ⬜
 `modules/staff.php:76` hardcodes the recovery target ₹1,25,00,000 and the

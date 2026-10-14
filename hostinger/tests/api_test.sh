@@ -471,6 +471,13 @@ ck "the introducer is paid nothing" "$BAL_BEFORE" "$(Q "SELECT balance FROM acco
 ck "nor is the new member" "0.00" "$(Q "SELECT balance FROM accounts WHERE account_number='AJSP0APITEST1'")"
 ck "no referral bonus transaction exists" "0" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='REFERRAL_BONUS' AND account_number IN ('$RETAIL_ACC','AJSP0APITEST1')")"
 
+print "\n-- KYC verification desk --"
+call GET /admin/kyc-pending "$STAFF"; ck "a teller can open the KYC queue" 200 "$CODE"
+call GET /kyc/documents/queue "$STAFF"; ck "and the document review queue" 200 "$CODE"
+LOANS=$(login loans@ajspay.in "$(sed -n "/loans@ajspay.in/,/Password/p" "$AJSPAY_ROOT/../memory/test_credentials.md" | grep -m1 -o 'Password: `[^`]*`' | cut -d'`' -f2)")
+call GET /admin/kyc-pending "$LOANS"; ck "the loan desk cannot" 403 "$CODE"
+call GET /admin/kyc-pending "$RETAIL"; ck "nor can a member" 403 "$CODE"
+
 print "\n-- My Network: recognition only --"
 call GET /referrals/structure "$RETAIL"; ck "the plan-book commission table is gone" 404 "$CODE"
 call GET /my-standing "$RETAIL"; ck "standing still loads" 200 "$CODE"

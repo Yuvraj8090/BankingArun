@@ -167,9 +167,11 @@ function route_admin_overview(array $d): void
 // The Pending KYC tab's own list, paginated -- route_admin_overview's dashboard
 // widgets stay capped previews, but a queue staff work through needs every row
 // reachable, not just the newest 20.
+// KYC is verified at the counter, so tellers work this queue as well as managers
+// (CRM_ROLES); the loan and collection desks do not.
 function route_admin_kyc_pending(array $d): void
 {
-    staff_user(ADMIN_ROLES);
+    staff_user(CRM_ROLES);
     $sql = "SELECT * FROM users WHERE kyc_status = 'pending_approval'";
     $params = [];
     if (!empty($_GET['q'])) {
@@ -185,7 +187,7 @@ function route_admin_kyc_pending(array $d): void
 function route_admin_kyc_action(array $d): void
 {
     global $pdo;
-    $admin = staff_user(ADMIN_ROLES);
+    $admin = staff_user(CRM_ROLES);
     need($d, 'user_id', 'status');
     if (!in_array($d['status'], ['verified', 'rejected', 'pending_approval'], true)) {
         fail(422, 'status must be verified, rejected or pending_approval.');
@@ -218,7 +220,7 @@ function route_admin_kyc_action(array $d): void
 function route_kyc_verify_and_fund(array $d): void
 {
     global $pdo;
-    $admin = staff_user(ADMIN_ROLES);
+    $admin = staff_user(CRM_ROLES);
     need($d, 'user_id');
     $customer = row('SELECT * FROM users WHERE id = ?', [clip($d['user_id'], 36)]);
     if (!$customer) {
@@ -891,7 +893,7 @@ function route_kyc_document_upload(array $d): void
 // Reviewers only: the bytes come back here, and nowhere else.
 function route_kyc_documents_queue(array $d): void
 {
-    staff_user(ADMIN_ROLES);
+    staff_user(CRM_ROLES);
     // A document waiting against an enquiry has no member row yet, so the join
     // to users cannot be the thing that decides whether it is listed -- an inner
     // join here is what would hide an applicant's file from the very queue that
@@ -922,7 +924,7 @@ function route_kyc_documents_queue(array $d): void
 function route_kyc_document_review(array $d, string $id = ''): void
 {
     global $pdo;
-    $staff = staff_user(ADMIN_ROLES);
+    $staff = staff_user(CRM_ROLES);
     $doc = row('SELECT * FROM kyc_documents WHERE id = ?', [$id]);
     if (!$doc) {
         fail(404, 'That document no longer exists.');

@@ -113,8 +113,7 @@ export const NAV_BY_ROLE = {
   loan_officer: [
     { id: 'loan-dept', label: 'Loan Pipeline', icon: GanttChartSquare, testId: 'tab-loan-dept' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },
-    { id: 'loans', label: 'EMI Calculator', icon: Banknote, testId: 'tab-loans' },
-    { id: 'kyc', label: 'Applicant KYC', icon: FileBadge2, testId: 'tab-kyc' }
+    { id: 'loans', label: 'EMI Calculator', icon: Banknote, testId: 'tab-loans' }
   ]
 };
 

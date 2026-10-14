@@ -70,6 +70,7 @@ for email pw role in $USERS; do
   # Each menu page's backing call must not be refused for the role that sees it.
   for tab in ${=${${(f)NAV}[(r)$role *]#$role }}; do
     api=${PAGE_API[$tab]}
+    [[ $tab == kyc && $role == (staff|admin|branch_manager|bank_owner) ]] && api=/admin/kyc-pending
     [[ -z $api ]] && { bad "$role menu tab '$tab' has no smoke mapping"; continue; }
     c=$(code $api $T)
     if [[ $c == 2* ]]; then ok; else bad "$role sees '$tab' but GET $api -> $c"; fi

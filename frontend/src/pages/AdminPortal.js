@@ -270,7 +270,7 @@ function KycVerifyModal({ customer, onClose, onDone }) {
 
   useEffect(() => {
     api.schemesList()
-      .then(r => setSchemes((r.schemes || []).filter(s => s.status === 'active')))
+      .then(r => setSchemes((r.schemes || []).filter(s => s.status === 'active' && !s.exceeds_cap)))
       .catch(() => setSchemes([]));
   }, []);
 
@@ -378,7 +378,7 @@ function KycVerifyModal({ customer, onClose, onDone }) {
 // capped preview route_admin_overview keeps for its dashboard widgets --
 // a queue staff work through end to end needs every row reachable, not
 // just the newest 20 (modules/staff.php).
-function PendingKycPanel({ onDecided }) {
+export function PendingKycPanel({ onDecided }) {
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -393,10 +393,13 @@ function PendingKycPanel({ onDecided }) {
   useEffect(() => { setPage(1); }, [search]);
 
   const handleKycAction = async (userId, status) => {
+    // The member is told this reason, so it has to be the real one, not a stock phrase.
+    const reason = status === 'rejected' ? window.prompt('Why is this KYC being rejected? The member will see this.') : null;
+    if (status === 'rejected' && !reason?.trim()) return;
     try {
       const res = await api.adminKycAction({
         user_id: userId, status,
-        rejection_reason: status === 'rejected' ? 'Incomplete document signature' : null
+        rejection_reason: reason?.trim() || null
       });
       toast.success(res.message);
       load();
