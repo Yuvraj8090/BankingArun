@@ -11,6 +11,12 @@ API=${AJSPAY_API:-http://127.0.0.1:8002/api}
 DB=${AJSPAY_DB:-ajspay_php}
 J='Content-Type: application/json'
 Q() { mysql -u root -N -B "$DB" -e "$1"; }
+# Leave the database exactly as it was found. The suite deletes and rewrites rows
+# across many tables (the whole member register, CRM, screening...), so snapshot
+# it first and restore it on any exit, including a failure or Ctrl-C half way.
+SNAP=$(mktemp "${TMPDIR:-/tmp}/ajspay_api_test.XXXXXX")
+mysqldump -u root --single-transaction "$DB" > "$SNAP" || { print "could not snapshot $DB"; exit 1; }
+trap 'mysql -u root "$DB" < "$SNAP"; rm -f "$SNAP"' EXIT
 CFG_BACKUP=$(Q "SELECT TO_BASE64(data) FROM system_config WHERE id='global'")
 pass=0; fail=0
 ck()    { if [[ "$2" == "$3" ]]; then print "  ok   $1"; pass=$((pass+1)); else print "  FAIL $1: expected '$2' got '$3'"; fail=$((fail+1)); fi }

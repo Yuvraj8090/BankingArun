@@ -202,7 +202,13 @@ booking charges nothing. Counter admissions are unchanged (the teller takes cash
 **Your decision:** members auto-admitted before today got their shares without
 paying. Collecting that ₹100 from them retroactively is not done.
 
-### 12. The API test suite wipes development data  ⬜
+### 12. The API test suite wipes development data  ✅ done 15 Oct
 Its cleanup deletes the **whole** member register, all CRM data and the agents.
 It should delete only the rows it created. (The run on 14 Oct emptied the local
 member register and agents table.)
+
+**Done:** `api_test.sh` snapshots the dev database before it starts and restores it
+on exit, including on a failure or Ctrl-C, so a run leaves the data exactly as it
+found it (proved with a marker row in a table the suite empties). The local rows
+deleted by earlier runs had no seed and cannot be rebuilt. They were local test data
+only.
