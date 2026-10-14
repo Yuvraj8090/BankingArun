@@ -471,6 +471,13 @@ ck "the introducer is paid nothing" "$BAL_BEFORE" "$(Q "SELECT balance FROM acco
 ck "nor is the new member" "0.00" "$(Q "SELECT balance FROM accounts WHERE account_number='AJSP0APITEST1'")"
 ck "no referral bonus transaction exists" "0" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='REFERRAL_BONUS' AND account_number IN ('$RETAIL_ACC','AJSP0APITEST1')")"
 
+print "\n-- My Network: recognition only --"
+call GET /referrals/structure "$RETAIL"; ck "the plan-book commission table is gone" 404 "$CODE"
+call GET /my-standing "$RETAIL"; ck "standing still loads" 200 "$CODE"
+hasnt "no booster programme on the standing" "$BODY" '"booster"'
+hasnt "no rupee reward beside a rank" "$BODY" "reward_amount"
+call GET "/rank-tiers?programme=booster" "$OWNER"; ck "the booster ladder cannot be opened" 422 "$CODE"
+
 print "\n-- cleanup --"
 Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_name IN ('Tata Digital','Tata','Outside');
    DELETE FROM fraud_alerts; DELETE FROM security_events; DELETE FROM login_attempts;

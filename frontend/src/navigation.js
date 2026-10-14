@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ArrowRightLeft, CreditCard, PiggyBank, Banknote,
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
-  GanttChartSquare, Building2, Video, ShieldCheck, FileText, Gift, Repeat, Settings2,
+  GanttChartSquare, Building2, Video, ShieldCheck, FileText, Repeat, Settings2,
   Layers, ClipboardList, Contact2, BarChart3, BookUser, FileLock2, Gavel, Award, Radio,
   SlidersHorizontal, Eye
 } from 'lucide-react';
@@ -16,8 +16,7 @@ export const NAV_BY_ROLE = {
     { id: 'deposits', label: 'Deposits', icon: PiggyBank, testId: 'tab-deposits' },
     { id: 'loans', label: 'Loans', icon: Banknote, testId: 'tab-loans' },
     { id: 'standing-instructions', label: 'Standing Instructions', icon: Repeat, testId: 'tab-si' },
-    { id: 'referrals', label: 'Invite a Member', icon: Gift, testId: 'tab-referrals' },
-    { id: 'my-standing', label: 'My Standing', icon: Award, testId: 'tab-my-standing' },
+    { id: 'referrals', label: 'My Network', icon: Users, testId: 'tab-referrals' },
     { id: 'statements', label: 'Statements (PDF/Excel)', icon: FileText, testId: 'tab-statements' },
     { id: 'video-kyc', label: 'Video KYC', icon: Video, testId: 'tab-video-kyc' },
     { id: 'security', label: 'Security & Passkeys', icon: ShieldCheck, testId: 'tab-security' },

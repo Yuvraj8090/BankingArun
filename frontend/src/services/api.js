@@ -183,8 +183,6 @@ export const api = {
   referralHistory: async () => (await axios.get(`${API}/referrals/history`, getAuthHeaders())).data,
   // The brochure's twelve-level table, shown but never paid — see
   // route_referral_structure for why.
-  referralStructure: async (params = {}) =>
-    (await axios.get(`${API}/referrals/structure?${new URLSearchParams(params)}`, getAuthHeaders())).data,
   // Who joined under whom, multiple levels deep — for the network tree view.
   referralTree: async () => (await axios.get(`${API}/referrals/tree`, getAuthHeaders())).data,
 

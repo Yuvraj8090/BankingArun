@@ -1,210 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Gift, Share2, Copy, Users, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info, Award } from 'lucide-react';
 import { api } from '../services/api';
-import BoosterCard from '../components/BoosterCard';
-import { inr } from '../utils/format';
+import MyStandingPage from './MyStandingPage';
 import { toast } from 'sonner';
 
-// The twelve-level table printed in the plan book, and what it would come to on
-// one plan at one amount. It is shown because members are asked about it and the
-// desk had no way to answer; it is not paid, and the banner says so before any
-// number appears. See route_referral_structure.
-function BrochureStructure() {
-  const [data, setData] = useState(null);
-  const [schemes, setSchemes] = useState([]);
-  const [code, setCode] = useState('');
-  const [amount, setAmount] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api.referralStructure().then(setData).catch(() => setData(null));
-    api.publicSchemes().then((r) => setSchemes(r.schemes || [])).catch(() => setSchemes([]));
-  }, []);
-
-  const scheme = schemes.find((s) => s.code === code);
-  const slabs = scheme?.slabs || [];
-
-  const illustrate = async (nextCode, nextAmount) => {
-    setCode(nextCode);
-    setAmount(nextAmount);
-    if (!nextCode || !nextAmount) {
-      return setData((d) => (d ? { ...d, illustration: null } : d));
-    }
-    setBusy(true);
-    try {
-      setData(await api.referralStructure({ scheme_code: nextCode, amount: nextAmount }));
-    } catch (e) {
-      toast.error(e.response?.data?.detail || 'Could not work that out');
-    } finally { setBusy(false); }
-  };
-
-  if (!data) return null;
-  const ill = data.illustration;
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm" data-testid="referral-structure">
-      <div className="p-4 border-b border-slate-100">
-        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <Info className="w-4 h-4 text-[#0b3b8c]" /> What the plan book states
-        </h2>
-      </div>
-
-      <div className="p-4 space-y-4">
-        <div className="p-3 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-900"
-          data-testid="referral-structure-notice">
-          {data.notice}
-        </div>
-
-        {data.chain?.length > 0 && (
-          <div className="flex flex-wrap gap-2" data-testid="referral-chain">
-            {data.chain.map((c) => (
-              <span key={c.level} className="px-2 py-1 rounded-full text-[10px] font-semibold border border-slate-200 bg-slate-50 text-slate-700">
-                Level {c.level}: {c.members} member{c.members === 1 ? '' : 's'}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[11px] text-slate-600 mb-1">Work it out for a plan</label>
-            <select data-testid="referral-calc-scheme" value={code}
-              onChange={(e) => illustrate(e.target.value, '')}
-              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white">
-              <option value="">Choose a plan</option>
-              {schemes.map((sc) => <option key={sc.code} value={sc.code}>{sc.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[11px] text-slate-600 mb-1">
-              {['daily', 'recurring'].includes(scheme?.scheme_type) ? 'Monthly instalment' : 'Amount'}
-            </label>
-            <select data-testid="referral-calc-amount" value={amount} disabled={!scheme}
-              onChange={(e) => illustrate(code, e.target.value)}
-              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white disabled:bg-slate-50">
-              <option value="">{scheme ? 'Choose an amount' : 'Choose a plan first'}</option>
-              {slabs.map((sl) => <option key={sl.unit} value={sl.unit}>{inr(sl.unit)}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {busy && <p className="text-[11px] text-slate-500">Working it out…</p>}
-
-        <div className="flex items-baseline gap-2 mt-4">
-          <span className="text-[10px] font-bold text-slate-400">PART 1</span>
-          <h3 className="text-sm font-semibold text-slate-900">Commission Structure</h3>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[480px]">
-            <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
-              <tr>
-                <th className="p-2 font-semibold">Level</th>
-                {(ill ? ill.columns : data.instalment.columns).map((c) => (
-                  <th key={c} className="p-2 font-semibold text-right">{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {(ill ? ill.levels : data.instalment.levels).map((r) => (
-                <tr key={r.level} className="hover:bg-blue-50/40 transition-colors">
-                  <td className="p-2 font-semibold text-slate-900">{r.level}</td>
-                  {r.rates.map((rate, i) => (
-                    <td key={i} className="p-2 text-right text-slate-700">
-                      {rate === null ? <span className="text-slate-500">—</span> : (
-                        <>
-                          {ill && <span className="font-semibold">{inr(r.amounts[i] ?? 0)}</span>}
-                          <span className={ill ? 'text-slate-500 ml-1' : ''}>{rate}%</span>
-                        </>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {ill?.family_unknown && (
-          <p className="text-[11px] text-[#c8102e]" data-testid="referral-family-unknown">
-            The book sets the first-level rate per BN plan family, and no priced page says which
-            family this plan is in — so all four are shown. Ask head office before quoting one.
-          </p>
-        )}
-        {data.mis_note && (
-          <p className="text-[11px] text-slate-500" data-testid="referral-mis-note">{data.mis_note}</p>
-        )}
-
-        {/* Parts 2 and 3. The book numbers them as one structure, so showing
-            only the commission table showed a third of it. */}
-        {(data.programmes || []).map((prog) => (
-          <div key={prog.code} className="pt-4 mt-4 border-t border-slate-100"
-            data-testid={`programme-${prog.code}`}>
-            <div className="flex items-baseline gap-2">
-              {prog.part_no != null && (
-                <span className="text-[10px] font-bold text-slate-400">PART {prog.part_no}</span>
-              )}
-              <h3 className="text-sm font-semibold text-slate-900">{prog.name}</h3>
-            </div>
-            {prog.headline && <p className="text-[11px] text-slate-700 mt-0.5">{prog.headline}</p>}
-            {prog.qualifying_note && (
-              <p className="text-[11px] text-slate-500 mt-1">{prog.qualifying_note}</p>
-            )}
-            {prog.slabs.length > 0 && (
-              <div className="overflow-x-auto mt-2">
-                <table className="w-full text-left text-xs min-w-[320px]">
-                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-600">
-                    <tr>
-                      <th className="p-2 font-semibold">Business in the year</th>
-                      <th className="p-2 font-semibold text-right">What the book states</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {prog.slabs.map((sl) => (
-                      <tr key={sl.position} className="hover:bg-slate-50">
-                        <td className="p-2 text-slate-800">{sl.label}</td>
-                        <td className="p-2 text-right text-slate-900 font-semibold">
-                          {sl.payout_percent != null
-                            ? `${sl.payout_percent}%`
-                            : inr(sl.payout_amount)}
-                          {sl.payout_note && (
-                            <span className="font-normal text-slate-500"> {sl.payout_note}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {prog.source_note && (
-              <p className="text-[10px] text-slate-400 mt-1">{prog.source_note}</p>
-            )}
-          </div>
-        ))}
-
-        <p className="text-[11px] text-slate-500">
-          {ill
-            ? ill.basis === 'instalment'
-              ? `On ${ill.scheme.name} at ${inr(ill.unit)} a month, ${inr(ill.total_paid_in)} is paid in over the plan. `
-                + 'The four columns are years — the rate falls the longer the plan runs.'
-              : `On ${ill.scheme.name} at ${inr(ill.total_paid_in)} paid in once. `
-                + 'The four columns here are plan families, not years: the book prints a different '
-                + 'first-level rate for each.'
-            : 'Shown for instalment plans. Choose a plan above to see the amounts, and the one-time '
-              + 'plans use a separate table where the columns are plan families rather than years.'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// A member-by-member view of who joined under whom, multiple levels deep --
-// unlike the flat "Level 1: N members" pills above, this shows the actual
-// names and how they connect, as an org-chart: circular nodes joined by
-// connector lines, shaded darker at the root and lighter with each level.
-// Visualisation only: no reward or commission is attached to it (see
-// route_referral_structure's notice on why not).
 function buildNetworkTree(root, nodes) {
   const byParent = {};
   nodes.forEach((n) => {
@@ -322,7 +121,6 @@ function NetworkTree() {
 export default function ReferralPage() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState({ referrals: [], total_earned: 0, count: 0 });
-  const [standing, setStanding] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -342,7 +140,6 @@ export default function ReferralPage() {
       .catch(() => setHistory({ referrals: [], total_earned: 0, count: 0 }));
     // Separate, and allowed to fail quietly: the ladders are worth showing here
     // but nobody came to this page to be told they could not be loaded.
-    api.myStanding().then(setStanding).catch(() => setStanding(null));
   };
 
   useEffect(() => {
@@ -385,7 +182,7 @@ export default function ReferralPage() {
         <div className="flex items-start gap-3">
           <div className="w-11 h-11 rounded-md bg-white/10 flex items-center justify-center"><Gift className="w-6 h-6 text-white" /></div>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">Invite a member</h1>
+            <h1 className="text-2xl font-bold">My Network</h1>
             <p className="text-sm text-white/85 mt-1">{data.note}</p>
           </div>
           <div className="text-right">
@@ -514,24 +311,7 @@ export default function ReferralPage() {
 
       <NetworkTree />
 
-      {standing && (
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-5" data-testid="referral-standing">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
-            <Award className="w-3.5 h-3.5 text-[#0b3b8c]" /> Your standing
-          </div>
-          <p className="text-xl font-bold text-slate-900 mt-1">
-            {standing.standing || 'Not yet on the ladder'}
-          </p>
-          {standing.next && (
-            <p className="text-[11px] text-slate-600 mt-1">{standing.next.step}</p>
-          )}
-          <p className="text-[11px] text-slate-500 mt-2">{standing.note}</p>
-        </div>
-      )}
-
-      <BoosterCard booster={standing?.booster} />
-
-      <BrochureStructure />
+      <MyStandingPage embedded />
     </div>
   );
 }

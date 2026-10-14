@@ -57,7 +57,7 @@ parameter is removed (migrate.sql), and the menu item, page, sign-up and CRM cop
 no longer promise money. Bonuses paid before today are left as they were; reversing
 them is your decision.
 
-### 3. MLM structure already exists in the member app  ⬜
+### 3. MLM structure already exists in the member app  ✅ done 15 Oct
 - **Refer & Earn** shows a 12-level commission % table, a downline "tree" and
   the line "₹2,500 earned".
 - **My Standing** shows a 10-rung rank ladder (Silver to Brand Ambassador) and a
@@ -75,6 +75,13 @@ merges Refer & Earn and My Standing. It would show who you introduced and a
 recognition-only rank, with no money, no percentages and no rate boosters. The
 plans themselves stay in Deposits. Decide before item 3 is done (or get legal
 advice in writing first).
+
+**Done (your decision: My Network, no money):** Invite a Member and My Standing are
+merged into one **My Network** tab: invite link, people introduced, the tree, and the
+recognition ladder. Removed: the 12-level commission table, the plan illustration,
+the turnover programmes (`/referrals/structure`), the Booster programme (rows
+soft-deleted in migrate.sql) and the ₹ reward field on ranks. The `reward_programmes`
+and `reward_slabs` tables are now unused and can be dropped later.
 
 ## High: wrong or misleading in the app
 

@@ -30,35 +30,23 @@ const rankName = (tiers, position) =>
 
 const blankTier = (programme, position) => ({
   programme, position, name: '', direct_required: 2, required_below: 0,
-  min_deposit_each: programme === 'booster' ? 1000 : '',
-  reward_label: '', reward_amount: '', notes: '', status: 'active',
+  min_deposit_each: '',
+  reward_label: '', notes: '', status: 'active',
 });
 
 const LADDER_COPY = {
   standing: {
-    title: 'Ranks and rewards',
-    description: 'Add a rank, change what it takes, or write what it is worth.',
+    title: 'Ranks',
+    description: 'Add a rank, change what it takes, or write the recognition it brings. No money is attached to a rank.',
     add: 'Add a rank',
     edit: 'Edit',
     modal: 'Add a rank',
     save: 'Save rank',
-    worth: 'What this rank is worth',
-    amount: 'Figure, if the book states one',
-    rewardHead: 'Reward (shown, never paid)',
+    worth: 'Recognition this rank brings',
+    rewardHead: 'Recognition',
     any: 'Any member',
   },
-  booster: {
-    title: 'MIS Booster Plan',
-    description: 'Admin-managed MIS ladder: 2 directs at ₹1,000 for 6%, 4 for 7%, 6 for pool / 2x.',
-    add: 'Add a MIS rung',
-    edit: 'Edit',
-    modal: 'Add MIS rung',
-    save: 'Save MIS rung',
-    worth: 'MIS benefit shown to member',
-    amount: 'Figure, if applicable',
-    rewardHead: 'MIS benefit',
-    any: 'Any qualifying member',
-  },
+
 };
 
 // The ladder, editable. Every rung was a line in a PHP constant until recently,
@@ -91,7 +79,6 @@ function LadderEditor({ programme = 'standing', onChanged }) {
         required_below: Number(editing.required_below),
         min_deposit_each: editing.min_deposit_each === '' ? '' : Number(editing.min_deposit_each),
         // Sent as an empty string rather than 0 so "no figure" stays no figure.
-        reward_amount: editing.reward_amount === '' ? '' : Number(editing.reward_amount),
       };
       const r = editing.id
         ? await api.rankTierUpdate(editing.id, body)
@@ -163,11 +150,6 @@ function LadderEditor({ programme = 'standing', onChanged }) {
                 </td>
                 <td className="p-3 text-slate-600">
                   {t.reward_label || <span className="text-slate-400">—</span>}
-                  {t.reward_amount != null && t.reward_amount !== '' && (
-                    <span className="block text-[10px] text-slate-500">
-                      ₹{Number(t.reward_amount).toLocaleString('en-IN')}
-                    </span>
-                  )}
                 </td>
                 <td className="p-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
@@ -177,7 +159,7 @@ function LadderEditor({ programme = 'standing', onChanged }) {
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">
                   <button data-testid={`${programme}-rank-edit-${t.position}`}
-                    onClick={() => setEditing({ ...t, min_deposit_each: t.min_deposit_each ?? '', reward_amount: t.reward_amount ?? '' })}
+                    onClick={() => setEditing({ ...t, min_deposit_each: t.min_deposit_each ?? '' })}
                     className="text-[11px] font-semibold text-[#0b3b8c] hover:underline inline-flex items-center gap-1">
                     <Pencil className="w-3 h-3" /> edit
                   </button>
@@ -245,14 +227,8 @@ function LadderEditor({ programme = 'standing', onChanged }) {
             <label className="block md:col-span-2">
               <span className="block text-[11px] text-slate-600 mb-1">{copy.worth}</span>
               <input data-testid="rank-reward" value={editing.reward_label ?? ''}
-                placeholder={programme === 'booster' ? 'e.g. 6% monthly after 2 directs' : 'e.g. Recognised at the annual meet'}
+                placeholder="e.g. Recognised at the annual meet"
                 onChange={(e) => setEditing({ ...editing, reward_label: e.target.value })}
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
-            </label>
-            <label className="block">
-              <span className="block text-[11px] text-slate-600 mb-1">{copy.amount}</span>
-              <input type="number" min="0" data-testid="rank-reward-amount" value={editing.reward_amount ?? ''}
-                onChange={(e) => setEditing({ ...editing, reward_amount: e.target.value })}
                 className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
             </label>
             <label className="block">
@@ -357,7 +333,6 @@ export default function MemberRanksPage() {
       {canEdit && (
         <div className="space-y-6">
           <LadderEditor programme="standing" onChanged={load} />
-          <LadderEditor programme="booster" onChanged={load} />
         </div>
       )}
 

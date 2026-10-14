@@ -1376,7 +1376,6 @@ $routes = [
     'GET /my-standing' => 'route_my_standing',
     'GET /referrals/my-code' => 'route_referral_code',
     'GET /referrals/history' => 'route_referral_history',
-    'GET /referrals/structure' => 'route_referral_structure',
     'GET /referrals/tree' => 'route_referral_tree',
     'GET /rank-tiers' => 'route_rank_tiers',
     'POST /rank-tiers' => 'route_rank_tier_create',

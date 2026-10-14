@@ -1373,3 +1373,10 @@ UPDATE schemes SET name = 'Niyamit Aay 40 Month MIS', scheme_type = 'mis', tenur
 -- bringing in members or deposits, so record_referral() credits nothing and the
 -- parameter that set the amount has nothing left to set.
 DELETE FROM system_parameters WHERE id = 'param-referral-reward' OR param_key = 'referral_reward_amount';
+
+-- My Network (15 Oct 2026): the booster programme tied a higher deposit rate to
+-- recruiting, and a rupee reward beside a rank reads as a promise to pay for
+-- introductions. Both are retired; the standing ladder stays as recognition only.
+UPDATE rank_tiers SET deleted_at = NOW(), deleted_by = 'migration: My Network'
+    WHERE programme = 'booster' AND deleted_at IS NULL;
+UPDATE rank_tiers SET reward_amount = NULL WHERE reward_amount IS NOT NULL;

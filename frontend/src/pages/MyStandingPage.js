@@ -3,7 +3,6 @@ import {
   Award, RefreshCw, Copy, Check, Share2, MessageCircle, Mail, Users, ArrowRight, Info, Zap
 } from 'lucide-react';
 import { api } from '../services/api';
-import BoosterCard from '../components/BoosterCard';
 import { toast } from 'sonner';
 
 // A member's own view of the ladder.
@@ -17,7 +16,9 @@ import { toast } from 'sonner';
 // brokerage or incentive for bringing in deposits, so a figure printed beside a
 // rung would read as a promise to pay it.
 
-export default function MyStandingPage() {
+// Rendered inside My Network (ReferralPage), which already carries the invite link
+// and the list of introduced members, so `embedded` leaves those two out.
+export default function MyStandingPage({ embedded = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -64,7 +65,7 @@ export default function MyStandingPage() {
   const atTop = !data.next;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-5">
+    <div className={embedded ? 'space-y-5' : 'p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-5'}>
       {/* Where you are */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -106,10 +107,8 @@ export default function MyStandingPage() {
         </div>
       </div>
 
-      <BoosterCard booster={data.booster} />
-
       {/* How to actually do it */}
-      {!atTop && (
+      {!atTop && !embedded && (
         <Section title="Your invitation link" icon={Share2}>
           <p className="text-[11px] text-slate-600 leading-relaxed mb-3">
             Anyone who opens a member account through this link and completes their KYC is counted
@@ -140,7 +139,7 @@ export default function MyStandingPage() {
       )}
 
       {/* Who you introduced, and where each of them stands */}
-      <Section title={`Members you introduced (${data.introduced_count})`} icon={Users}>
+      {!embedded && <Section title={`Members you introduced (${data.introduced_count})`} icon={Users}>
         {data.introduced.length === 0 ? (
           <p className="text-[11px] text-slate-500 leading-relaxed">
             Nobody yet. Share the link above — each person who joins through it and completes their
@@ -165,13 +164,13 @@ export default function MyStandingPage() {
             ))}
           </ul>
         )}
-      </Section>
+      </Section>}
 
       {/* The ladder, for context rather than instruction */}
       <Section title="The ladder" icon={Award}>
         <p className="text-[11px] text-slate-600 mb-3 leading-relaxed">
-          Each rung needs {data.width} members you introduced who hold the rung below it. Silver is
-          the entry: {data.width} members of any standing.
+          Each rung needs a number of the members you introduced to hold the rung below it. The
+          first rung counts members of any standing.
         </p>
         <div className="overflow-x-auto -mx-1 px-1">
           <ol className="flex gap-2 min-w-max" data-testid="standing-ladder">

@@ -1127,12 +1127,10 @@ function route_automation_status(array $d): void
 // Adding a rung, renaming one, or changing how many introductions it takes is a
 // row now, not a deploy.
 //
-// reward_label and reward_amount describe what a tier is worth as the plan book
-// states it. Nothing here pays them and no code reads reward_amount to move
-// money: the Nidhi Rules, 2014 do not permit brokerage or incentive for
-// mobilising deposits, and the owner's standing decision is recognition without
-// commission. They are held so the same figure appears at the counter and on the
-// page, rather than being quoted from memory.
+// reward_label is the recognition a tier brings (a certificate, a mention at the
+// annual meet). There is no money figure: the Nidhi Rules, 2014 forbid brokerage or
+// incentive for mobilising deposits, and a rupee amount beside a rung reads as a
+// promise to pay it. reward_amount is always stored empty.
 
 function rank_tier_payload(array $d, array $existing = []): array
 {
@@ -1164,7 +1162,6 @@ function rank_tier_payload(array $d, array $existing = []): array
     if (!in_array($programme, RANK_PROGRAMMES, true)) {
         fail(422, 'programme must be one of: ' . implode(', ', RANK_PROGRAMMES));
     }
-    $amount = $get('reward_amount', null);
     $minDeposit = $get('min_deposit_each', null);
     return [
         'programme' => $programme,
@@ -1174,7 +1171,7 @@ function rank_tier_payload(array $d, array $existing = []): array
         'direct_required' => $direct,
         'required_below' => $below,
         'reward_label' => clip((string)$get('reward_label', ''), 200) ?: null,
-        'reward_amount' => ($amount === null || $amount === '') ? null : money($amount),
+        'reward_amount' => null,
         'notes' => clip((string)$get('notes', ''), 500) ?: null,
         'status' => $status,
     ];
@@ -1341,10 +1338,11 @@ function route_recycle_restore(array $d): void
 // Read once per request and kept, because the rank map walks it for every member
 // on every pass and re-querying inside that loop would turn one query into
 // thousands.
-// 'standing' is the recognition ladder; 'booster' adds a deposit condition to
-// every rung. Both live in one table so the engine, the admin screen and the
-// recycle bin serve them without being written twice.
-const RANK_PROGRAMMES = ['standing', 'booster'];
+// Only the recognition ladder. The plan book's 'booster' programme (a higher MIS rate
+// once N introduced members hold deposits) tied a return to recruiting, which the
+// Nidhi Rules and the Money Circulation Schemes (Banning) Act forbid; it was retired
+// on 15 Oct 2026 and its rows soft-deleted in migrate.sql.
+const RANK_PROGRAMMES = ['standing'];
 
 function rank_tiers(string $programme = 'standing'): array
 {
@@ -1421,7 +1419,7 @@ function member_rank_map(string $programme = 'standing'): array
                     if (($rank[$kid] ?? 0) < $needed) {
                         continue;
                     }
-                    // An introduction only counts towards a booster rung while
+                    // An introduction only counts towards a deposit-holding rung while
                     // the member they introduced is actually holding the money.
                     // A closed or matured deposit stops counting, which is the
                     // point of checking it rather than recording it once.
@@ -1457,123 +1455,6 @@ function member_rank_map(string $programme = 'standing'): array
 // the Nidhi Rules, 2014 forbid paying brokerage or incentive for bringing in
 // deposits, and a screen that showed a figure beside a rung would be read as a
 // promise to pay it.
-// Where a member stands on the booster ladder, and what is still missing. The
-// shortfall is counted the way the rung is judged -- an introduction only counts
-// while the member is holding the deposit -- so the number shown is the number
-// of people the member actually has to go and talk to.
-// A threshold, not a balance. rupees() prints two decimals, which is correct
-// for money that has moved and noise for a round qualifying figure.
-function threshold_amount(float $amount): string
-{
-    return '₹' . number_format($amount, fmod($amount, 1.0) === 0.0 ? 0 : 2);
-}
-
-function booster_standing(string $userId): array
-{
-    $tiers = rank_tiers('booster');
-    if ($tiers === []) {
-        return ['enabled' => false];
-    }
-    $map = member_rank_map('booster');
-    $level = $map[$userId] ?? 0;
-    $names = rank_names('booster');
-
-    $next = null;
-    foreach ($tiers as $tier) {
-        if ((int)$tier['position'] !== $level + 1) {
-            continue;
-        }
-        $need = (float)($tier['min_deposit_each'] ?? 0);
-        $holders = members_with_deposits_over($need);
-        $below = (int)$tier['required_below'];
-        $have = 0;
-        foreach (rows('SELECT referee_id FROM referrals WHERE referrer_id = ? AND status = ?',
-            [$userId, 'paid']) as $r) {
-            $kid = $r['referee_id'];
-            if (($map[$kid] ?? 0) >= $below && ($need <= 0 || isset($holders[$kid]))) {
-                $have++;
-            }
-        }
-        $short = max(0, (int)$tier['direct_required'] - $have);
-        $next = [
-            'name' => $tier['name'],
-            'needs' => (int)$tier['direct_required'],
-            'qualifying_now' => $have,
-            'short_by' => $short,
-            'min_deposit_each' => $need > 0 ? $need : null,
-            'needs_level' => $below === 0 ? null : ($names[$below] ?? null),
-            'reward_label' => $tier['reward_label'],
-            'reward_amount' => $tier['reward_amount'],
-            'how' => $short === 0
-                ? 'You have everything you need for ' . $tier['name'] . '.'
-                : sprintf('%d more %s %s%s.', $short, $short === 1 ? 'member' : 'members',
-                    $below === 0 ? 'who each hold ' . threshold_amount($need) . ' on deposit'
-                        : 'who have each reached ' . ($names[$below] ?? 'the level below'),
-                    $below === 0 ? '' : ' while holding ' . threshold_amount($need)),
-        ];
-    }
-
-    // Who the member actually introduced, what level each of them is on, and
-    // whether each is holding the deposit. Without this the card can say
-    // "0 of 4 counting right now" to somebody who has plainly introduced four
-    // people, and look broken rather than true. The answer is nearly always
-    // "they are a level below, or one of them closed their deposit", and the
-    // member can only act on it if they can see which.
-    $topNeed = 0.0;
-    foreach ($tiers as $tier) {
-        $topNeed = max($topNeed, (float)($tier['min_deposit_each'] ?? 0));
-    }
-    $holders = $topNeed > 0 ? members_with_deposits_over($topNeed) : [];
-    $directs = [];
-    $atLevel = [];
-    foreach (rows('SELECT r.referee_id, u.name FROM referrals r
-        JOIN users u ON u.id = r.referee_id
-        WHERE r.referrer_id = ? AND r.status = ? ORDER BY r.created_at', [$userId, 'paid']) as $r) {
-        $theirLevel = $map[$r['referee_id']] ?? 0;
-        $directs[] = [
-            'name' => $r['name'],
-            'level' => $theirLevel,
-            'level_name' => $theirLevel === 0 ? null : ($names[$theirLevel] ?? null),
-            'holds_deposit' => $topNeed <= 0 || isset($holders[$r['referee_id']]),
-        ];
-        $atLevel[$theirLevel] = ($atLevel[$theirLevel] ?? 0) + 1;
-    }
-    $current = null;
-    foreach ($tiers as $tier) {
-        if ((int)$tier['position'] === $level) {
-            $current = $tier;
-            break;
-        }
-    }
-
-    return [
-        'enabled' => true,
-        'level' => $level,
-        'name' => $level === 0 ? null : ($names[$level] ?? null),
-        'reward_label' => $current['reward_label'] ?? null,
-        'reward_amount' => $current['reward_amount'] ?? null,
-        'next' => $next,
-        'introduced' => $directs,
-        'introduced_count' => count($directs),
-        'holding_deposit' => count(array_filter($directs, fn($d) => $d['holds_deposit'])),
-        'min_deposit_each' => $topNeed > 0 ? $topNeed : null,
-        'ladder' => array_map(fn($t) => [
-            'position' => (int)$t['position'], 'name' => $t['name'],
-            'direct_required' => (int)$t['direct_required'],
-            'required_below' => (int)$t['required_below'],
-            'min_deposit_each' => $t['min_deposit_each'],
-            'reward_label' => $t['reward_label'],
-            // How many of this member's own introductions sit on this rung, so
-            // every level on the card carries a real number rather than only
-            // the one being worked towards.
-            'your_members_here' => $atLevel[(int)$t['position']] ?? 0,
-        ], $tiers),
-        'note' => 'Reaching a booster level is automatic: it is worked out from who you have '
-            . 'introduced and what they hold, and nothing has to be claimed. An introduction stops '
-            . 'counting if that member closes their deposit.',
-    ];
-}
-
 function route_my_standing(array $d): void
 {
     global $config;
@@ -1642,9 +1523,8 @@ function route_my_standing(array $d): void
             'position' => (int)$t['position'], 'name' => $t['name'],
             'direct_required' => (int)$t['direct_required'],
             'required_below' => (int)$t['required_below'],
-            'reward_label' => $t['reward_label'], 'reward_amount' => $t['reward_amount'],
+            'reward_label' => $t['reward_label'],
         ], rank_tiers()),
-        'booster' => booster_standing($user['id']),
         'referral_code' => $code,
         'referral_link' => rtrim((string)$config['public_app_url'], '/') . '/open-account?ref=' . rawurlencode($code),
         'note' => 'A standing is recognition only. No commission, brokerage or incentive is paid on it — '
@@ -1722,7 +1602,7 @@ function route_member_ranks(array $d): void
             'position' => (int)$t['position'], 'name' => $t['name'],
             'direct_required' => (int)$t['direct_required'],
             'required_below' => (int)$t['required_below'],
-            'reward_label' => $t['reward_label'], 'reward_amount' => $t['reward_amount'],
+            'reward_label' => $t['reward_label'],
         ], rank_tiers()),
         'note' => 'Standing only. No commission, brokerage or incentive is paid on it — '
             . 'the Nidhi Rules, 2014 prohibit paying for the mobilising of deposits.',
