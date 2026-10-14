@@ -52,7 +52,8 @@ def product_public(r: dict) -> dict:
 @router.get("/public/products")
 def public_products() -> dict:
     found = rows(
-        "SELECT * FROM site_products WHERE status = 'active' ORDER BY sort_order, title"
+        "SELECT * FROM site_products WHERE status = 'active' AND deleted_at IS NULL "
+        "ORDER BY sort_order, title"
     )
     return {"products": [product_public(r) for r in found]}
 
@@ -77,13 +78,16 @@ COMPANY_IDENTITY = {
 @router.get("/public/schemes")
 def public_schemes() -> dict:
     found = rows(
-        "SELECT * FROM schemes WHERE status = :status "
+        "SELECT * FROM schemes WHERE status = :status AND deleted_at IS NULL "
         "ORDER BY scheme_type, tenure_months, code",
         {"status": "active"},
     )
+    # A plan above the cap cannot be booked, so it is not advertised either
+    # (same rule as route_public_schemes in modules/master.php).
+    shaped = [scheme_public(r) for r in found]
     return {
         "company": COMPANY_IDENTITY,
-        "schemes": [scheme_public(r) for r in found],
+        "schemes": [s for s in shaped if not s["exceeds_cap"]],
         "max_rate_pa": NIDHI_MAX_DEPOSIT_RATE,
         "disclosure": "Returns are the amounts the scheme itself promises.",
     }
