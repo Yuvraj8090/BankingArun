@@ -20,7 +20,14 @@ call() { local out
   if [[ -n "$4" ]]; then out=$(curl -s -w '\n%{http_code}' -X "$1" "$API$2" -H "$J" -H "Authorization: Bearer $3" -d "$4")
   else out=$(curl -s -w '\n%{http_code}' -X "$1" "$API$2" -H "$J" -H "Authorization: Bearer $3"); fi
   CODE="${out##*$'\n'}"; BODY="${out%$'\n'*}"; }
-login() { curl -s -X POST "$API/auth/login" -H "$J" -d "{\"email\":\"$1\",\"password\":\"$2\"}" \
+# Login needs a captcha: take a real challenge, then pin its answer to 00000 using the local secret.
+export AJSPAY_ROOT=${AJSPAY_ROOT:-${0:A:h:h}}
+CAP_HASH=$(php -r '$c=require getenv("AJSPAY_ROOT")."/config.local.php"; echo hash_hmac("sha256","00000",$c["token_secret"]);')
+cap() { local id=$(curl -s "$API/public/captcha" | python3 -c 'import sys,json;print(json.load(sys.stdin)["captcha_id"])')
+  Q "UPDATE captcha_challenges SET code_hash='$CAP_HASH' WHERE id='$id'" >/dev/null; print -r -- "\"captcha_id\":\"$id\",\"captcha_answer\":\"00000\""; }
+# Staff and directors sign in through the staff door (portal=staff); members through the member one.
+login() { local portal=member; [[ $1 == *@ajspay.in ]] && portal=staff
+  curl -s -X POST "$API/auth/login" -H "$J" -d "{$(cap),\"portal\":\"$portal\",\"email\":\"$1\",\"password\":\"$2\"}" \
   | python3 -c 'import sys,json;print(json.load(sys.stdin).get("token",""))'; }
 jq_() { python3 -c "import sys,json;d=json.load(sys.stdin);$1"; }
 
@@ -185,7 +192,7 @@ CODE6=$(php -r 'require getenv("AJSPAY_ROOT")."/modules/mfa.php"; echo totp_code
 call POST /totp/enable "$RETAIL" '{"code":"000000"}'; ck "wrong code refused" 401 "$CODE"
 call POST /totp/enable "$RETAIL" "{\"code\":\"$CODE6\"}"; ck "live code enables 2FA" 200 "$CODE"
 ck "the secret is encrypted at rest" "enc:" "$(Q "SELECT LEFT(totp_secret,4) FROM users WHERE email='rahul.sharma@example.com'")"
-LOGIN=$(curl -s -X POST "$API/auth/login" -H "$J" -d '{"email":"rahul.sharma@example.com","password":"Banking@123"}')
+LOGIN=$(curl -s -X POST "$API/auth/login" -H "$J" -d "{$(cap),\"email\":\"rahul.sharma@example.com\",\"password\":\"Banking@123\"}")
 ck "password alone no longer returns a session" "False" "$(print -r -- "$LOGIN" | jq_ 'print("token" in d)')"
 Q "UPDATE users SET totp_enabled=0, totp_secret=NULL, totp_backup_codes=NULL, totp_enrolled_at=NULL WHERE email='rahul.sharma@example.com'" >/dev/null
 
@@ -193,7 +200,7 @@ print "\n-- rate limiting --"
 Q "DELETE FROM login_attempts" >/dev/null
 codes=""
 for i in $(seq 1 34); do
-  codes="$codes$(curl -s -o /dev/null -w '%{http_code} ' -X POST "$API/auth/login" -H "$J" -d '{"email":"nobody@example.com","password":"wrong"}')"
+  codes="$codes$(curl -s -o /dev/null -w '%{http_code} ' -X POST "$API/auth/login" -H "$J" -d "{$(cap),\"email\":\"nobody@example.com\",\"password\":\"wrong\"}")"
 done
 ck "repeated logins hit a 429" "1" "$(print -r -- "$codes" | grep -q 429 && echo 1 || echo 0)"
 Q "DELETE FROM login_attempts" >/dev/null
@@ -367,21 +374,23 @@ ck "skip and finish are audited distinctly" "2" "$(Q "SELECT COUNT(DISTINCT acti
 
 print "\n-- member register (Nidhi Rules 11) --"
 Q "DELETE FROM screening_hits; DELETE FROM watchlist_entries; DELETE FROM share_allotments; DELETE FROM member_register;" >/dev/null
+# A non-member's first deposit admits them on the spot with the statutory ten shares.
+reset_balances
 call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
-ck "a non-member cannot deposit" 403 "$CODE"
-has "and is told why" "$BODY" "members only"
-call POST /register/admit "$RETAIL" '{"user_id":"retail-001","shares":10}'
+ck "a non-member's first deposit is booked" 200 "$CODE"
+ck "and admits them with ten shares" "10" "$(Q "SELECT shares_held FROM member_register WHERE user_id='retail-001' AND status='active'")"
+call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
+ck "an identical booking a moment later is refused" 409 "$CODE"
+call POST /register/admit "$RETAIL" '{"user_id":"corp-001","shares":10}'
 ck "a member cannot admit anyone" 403 "$CODE"
-call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":5}'
+call POST /register/admit "$OWNER" '{"user_id":"corp-001","shares":5}'
 ck "fewer than ten shares is refused" 422 "$CODE"
-call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":10,"occupation":"Salaried"}'
+call POST /register/admit "$OWNER" '{"user_id":"corp-001","shares":10,"occupation":"Business"}'
 ck "admitted with ten shares" 200 "$CODE"
 has "a folio number is issued" "$BODY" '"folio_no"'
-ck "the share ledger records it" "10" "$(Q "SELECT COALESCE(SUM(shares),0) FROM share_allotments WHERE kind='allotment'")"
-call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":10}'
+ck "the share ledger records both" "20" "$(Q "SELECT COALESCE(SUM(shares),0) FROM share_allotments WHERE kind='allotment'")"
+call POST /register/admit "$OWNER" '{"user_id":"corp-001","shares":10}'
 ck "the same person cannot be admitted twice" 400 "$CODE"
-call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
-ck "a member can deposit" 200 "$CODE"
 call POST /register/shares "$OWNER" '{"user_id":"retail-001","shares":5,"kind":"surrender"}'
 ck "cannot drop below ten while deposits are live" 400 "$CODE"
 call POST "/register/cease/retail-001" "$OWNER" '{"reason":"requested"}'
@@ -462,6 +471,7 @@ Q "DELETE FROM transactions WHERE description LIKE '%APITEST%' OR counterparty_n
    DELETE FROM crm_tasks; DELETE FROM crm_interactions; DELETE FROM crm_leads;
    DELETE FROM audit_logs WHERE action LIKE 'TUTORIAL%';
    UPDATE users SET tutorial_status='completed', tutorial_step=0;
+   DELETE FROM transactions WHERE ref_number IN (SELECT deposit_number FROM deposits WHERE principal_amount IN (1000,5000));
    DELETE FROM deposits WHERE principal_amount IN (1000,5000);
    DELETE FROM screening_hits; DELETE FROM watchlist_entries;
    DELETE FROM share_allotments; DELETE FROM member_register;

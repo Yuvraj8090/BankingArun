@@ -33,14 +33,10 @@ cleanup() {
 print "AJSPay cron regression suite"
 cleanup
 Q "INSERT INTO system_config (id,data,updated_by) VALUES ('global','{}','cron_test')
-   ON DUPLICATE KEY UPDATE data = JSON_SET(data,
-     '$.capabilities.payment_systems.enabled', true,
-     '$.capabilities.payment_systems.reference', 'CRONTEST',
-     '$.capabilities.payment_systems.authorised_on', NOW(),
-     '$.capabilities.payment_systems.by', 'cron_test',
-     '$.rails.driver', 'simulator',
-     '$.rails.max_payout', 200000,
-     '$.rails.daily_payout_cap', 1000000), updated_by='cron_test';" >/dev/null
+   ON DUPLICATE KEY UPDATE data = JSON_MERGE_PATCH(data, JSON_OBJECT(
+     'capabilities', JSON_OBJECT('payment_systems', JSON_OBJECT('enabled', true, 'reference', 'CRONTEST',
+       'authorised_on', NOW(), 'by', 'cron_test')),
+     'rails', JSON_OBJECT('driver', 'simulator', 'max_payout', 200000, 'daily_payout_cap', 1000000))), updated_by='cron_test';" >/dev/null
 DBX <<SQL
 INSERT INTO standing_instructions (id,user_id,from_account_number,beneficiary_name,beneficiary_account,amount,frequency,category,start_date,end_date,remarks,status,executions,next_run) VALUES
 ('crontest-daily','retail-001','$RETAIL_ACC','Tata Digital','$CORP_ACC',100.00,'daily','generic','$TODAY',NULL,'CRONTEST daily','active',0,'$TODAY'),
@@ -126,7 +122,7 @@ ck "over threshold: 10% TDS withheld on the release" "15.50" \
 ck "over threshold: net of TDS credited, not the gross total" "139.50" \
   "$(Q "SELECT amount FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-B%'")"
 ck "matures with leftover accrued interest: gross tracked, TDS withheld" "matured|50.00|5.00" \
-  "$(Q "SELECT status,interest_paid,tds_deducted FROM deposits WHERE deposit_number='CRONTEST-DAILY-C'")"
+  "$(Q "SELECT CONCAT_WS('|',status,interest_paid,tds_deducted) FROM deposits WHERE deposit_number='CRONTEST-DAILY-C'")"
 ck "matures with leftover: principal + net interest paid out" "1045.00" \
   "$(Q "SELECT amount FROM transactions WHERE ref_number='MAT-CRONTEST-DAILY-C'")"
 
