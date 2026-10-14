@@ -7,6 +7,37 @@
 position below must be confirmed with counsel or the regulator before you rely
 on it.
 
+## Status update: 15 October 2026
+
+The audit below is the 14 September baseline. Since then, checked against the code:
+
+| Item | Then | Now |
+|---|---|---|
+| Member and share register (Rule 11) | Missing | **Implemented**: register, share ledger, minimum 10 shares, auto-admission on first deposit |
+| Customer risk categorisation | Missing | **Implemented** on admission |
+| Sanctions / PEP screening | Missing | **Implemented**: watchlists, screening runs, hit review, a confirmed match blocks transacting |
+| Principal Officer, Designated Director, Grievance Officer | Missing | **Implemented**: named in System Config, shown on the privacy notice |
+| DPDP notice, consent, data-principal requests | Missing | **Implemented**: privacy notice, consent, Data Requests queue with deadlines |
+| Grievance escalation and SLA | Partial | **Implemented**: Grievance Queue, 30-day clock |
+| Pagination | Missing | **Implemented**: shared `paginate()` (25 a page, up to 100) |
+| Interest credit and maturity | Missing | **Implemented**: daily, monthly and maturity jobs in `cron.php`, with TDS |
+| Deposit cap at 12.5% | Activation only | **Enforced at every booking**. Active over-cap plans are closed and hidden, and existing over-cap deposits are re-rated to 12.5% nightly |
+| Referral bonus (₹500 each side) | Paid in cash | **Stopped**: introductions are recorded and credit nobody |
+| 12-level commission table, booster programme | Displayed to members | **Removed**. "My Network" shows the tree and a recognition-only ladder |
+| NOF and NOF : deposits | Typed-in strings | **Computed** from the books, with NOF as a Business Parameter. Shown, not yet enforced at booking |
+| Corporate role, current account, cards, investments, unsecured loans | Live on the public site | **Unpublished**. Loans accept gold and home only (API-enforced) |
+| CVV storage | Non-compliant | **Not in the schema** |
+| Periodic re-KYC cycle | Missing | Still missing |
+| Beneficiary management with cooling-off | Missing | Still missing (internal transfers only) |
+| Passbook issue / printing | Missing | Still missing (PDF/Excel statements exist) |
+| CTR/STR in FIU-IND submission format | Partial | Still partial: on-screen reports and exports, no FIU XML |
+| NDH-1 / NDH-3 returns | Missing | Still missing |
+| 10% unencumbered term deposits | Displayed | Reported as "not tracked": there is no treasury book |
+
+The live task list is `docs/PENDING_TASKS.md`.
+
+---
+
 Status vocabulary used throughout:
 
 | Status | Meaning |

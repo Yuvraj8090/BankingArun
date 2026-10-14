@@ -13,7 +13,7 @@ Live at **https://ajspay.co.in**
 |---|---|---|
 | Frontend | React (CRA + craco), Tailwind | Live |
 | API | PHP 8.5 (`hostinger/`) | **Live — serves every route** |
-| API | FastAPI (`pyapi/`) | Port in progress, 1 of 144 routes |
+| API | FastAPI (`pyapi/`) | Port in progress, 11 of ~196 routes |
 | API | FastAPI + MongoDB (`backend/`) | Legacy dev stack, not deployed |
 | Database | MariaDB, 40 tables | Live |
 | Host | Apache on a VPS, Let's Encrypt | Live |
@@ -59,6 +59,11 @@ directly bypasses it and the build fails on `Can't resolve '@/index.css'`.
 Backend development needs PHP 8.1+ and MariaDB; import `schema.sql` into an
 empty database and create `hostinger/config.local.php` (see
 `hostinger/INSTALL_HOSTINGER.md`). That file is gitignored and must stay so.
+
+Tests: with the API on 127.0.0.1:8002 (`php -S 127.0.0.1:8002 api.php` from
+`hostinger/`), run `zsh hostinger/tests/run_all.sh`. It covers the API, the daily
+jobs, every role against every page, and the Python port. Never point it at
+production: the suites write and delete rows.
 
 ---
 

@@ -170,7 +170,7 @@ Cards, UPI, cheque book, demand draft and mutual funds are gated off but still
 fully built, both front and back. Choose: delete them (smaller and safer), or
 keep them gated.
 
-### 10. Stale .md files  ⬜
+### 10. Stale .md files  ✅ done 15 Oct
 - `memory/PRD.md`, `test_result.md`, `auth_testing.md`: Emergent-era, describe
   FastAPI/Mongo, cards, UPI and mutual funds, and two of them **contain the demo
   passwords**. Delete them, or replace them with a current summary.
@@ -180,6 +180,15 @@ keep them gated.
 - `docs/UAT_TEST_PLAN.md`: still points at `srv1983286.hstgr.cloud`, not
   `ajspay.co.in`.
 - `README.md`: the pyapi status line is out of date.
+
+**Done:** `memory/PRD.md`, `test_result.md` and `auth_testing.md` are deleted.
+`COMPLIANCE_AUDIT.md` opens with a status update checked against the code: what is
+built now, and what is still missing (re-KYC, beneficiaries, passbook, FIU XML,
+NDH returns). The UAT plan points at ajspay.co.in and checks the new behaviour. The
+README has the correct pyapi status and how to run the tests.
+`memory/test_credentials.md` stays, because the test suites read it. It holds
+**demo** passwords only; production must never use them, and Security Centre checks
+for that.
 
 ### 11. Shares on auto-admission are not paid for  ⬜
 A first deposit auto-admits the member with 10 shares (₹100), but no ₹100 is

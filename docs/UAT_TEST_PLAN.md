@@ -1,6 +1,6 @@
 # AJSPay — test plan
 
-**Site:** https://srv1983286.hstgr.cloud
+**Site:** https://ajspay.co.in
 **Build:** live on the Hostinger KVM 2 VPS (Mumbai)
 **Entity:** Aadhunik Jeewan Sanchay Nidhi Limited — a Nidhi company, *not* a bank
 
@@ -39,11 +39,12 @@ are deliberately not committed to the repository).
 - [ ] `/rates` shows the interest-rate table
 - [ ] `/branches` lists branches and ATMs
 - [ ] `/personal/fixed-deposits` loads normally
-- [ ] `/personal/debit-cards` loads **with an amber "Not currently offered" notice at the top**
-- [ ] `/investments/mutual-funds` also shows that notice
+- [ ] The navbar offers only Personal (savings, salary, FD, RD) and Loans (gold, home)
+- [ ] `/personal/debit-cards`, `/investments/mutual-funds` and `/corporate/trade-finance` show "We couldn't find that page"
+- [ ] `/help` shows the membership FAQ
 - [ ] A made-up address such as `/nothing-here` shows the "Page not found" page
 - [ ] The footer states the entity is a Nidhi company, not a bank, and not DICGC insured
-- [ ] The padlock in the address bar shows a valid certificate for `srv1983286.hstgr.cloud`
+- [ ] The padlock in the address bar shows a valid certificate for `ajspay.co.in`
 
 ## 2. Sign-in and security
 
@@ -83,6 +84,11 @@ are deliberately not committed to the repository).
 - [ ] Transaction history pages: 25 per page, and page 2 shows **different** rows to page 1
 - [ ] Filtering history by type or date changes the results
 - [ ] Support → raising a query returns a ticket number and a response deadline
+- [ ] The **Guide** button in the top bar opens a guide for the page you are on
+- [ ] Profile menu → **Help Centre** lists a guide for every menu page, then the FAQ
+- [ ] **My Network** shows your link, the people you introduced, the tree and your standing, with **no** rupee amounts, commission table or booster
+- [ ] Loans offers **Gold** and **Home** only
+- [ ] Deposits does **not** offer any plan above 12.5% a year
 
 ## 4. Staff / teller
 
@@ -156,12 +162,12 @@ The register is the reason a deposit can be refused. These checks prove it binds
 
 ## 7. Things that must stay blocked
 
-- [ ] `https://srv1983286.hstgr.cloud/db.php` → **403**
-- [ ] `https://srv1983286.hstgr.cloud/config.local.php` → **403**
-- [ ] `https://srv1983286.hstgr.cloud/cron.php` → **403**
-- [ ] `https://srv1983286.hstgr.cloud/schema.sql` → **403**
-- [ ] `https://srv1983286.hstgr.cloud/modules/staff.php` → **403**
-- [ ] `http://srv1983286.hstgr.cloud` redirects to `https://`
+- [ ] `https://ajspay.co.in/db.php` → **403**
+- [ ] `https://ajspay.co.in/config.local.php` → **403**
+- [ ] `https://ajspay.co.in/cron.php` → **403**
+- [ ] `https://ajspay.co.in/schema.sql` → **403**
+- [ ] `https://ajspay.co.in/modules/staff.php` → **403**
+- [ ] `http://ajspay.co.in` redirects to `https://`
 - [ ] A member signed in on one account cannot reach another member's data by changing a URL
 
 ## 8. Mobile and layout
