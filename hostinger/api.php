@@ -691,8 +691,7 @@ function route_register(array $d): void
         }
         $deposit = ['deposit_number' => $depositNumber, 'maturity_date' => $maturityDate] + $terms;
         audit($opener, 'DEPOSIT_BOOKED', "$depositNumber {$terms['scheme_code']} "
-            . rupees($terms['total_deposit']) . " for $accountNumber"
-            . ($terms['exceeds_cap'] ? ' (above the 12.5% cap on its own printed figures)' : ''));
+            . rupees($terms['total_deposit']) . " for $accountNumber");
     }
 
     if ($lead !== null) {

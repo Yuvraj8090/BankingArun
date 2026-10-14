@@ -181,6 +181,15 @@ function scheme_public(array $scheme): array
 // so rather than the figure being quietly trimmed to fit.
 function scheme_deposit_terms(array $scheme, float $unit): array
 {
+    // Every new booking goes through here, so the cap binds here too. Activation
+    // alone was not enough: plans loaded straight into the database never passed
+    // that check and kept taking deposits above the cap. Deposits already booked
+    // are untouched -- they are priced from their own stored row, not from this.
+    $headline = scheme_public($scheme)['effective_rate_pa'];
+    if ($headline !== null && $headline > NIDHI_MAX_DEPOSIT_RATE) {
+        fail(422, sprintf('%s returns about %.2f%% a year, above the %.1f%% cap in the Nidhi Rules, 2014, '
+            . 'so it is closed to new deposits.', $scheme['name'], $headline, NIDHI_MAX_DEPOSIT_RATE));
+    }
     // A simple daily-interest plan has no slab table -- any amount at or above
     // the minimum earns the same flat percent of itself, so there is nothing to
     // look up. Interest is credited daily and held back until it crosses
@@ -235,6 +244,10 @@ function scheme_deposit_terms(array $scheme, float $unit): array
             'scheme_type' => $scheme['scheme_type'],
             'payout_type' => $scheme['payout_type'],
         ]) ?? 0.0;
+    }
+    if ($rate > NIDHI_MAX_DEPOSIT_RATE) {
+        fail(422, sprintf('The %s denomination of %s returns about %.2f%% a year, above the %.1f%% cap, '
+            . 'so it is closed to new deposits.', rupees($unit), $scheme['name'], $rate, NIDHI_MAX_DEPOSIT_RATE));
     }
 
     return [
@@ -509,15 +522,14 @@ function route_public_market_rates(array $d): void
 }
 
 // Open to anyone, no login: the plans on sale and the terms attached to them.
-// Draft plans are never listed. A published plan may still price above the cap —
-// several do, on the owner's instruction — so scheme_public() rates every
-// denomination and marks the ones that exceed it rather than the listing
-// filtering them out.
+// Draft plans are never listed, and neither is a plan above the cap: it cannot be
+// booked (scheme_deposit_terms), so advertising it would only promise a return
+// the Nidhi Rules forbid. Staff still see it in the scheme master.
 function route_public_schemes(array $d): void
 {
-    $schemes = array_map('scheme_public', rows(
+    $schemes = array_values(array_filter(array_map('scheme_public', rows(
         'SELECT * FROM schemes WHERE status = ? AND deleted_at IS NULL
-            ORDER BY scheme_type, tenure_months, code', ['active']));
+            ORDER BY scheme_type, tenure_months, code', ['active'])), fn($s) => !$s['exceeds_cap']));
     respond([
         'company' => COMPANY_IDENTITY,
         'schemes' => $schemes,

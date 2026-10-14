@@ -27,7 +27,7 @@ Work through the list top to bottom. Type **next** to fix the next open item.
 
 ## Critical: legal exposure (Nidhi Rules, 2014)
 
-### 1. Five ACTIVE deposit plans are above the 12.5% cap  ⬜
+### 1. Five ACTIVE deposit plans are above the 12.5% cap  ✅ new bookings closed · ⏳ your call on existing deposits
 The app's own calculator gives these effective annual returns. Each plan's
 status is still `active`:
 

@@ -87,6 +87,14 @@ ck "over-cap scheme refused activation" 422 "$CODE"
 has "refusal names the rate" "$BODY" "above the 12.5% cap"
 call POST /schemes "$OWNER" '{"code":"ZZ-CAP-1","name":"Over cap","scheme_type":"recurring","tenure_months":12,"total_deposit":12000,"maturity_amount":16000,"status":"draft"}'
 ck "same scheme saved as a draft" 200 "$CODE"
+# A plan switched on straight in the database (as migrations did) skips that check,
+# so booking checks the cap again, and the public list does not advertise it.
+Q "UPDATE schemes SET status='active' WHERE code='ZZ-CAP-1'" >/dev/null
+call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"scheme_code\":\"ZZ-CAP-1\",\"amount\":1000}"
+ck "an active over-cap plan cannot be booked" 422 "$CODE"
+has "and the refusal says it is closed" "$BODY" "closed to new deposits"
+hasnt "nor is it on the public plan list" "$(curl -s "$API/public/schemes")" "ZZ-CAP-1"
+Q "UPDATE schemes SET status='draft' WHERE code='ZZ-CAP-1'" >/dev/null
 
 # The cap applies to every published denomination, not just the headline one: a
 # member buys a slab, so a compliant headline must not smuggle an over-cap row in.
