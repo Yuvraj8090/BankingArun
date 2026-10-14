@@ -237,23 +237,18 @@ function NotFound() {
 function PublicFooter() {
   const columns = [
     {
-      heading: 'Personal Banking',
+      heading: 'Deposits',
       links: [
         ['Savings Account', '/personal/savings-account'],
         ['Fixed Deposits', '/personal/fixed-deposits'],
-        ['Home Loan', '/loans/home-loan'],
-        ['Personal Loan', '/loans/personal-loan'],
-        ['Debit & Credit Cards', '/personal/debit-cards']
+        ['Recurring Deposit', '/personal/recurring-deposit']
       ]
     },
     {
-      heading: 'Corporate',
+      heading: 'Loans',
       links: [
-        ['Current Account', '/corporate/current-account'],
-        ['Bulk NEFT / RTGS', '/corporate/bulk-neft-rtgs'],
-        ['Trade Finance', '/corporate/trade-finance'],
-        ['Cash Management', '/corporate/cash-management'],
-        ['Payroll Services', '/corporate/payroll-services']
+        ['Gold Loan', '/loans/gold-loan'],
+        ['Home Loan', '/loans/home-loan']
       ]
     },
     {

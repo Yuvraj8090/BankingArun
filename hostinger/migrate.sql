@@ -1382,3 +1382,13 @@ DELETE FROM system_parameters WHERE id = 'param-referral-reward' OR param_key = 
 UPDATE rank_tiers SET deleted_at = NOW(), deleted_by = 'migration: My Network'
     WHERE programme = 'booster' AND deleted_at IS NULL;
 UPDATE rank_tiers SET reward_amount = NULL WHERE reward_amount IS NOT NULL;
+
+-- Public pages for products a Nidhi may not offer (Nidhi Rules, 2014): corporate
+-- banking and current accounts (members are individuals; current accounts are
+-- barred), cards, mutual funds, gold bonds, insurance, and unsecured personal,
+-- vehicle and education loans (lending is against gold, property, deposits or
+-- government securities only). Set to draft so the director can still see them.
+UPDATE site_products SET status = 'draft'
+    WHERE status = 'active' AND (group_key IN ('corporate', 'investments')
+       OR (group_key = 'personal' AND slug = 'debit-cards')
+       OR (group_key = 'loans' AND slug IN ('personal-loan', 'vehicle-loan', 'education-loan')));

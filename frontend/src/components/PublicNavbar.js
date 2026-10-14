@@ -13,40 +13,15 @@ const NAV_GROUPS = [
       ['Savings Account', '/personal/savings-account'],
       ['Salary Account', '/personal/salary-account'],
       ['Fixed Deposits', '/personal/fixed-deposits'],
-      ['Recurring Deposit', '/personal/recurring-deposit'],
-      ['Debit Cards', '/personal/debit-cards']
-    ]
-  },
-  {
-    key: 'corporate',
-    label: 'Corporate',
-    items: [
-      ['Current Account', '/corporate/current-account'],
-      ['Bulk NEFT / RTGS', '/corporate/bulk-neft-rtgs'],
-      ['Trade Finance', '/corporate/trade-finance'],
-      ['Payroll Services', '/corporate/payroll-services'],
-      ['Cash Management', '/corporate/cash-management']
+      ['Recurring Deposit', '/personal/recurring-deposit']
     ]
   },
   {
     key: 'loans',
     label: 'Loans',
     items: [
-      ['Home Loan', '/loans/home-loan'],
-      ['Personal Loan', '/loans/personal-loan'],
-      ['Vehicle Loan', '/loans/vehicle-loan'],
       ['Gold Loan', '/loans/gold-loan'],
-      ['Education Loan', '/loans/education-loan']
-    ]
-  },
-  {
-    key: 'invest',
-    label: 'Investments',
-    items: [
-      ['Mutual Funds', '/investments/mutual-funds'],
-      ['Fixed Deposits', '/personal/fixed-deposits'],
-      ['Sovereign Gold Bonds', '/investments/sovereign-gold-bonds'],
-      ['Insurance', '/investments/insurance']
+      ['Home Loan', '/loans/home-loan']
     ]
   }
 ];

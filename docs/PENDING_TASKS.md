@@ -106,11 +106,19 @@ works them out from the books. NOF comes from a new **Net owned funds** Business
 Parameter (enter it from the audited balance sheet). The ratio and the
 members-only check are computed. The 10% unencumbered rule says "not tracked".
 
-### 6. Corporate role does not fit a Nidhi  ⬜
+### 6. Corporate role does not fit a Nidhi  ✅ done 15 Oct
 Nidhi members must be individuals, and current accounts are prohibited. The
 corporate login still shows "Bulk Transfers", "Treasury", "Trade Finance", a
 "Current" account, and a public page `/corporate/trade-finance`. Fix: retire the
 corporate role from sign-up and the menus, and unpublish the trade-finance page.
+
+**Done:** corporate accounts already could not be created. The separate corporate
+menu is removed, so the one legacy demo login gets the member menu. Twelve public
+pages for things a Nidhi may not offer are set to draft (migrate.sql) and removed
+from the navbar, footer, homepage tiles, quick links and the bundled fallback:
+corporate (5), mutual funds, gold bonds, insurance, debit cards, and personal,
+vehicle and education loans. The public site now offers savings, salary, FD, RD,
+gold loan and home loan. The legacy bulk-payout route goes with item 9.
 
 ### 7. Banking language still on member screens  ⬜
 - Transfers: "IMPS (24x7) | NEFT | RTGS", "Corporate Payout Hub"

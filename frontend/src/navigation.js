@@ -6,7 +6,8 @@ import {
   SlidersHorizontal, Eye
 } from 'lucide-react';
 
-// Role → sidebar menu. The same list is the access rule for /app/* URLs:
+// Role → sidebar menu. A role not listed here (the legacy 'corporate' login) gets the
+// member menu: a Nidhi's members are individuals, so there is no separate corporate one. The same list is the access rule for /app/* URLs:
 // a role may only open the tabs listed here (plus ALWAYS_ALLOWED below).
 export const NAV_BY_ROLE = {
   retail: [
@@ -21,18 +22,6 @@ export const NAV_BY_ROLE = {
     { id: 'video-kyc', label: 'Video KYC', icon: Video, testId: 'tab-video-kyc' },
     { id: 'security', label: 'Security & Passkeys', icon: ShieldCheck, testId: 'tab-security' },
     { id: 'kyc', label: 'KYC / Profile', icon: FileBadge2, testId: 'tab-kyc' },
-    { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
-  ],
-  corporate: [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, testId: 'tab-dashboard' },
-    { id: 'transfer', label: 'Bulk Transfers', icon: ArrowRightLeft, testId: 'tab-transfer' },
-    { id: 'cards', label: 'Cards & UPI', icon: CreditCard, testId: 'tab-cards', requires: 'debit_cards' },
-    { id: 'deposits', label: 'Treasury', icon: PiggyBank, testId: 'tab-deposits' },
-    { id: 'loans', label: 'Trade Finance', icon: Banknote, testId: 'tab-loans' },
-    { id: 'standing-instructions', label: 'Standing Instructions', icon: Repeat, testId: 'tab-si' },
-    { id: 'statements', label: 'Statements (PDF/Excel)', icon: FileText, testId: 'tab-statements' },
-    { id: 'security', label: 'Security & Passkeys', icon: ShieldCheck, testId: 'tab-security' },
-    { id: 'kyc', label: 'Corporate KYC', icon: FileBadge2, testId: 'tab-kyc' },
     { id: 'branches', label: 'Branch & ATM', icon: MapPin, testId: 'tab-locator' }
   ],
   admin: [

@@ -478,6 +478,13 @@ hasnt "no typed-in ratio" "$BODY" "1:18"
 call GET /panel/collection "$OWNER"
 hasnt "no made-up recovery target" "$BODY" "recovery_target_month"
 
+print "\n-- public site offers only what a Nidhi may --"
+PUB=$(curl -s "$API/public/products")
+for p in trade-finance current-account mutual-funds insurance debit-cards personal-loan vehicle-loan education-loan; do
+  hasnt "no public page for $p" "$PUB" "\"$p\""
+done
+has "gold loan is still offered" "$PUB" "gold-loan"
+
 print "\n-- KYC verification desk --"
 call GET /admin/kyc-pending "$STAFF"; ck "a teller can open the KYC queue" 200 "$CODE"
 call GET /kyc/documents/queue "$STAFF"; ck "and the document review queue" 200 "$CODE"

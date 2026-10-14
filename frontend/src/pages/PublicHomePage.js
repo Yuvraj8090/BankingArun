@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import {
   ShieldCheck, ArrowRight, Lock, UserPlus, Calculator, PiggyBank,
-  Banknote, CreditCard, CheckCircle2, Fingerprint, HomeIcon,
-  Car, GraduationCap, Briefcase, TrendingUp, Umbrella, ChevronRight,
+  Banknote, CheckCircle2, Fingerprint, HomeIcon, Coins,
+  TrendingUp, ChevronRight,
   Phone, HelpCircle, MapPin, Video
 } from 'lucide-react';
 
@@ -31,10 +31,7 @@ export default function PublicHomePage() {
   const fdTwoToThree = clean(fact('personal/fixed-deposits', '2 years to 3 years'));
   const seniorBonus = clean(fact('personal/fixed-deposits', 'Senior citizen bonus'));
   const homeLoanRate = clean(fact('loans/home-loan', 'Interest rate'));
-  const personalLoanRate = clean(fact('loans/personal-loan', 'Interest rate'));
-  const vehicleLoanRate = clean(fact('loans/vehicle-loan', 'Interest rate'));
   const goldLoanRate = clean(fact('loans/gold-loan', 'Interest rate'));
-  const educationLoanRate = clean(fact('loans/education-loan', 'Interest rate'));
 
   // Calculators
   const [calcType, setCalcType] = useState('emi');
@@ -60,10 +57,7 @@ export default function PublicHomePage() {
     { label: 'Fixed Deposit (2-3 Yrs)', value: fdTwoToThree },
     { label: 'Senior Citizen FD bonus', value: seniorBonus },
     { label: 'Home Loan', value: homeLoanRate },
-    { label: 'Personal Loan', value: personalLoanRate },
-    { label: 'Vehicle Loan', value: vehicleLoanRate },
     { label: 'Gold Loan', value: goldLoanRate },
-    { label: 'Education Loan', value: educationLoanRate },
     marketRates?.usd_inr && {
       label: 'USD / INR (ECB daily)',
       value: `₹${Number(marketRates.usd_inr.rate).toFixed(2)} as of ${marketRates.usd_inr.as_of}`
@@ -75,23 +69,17 @@ export default function PublicHomePage() {
   const products = [
     { icon: PiggyBank, label: 'Savings Account', desc: savingsRate ? `Zero balance, ${savingsRate}` : 'Zero-balance member account', to: '/personal/savings-account', color: 'text-blue-800' },
     { icon: HomeIcon, label: 'Home Loan', desc: homeLoanRate || 'Buy, build or transfer', to: '/loans/home-loan', color: 'text-emerald-700' },
-    { icon: Car, label: 'Vehicle Loan', desc: vehicleLoanRate || 'New and used vehicles', to: '/loans/vehicle-loan', color: 'text-slate-700' },
-    { icon: CreditCard, label: 'Debit & Credit Cards', desc: 'Freeze, limits, UPI', to: '/personal/debit-cards', color: 'text-[#c8102e]' },
     { icon: TrendingUp, label: 'Fixed Deposit', desc: fdOneToTwo ? `1-2 years: ${fdOneToTwo}` : 'Flexible deposit tenures', to: '/personal/fixed-deposits', color: 'text-blue-800' },
-    { icon: Briefcase, label: 'Corporate Banking', desc: 'Bulk NEFT · Trade finance', to: '/corporate/current-account', color: 'text-slate-700' },
-    { icon: GraduationCap, label: 'Education Loan', desc: 'Study in India or abroad', to: '/loans/education-loan', color: 'text-emerald-700' },
-    { icon: Umbrella, label: 'Insurance', desc: 'Term · Health · Motor', to: '/investments/insurance', color: 'text-[#c8102e]' }
+    { icon: Banknote, label: 'Recurring Deposit', desc: 'Save a fixed amount every month', to: '/personal/recurring-deposit', color: 'text-emerald-700' },
+    { icon: Coins, label: 'Gold Loan', desc: goldLoanRate || 'Against your gold jewellery', to: '/loans/gold-loan', color: 'text-amber-700' }
   ];
 
   // Each shortcut names the capability it needs, so the panel never invites a
   // visitor towards a service this institution is not authorised to offer.
   const ALL_QUICK_LINKS = [
     ['Open Savings Account', '/personal/savings-account', null],
-    ['Apply for a Loan', '/loans/personal-loan', 'loans'],
+    ['Apply for a Loan', '/loans/gold-loan', 'loans'],
     ['Book a Fixed Deposit', '/personal/fixed-deposits', 'deposits'],
-    ['Get a Debit Card', '/personal/debit-cards', 'debit_cards'],
-    ['Start a SIP', '/investments/mutual-funds', 'mutual_funds'],
-    ['Bulk NEFT / RTGS', '/corporate/bulk-neft-rtgs', 'payment_systems'],
     ['Branch & ATM Locator', '/branches', null],
     ['Rates & Charges', '/rates', null]
   ];
@@ -194,7 +182,7 @@ export default function PublicHomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-900">Explore what we offer members</h2>
-          <p className="text-sm text-slate-600 mt-1">Everything you need for personal finance, retail operations and corporate treasury.</p>
+          <p className="text-sm text-slate-600 mt-1">Savings, deposits and secured loans for members of Aadhunik Jeewan Sanchay Nidhi Limited.</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
