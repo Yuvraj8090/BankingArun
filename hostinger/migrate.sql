@@ -618,7 +618,8 @@ UPDATE schemes SET status = 'active',
     contribution_amount = 6000.00, total_deposit = 432000.00, maturity_amount = 3849700.00,
     slabs = '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]',
     notes = 'Brochure p8. 72 monthly instalments, held to year 21.'
-    WHERE code = 'AJS-SL-21Y';
+    WHERE code = 'AJS-SL-21Y'
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- The last two brochure plans, activated on the owner's instruction. Both price
 -- well above the cap on their own printed figures -- the fixed deposit triples in
@@ -627,7 +628,8 @@ UPDATE schemes SET status = 'active',
 UPDATE schemes SET status = 'active',
     slabs = '[{"unit":2500,"deposit":2500,"maturity":7500},{"unit":3000,"deposit":3000,"maturity":9000},{"unit":3500,"deposit":3500,"maturity":10500},{"unit":4000,"deposit":4000,"maturity":12000},{"unit":4500,"deposit":4500,"maturity":13500},{"unit":5000,"deposit":5000,"maturity":15000},{"unit":5500,"deposit":5500,"maturity":16500},{"unit":6000,"deposit":6000,"maturity":18000},{"unit":7000,"deposit":7000,"maturity":21000},{"unit":8000,"deposit":8000,"maturity":24000},{"unit":9000,"deposit":9000,"maturity":27000},{"unit":10000,"deposit":10000,"maturity":30000},{"unit":12000,"deposit":12000,"maturity":36000},{"unit":14000,"deposit":14000,"maturity":42000},{"unit":15000,"deposit":15000,"maturity":45000},{"unit":17000,"deposit":17000,"maturity":51000},{"unit":18000,"deposit":18000,"maturity":54000},{"unit":20000,"deposit":20000,"maturity":60000},{"unit":25000,"deposit":25000,"maturity":75000},{"unit":30000,"deposit":30000,"maturity":90000},{"unit":33000,"deposit":33000,"maturity":99000},{"unit":35000,"deposit":35000,"maturity":105000},{"unit":40000,"deposit":40000,"maturity":120000},{"unit":45000,"deposit":45000,"maturity":135000},{"unit":50000,"deposit":50000,"maturity":150000},{"unit":60000,"deposit":60000,"maturity":180000},{"unit":70000,"deposit":70000,"maturity":210000},{"unit":80000,"deposit":80000,"maturity":240000},{"unit":90000,"deposit":90000,"maturity":270000},{"unit":100000,"deposit":100000,"maturity":300000},{"unit":125000,"deposit":125000,"maturity":375000},{"unit":150000,"deposit":150000,"maturity":450000}]',
     notes = 'Brochure p10-11. Every amount triples over eight years.'
-    WHERE code = 'AJS-FD-8Y';
+    WHERE code = 'AJS-FD-8Y'
+      AND updated_at < '2026-10-15 00:00:00';
 
 UPDATE schemes SET status = 'active',
     slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]',
@@ -745,7 +747,8 @@ UPDATE schemes SET status = 'active', scheme_type = 'recurring',
     payout_type = 'maturity',
     slabs = '[{"unit":500,"deposit":6000,"maturity":12000},{"unit":1000,"deposit":12000,"maturity":24000},{"unit":1500,"deposit":18000,"maturity":36000},{"unit":2000,"deposit":24000,"maturity":48000},{"unit":2500,"deposit":30000,"maturity":60000},{"unit":3000,"deposit":36000,"maturity":72000},{"unit":3500,"deposit":42000,"maturity":84000},{"unit":4000,"deposit":48000,"maturity":96000},{"unit":5000,"deposit":60000,"maturity":120000},{"unit":6000,"deposit":72000,"maturity":144000}]',
     notes = 'Brochure p13, BN-1018. Twelve monthly instalments, then held to year six and paid at double.'
-    WHERE code = 'AJS-12M-6Y';
+    WHERE code = 'AJS-12M-6Y'
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- Master data was deleted outright: a scheme, agent, branch or public page
 -- removed by mistake was gone, and the audit line saying who removed it was the
@@ -796,7 +799,8 @@ UPDATE schemes SET name = 'Daily Yojana 3 Year', scheme_type = 'daily',
     contribution_amount = 100.0, principal_amount = NULL,
     total_deposit = 108000.0, maturity_amount = 125900.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":100,"deposit":108000,"maturity":125900},{"unit":200,"deposit":216000,"maturity":253200},{"unit":300,"deposit":324000,"maturity":377500},{"unit":500,"deposit":540000,"maturity":629000}]'
-    WHERE code = 'AJS-DD-3Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-DD-3Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-DD-5Y: brochure p6. Daily Yojana 5 Year
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -809,7 +813,8 @@ UPDATE schemes SET name = 'Daily Yojana 5 Year', scheme_type = 'daily',
     contribution_amount = 500.0, principal_amount = NULL,
     total_deposit = 900000.0, maturity_amount = 1174000.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":50,"deposit":90000,"maturity":117900},{"unit":100,"deposit":180000,"maturity":235600},{"unit":200,"deposit":360000,"maturity":469500},{"unit":500,"deposit":900000,"maturity":1174000}]'
-    WHERE code = 'AJS-DD-5Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-DD-5Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-DD-6Y: brochure p6. Daily Yojana 6 Year
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -822,7 +827,8 @@ UPDATE schemes SET name = 'Daily Yojana 6 Year', scheme_type = 'daily',
     contribution_amount = 100.0, principal_amount = NULL,
     total_deposit = 216000.0, maturity_amount = 311600.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":50,"deposit":108000,"maturity":155800},{"unit":100,"deposit":216000,"maturity":311600},{"unit":200,"deposit":432000,"maturity":622600},{"unit":500,"deposit":1080000,"maturity":1555000}]'
-    WHERE code = 'AJS-DD-6Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-DD-6Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-RD-1Y: brochure p7. Masik Yojana 1 Year
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -835,7 +841,8 @@ UPDATE schemes SET name = 'Masik Yojana 1 Year', scheme_type = 'recurring',
     contribution_amount = 6000.0, principal_amount = NULL,
     total_deposit = 72000.0, maturity_amount = 76320.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":6000,"maturity":6360},{"unit":1000,"deposit":12000,"maturity":12720},{"unit":1500,"deposit":18000,"maturity":19080},{"unit":2000,"deposit":24000,"maturity":25440},{"unit":3000,"deposit":36000,"maturity":38160},{"unit":4000,"deposit":48000,"maturity":50880},{"unit":5000,"deposit":60000,"maturity":63600},{"unit":6000,"deposit":72000,"maturity":76320}]'
-    WHERE code = 'AJS-RD-1Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-RD-1Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-RD-2Y: brochure p7. Masik Yojana 2 Year
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -848,7 +855,8 @@ UPDATE schemes SET name = 'Masik Yojana 2 Year', scheme_type = 'recurring',
     contribution_amount = 6000.0, principal_amount = NULL,
     total_deposit = 144000.0, maturity_amount = 155520.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":12000,"maturity":12960},{"unit":1000,"deposit":24000,"maturity":25920},{"unit":1500,"deposit":36000,"maturity":38880},{"unit":2000,"deposit":48000,"maturity":51840},{"unit":3000,"deposit":72000,"maturity":77760},{"unit":4000,"deposit":96000,"maturity":103680},{"unit":5000,"deposit":120000,"maturity":129600},{"unit":6000,"deposit":144000,"maturity":155520}]'
-    WHERE code = 'AJS-RD-2Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-RD-2Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-RD-3Y: brochure p7. Masik Yojana 3 Year
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -861,7 +869,8 @@ UPDATE schemes SET name = 'Masik Yojana 3 Year', scheme_type = 'recurring',
     contribution_amount = 6000.0, principal_amount = NULL,
     total_deposit = 216000.0, maturity_amount = 249300.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":18000,"maturity":21975},{"unit":1000,"deposit":36000,"maturity":43950},{"unit":1500,"deposit":54000,"maturity":65925},{"unit":2000,"deposit":72000,"maturity":87900},{"unit":3000,"deposit":108000,"maturity":124650},{"unit":4000,"deposit":144000,"maturity":166200},{"unit":5000,"deposit":180000,"maturity":207750},{"unit":6000,"deposit":216000,"maturity":249300}]'
-    WHERE code = 'AJS-RD-3Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-RD-3Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-RD-5Y: brochure p7. Masik Yojana 5 Year
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -874,7 +883,8 @@ UPDATE schemes SET name = 'Masik Yojana 5 Year', scheme_type = 'recurring',
     contribution_amount = 6000.0, principal_amount = NULL,
     total_deposit = 360000.0, maturity_amount = 469800.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":30000,"maturity":39150},{"unit":1000,"deposit":60000,"maturity":78300},{"unit":1500,"deposit":90000,"maturity":117450},{"unit":2000,"deposit":120000,"maturity":156600},{"unit":3000,"deposit":180000,"maturity":234900},{"unit":4000,"deposit":240000,"maturity":313200},{"unit":5000,"deposit":300000,"maturity":391500},{"unit":6000,"deposit":360000,"maturity":469800}]'
-    WHERE code = 'AJS-RD-5Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-RD-5Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-RD-6Y: brochure p7 and p12. Masik Yojana 6 Year
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -887,7 +897,8 @@ UPDATE schemes SET name = 'Masik Yojana 6 Year', scheme_type = 'recurring',
     contribution_amount = 10000.0, principal_amount = NULL,
     total_deposit = 720000.0, maturity_amount = 1048500.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":100,"deposit":7200,"maturity":10485},{"unit":200,"deposit":14400,"maturity":20970},{"unit":300,"deposit":21600,"maturity":31455},{"unit":400,"deposit":28800,"maturity":41940},{"unit":500,"deposit":36000,"maturity":52500},{"unit":600,"deposit":43200,"maturity":62910},{"unit":700,"deposit":50400,"maturity":73395},{"unit":800,"deposit":57600,"maturity":83880},{"unit":900,"deposit":64800,"maturity":94365},{"unit":1000,"deposit":72000,"maturity":105000},{"unit":1100,"deposit":79200,"maturity":115335},{"unit":1200,"deposit":86400,"maturity":125820},{"unit":1300,"deposit":93600,"maturity":136305},{"unit":1400,"deposit":100800,"maturity":146790},{"unit":1500,"deposit":108000,"maturity":157500},{"unit":1600,"deposit":115200,"maturity":167760},{"unit":1700,"deposit":122400,"maturity":178245},{"unit":1800,"deposit":129600,"maturity":188730},{"unit":1900,"deposit":136800,"maturity":199215},{"unit":2000,"deposit":144000,"maturity":210000},{"unit":2500,"deposit":180000,"maturity":262125},{"unit":3000,"deposit":216000,"maturity":315000},{"unit":3500,"deposit":252000,"maturity":366975},{"unit":4000,"deposit":288000,"maturity":419400},{"unit":4500,"deposit":324000,"maturity":471825},{"unit":5000,"deposit":360000,"maturity":524250},{"unit":5500,"deposit":396000,"maturity":576675},{"unit":6000,"deposit":432000,"maturity":629100},{"unit":7000,"deposit":504000,"maturity":733950},{"unit":8000,"deposit":576000,"maturity":838800},{"unit":9000,"deposit":648000,"maturity":943650},{"unit":10000,"deposit":720000,"maturity":1048500}]'
-    WHERE code = 'AJS-RD-6Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-RD-6Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-SL-6Y: brochure p8. Shubh Lakshmi payout at 6
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -900,7 +911,8 @@ UPDATE schemes SET name = 'Shubh Lakshmi payout at 6', scheme_type = 'recurring'
     contribution_amount = 6000.0, principal_amount = NULL,
     total_deposit = 432000.0, maturity_amount = 630000.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":36000,"maturity":52500},{"unit":1000,"deposit":72000,"maturity":105000},{"unit":1500,"deposit":108000,"maturity":157500},{"unit":2000,"deposit":144000,"maturity":210000},{"unit":3000,"deposit":216000,"maturity":315000},{"unit":4000,"deposit":288000,"maturity":420000},{"unit":5000,"deposit":360000,"maturity":525000},{"unit":6000,"deposit":432000,"maturity":630000}]'
-    WHERE code = 'AJS-SL-6Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-SL-6Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-SL-11Y: brochure p8. Shubh Lakshmi payout at 11
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -913,7 +925,8 @@ UPDATE schemes SET name = 'Shubh Lakshmi payout at 11', scheme_type = 'recurring
     contribution_amount = 3000.0, principal_amount = NULL,
     total_deposit = 216000.0, maturity_amount = 525701.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":36000,"maturity":90189},{"unit":1000,"deposit":72000,"maturity":176578},{"unit":1500,"deposit":108000,"maturity":263867},{"unit":2000,"deposit":144000,"maturity":351200},{"unit":3000,"deposit":216000,"maturity":525701},{"unit":4000,"deposit":288000,"maturity":696318},{"unit":5000,"deposit":360000,"maturity":873290},{"unit":6000,"deposit":432000,"maturity":1045468}]'
-    WHERE code = 'AJS-SL-11Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-SL-11Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-SL-16Y: brochure p8. Shubh Lakshmi payout at 16
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -926,7 +939,8 @@ UPDATE schemes SET name = 'Shubh Lakshmi payout at 16', scheme_type = 'recurring
     contribution_amount = 6000.0, principal_amount = NULL,
     total_deposit = 432000.0, maturity_amount = 1930557.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":36000,"maturity":110580},{"unit":1000,"deposit":72000,"maturity":323778},{"unit":1500,"deposit":108000,"maturity":484270},{"unit":2000,"deposit":144000,"maturity":645558},{"unit":3000,"deposit":216000,"maturity":967332},{"unit":4000,"deposit":288000,"maturity":1285112},{"unit":5000,"deposit":360000,"maturity":1608690},{"unit":6000,"deposit":432000,"maturity":1930557}]'
-    WHERE code = 'AJS-SL-16Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-SL-16Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-SL-21Y: brochure p8. Shubh Lakshmi payout at 21
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -939,7 +953,8 @@ UPDATE schemes SET name = 'Shubh Lakshmi payout at 21', scheme_type = 'recurring
     contribution_amount = 6000.0, principal_amount = NULL,
     total_deposit = 432000.0, maturity_amount = 3849700.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":500,"deposit":36000,"maturity":330355},{"unit":1000,"deposit":72000,"maturity":643510},{"unit":1500,"deposit":108000,"maturity":963500},{"unit":2000,"deposit":144000,"maturity":1285200},{"unit":3000,"deposit":216000,"maturity":1926533},{"unit":4000,"deposit":288000,"maturity":2564040},{"unit":5000,"deposit":360000,"maturity":3200800},{"unit":6000,"deposit":432000,"maturity":3849700}]'
-    WHERE code = 'AJS-SL-21Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-SL-21Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-FD-8Y: brochure p10-11. Savadhi Yojana 3x in 8 years
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -952,7 +967,8 @@ UPDATE schemes SET name = 'Savadhi Yojana 3x in 8 years', scheme_type = 'fixed',
     contribution_amount = NULL, principal_amount = 150000.0,
     total_deposit = 150000.0, maturity_amount = 450000.0,
     payout_type = 'maturity', status = 'active', slabs = '[{"unit":2500,"deposit":2500,"maturity":7500},{"unit":3000,"deposit":3000,"maturity":9000},{"unit":3500,"deposit":3500,"maturity":10500},{"unit":4000,"deposit":4000,"maturity":12000},{"unit":4500,"deposit":4500,"maturity":13500},{"unit":5000,"deposit":5000,"maturity":15000},{"unit":5500,"deposit":5500,"maturity":16500},{"unit":6000,"deposit":6000,"maturity":18000},{"unit":7000,"deposit":7000,"maturity":21000},{"unit":8000,"deposit":8000,"maturity":24000},{"unit":9000,"deposit":9000,"maturity":27000},{"unit":10000,"deposit":10000,"maturity":30000},{"unit":12000,"deposit":12000,"maturity":36000},{"unit":14000,"deposit":14000,"maturity":42000},{"unit":15000,"deposit":15000,"maturity":45000},{"unit":17000,"deposit":17000,"maturity":51000},{"unit":18000,"deposit":18000,"maturity":54000},{"unit":20000,"deposit":20000,"maturity":60000},{"unit":25000,"deposit":25000,"maturity":75000},{"unit":30000,"deposit":30000,"maturity":90000},{"unit":33000,"deposit":33000,"maturity":99000},{"unit":35000,"deposit":35000,"maturity":105000},{"unit":40000,"deposit":40000,"maturity":120000},{"unit":45000,"deposit":45000,"maturity":135000},{"unit":50000,"deposit":50000,"maturity":150000},{"unit":60000,"deposit":60000,"maturity":180000},{"unit":70000,"deposit":70000,"maturity":210000},{"unit":80000,"deposit":80000,"maturity":240000},{"unit":90000,"deposit":90000,"maturity":270000},{"unit":100000,"deposit":100000,"maturity":300000},{"unit":125000,"deposit":125000,"maturity":375000},{"unit":150000,"deposit":150000,"maturity":450000}]'
-    WHERE code = 'AJS-FD-8Y' AND deleted_at IS NULL;
+    WHERE code = 'AJS-FD-8Y' AND deleted_at IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-MIS-5Y: brochure p9. Niyamit Aay 60 Month MIS
 INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
@@ -965,7 +981,8 @@ UPDATE schemes SET name = 'Niyamit Aay 60 Month MIS', scheme_type = 'mis',
     contribution_amount = NULL, principal_amount = 200000.0,
     total_deposit = 200000.0, maturity_amount = 300000.0,
     payout_type = 'monthly', status = 'active', slabs = '[{"unit":10000,"deposit":10000,"maturity":15000,"monthly_payout":250},{"unit":20000,"deposit":20000,"maturity":30000,"monthly_payout":500},{"unit":30000,"deposit":30000,"maturity":45000,"monthly_payout":750},{"unit":40000,"deposit":40000,"maturity":60000,"monthly_payout":1000},{"unit":50000,"deposit":50000,"maturity":75000,"monthly_payout":1250},{"unit":60000,"deposit":60000,"maturity":90000,"monthly_payout":1500},{"unit":70000,"deposit":70000,"maturity":105000,"monthly_payout":1750},{"unit":80000,"deposit":80000,"maturity":120000,"monthly_payout":2000},{"unit":100000,"deposit":100000,"maturity":150000,"monthly_payout":2500},{"unit":200000,"deposit":200000,"maturity":300000,"monthly_payout":5000}]'
-    WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL AND daily_rate_percent IS NULL;
+    WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL AND daily_rate_percent IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- AJS-MIS-40M: Dainik Aay 40 Month Plan. A simple daily-% plan (no slab
 -- table -- see schemes.daily_rate_percent, modules/master.php) rather than
@@ -1230,7 +1247,8 @@ ALTER TABLE schemes MODIFY COLUMN daily_rate_percent DECIMAL(8,5);
 -- figure. Keyed on the old value, so it never overrides a rate the director
 -- has since set by hand.
 UPDATE schemes SET daily_rate_percent = 0.16667
-    WHERE code = 'AJS-MIS-40M' AND daily_rate_percent = 0.167;
+    WHERE code = 'AJS-MIS-40M' AND daily_rate_percent = 0.167
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- How many months a plan's deposits are locked before they can be closed
 -- early. NULL falls back to the 30-day minimum in route_premature_close.
@@ -1242,7 +1260,8 @@ ALTER TABLE schemes ADD COLUMN IF NOT EXISTS lock_in_months INT;
 -- rate the director sets afterwards.
 UPDATE schemes SET daily_rate_percent = 0.08333, maturity_amount = 20000.0,
     notes = 'Plan book: ₹10,000 minimum, doubles in 40 months, paid out daily (~₹8.33/day) -- above the Nidhi cap on its own numbers.'
-    WHERE code = 'AJS-MIS-40M' AND daily_rate_percent = 0.16667;
+    WHERE code = 'AJS-MIS-40M' AND daily_rate_percent = 0.16667
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- Move deposits already booked on AJS-MIS-40M to the doubling rate. A deposit
 -- locks the rate it was booked at (deposits.interest_rate), so changing the
@@ -1369,7 +1388,8 @@ UPDATE schemes SET name = 'Niyamit Aay 40 Month MIS', scheme_type = 'mis', tenur
     maturity_amount = 10000.0, payout_type = 'daily', daily_rate_percent = 0.08333, withdrawal_threshold = NULL,
     slabs = NULL, status = 'active',
     notes = 'Plan book: ₹10,000 minimum, doubles in 40 months, paid out daily (~₹8.33/day on ₹10,000) -- above the Nidhi cap on its own numbers.'
-    WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL AND daily_rate_percent IS NULL;
+    WHERE code = 'AJS-MIS-5Y' AND deleted_at IS NULL AND daily_rate_percent IS NULL
+      AND updated_at < '2026-10-15 00:00:00';
 
 -- No referral bonus any more: the Nidhi Rules, 2014 forbid an incentive for
 -- bringing in members or deposits, so record_referral() credits nothing and the
@@ -1392,6 +1412,17 @@ UPDATE site_products SET status = 'draft'
     WHERE status = 'active' AND (group_key IN ('corporate', 'investments')
        OR (group_key = 'personal' AND slug = 'debit-cards')
        OR (group_key = 'loans' AND slug IN ('personal-loan', 'vehicle-loan', 'education-loan')));
+
+-- The brochure UPDATEs above used to run on every deploy and put each plan back to its
+-- printed figures, wiping Scheme Master edits and the re-pricing to the 12.5% cap. Each
+-- now carries "updated_at < 2026-10-15", so it only touches a plan nobody has changed
+-- since; any edit (by the director, or by reprice_scheme_to_cap) protects it from then on.
+
+-- Names that promised more than the plans pay once re-priced to the 12.5% cap.
+UPDATE schemes SET name = 'Savadhi Yojana 8 Year'
+    WHERE code = 'AJS-FD-8Y' AND name IN ('Savadhi Yojana 3x in 8 years', 'Savadhi Yojana (3x in 8 years)');
+UPDATE schemes SET name = 'Dwigun Yojana 6 Year (12 instalments)'
+    WHERE code = 'AJS-12M-6Y' AND name = 'Dwigun Yojana (12 instalments, doubles by year 6)';
 
 -- Instalment plans (15 Oct 2026): track what has actually been paid in, so the
 -- rest can be auto-debited from savings and maturity pays only for what was paid.
