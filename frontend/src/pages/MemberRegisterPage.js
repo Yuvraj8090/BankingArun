@@ -44,6 +44,13 @@ export default function MemberRegisterPage() {
   const [admitting, setAdmitting] = useState(false);
   const [moving, setMoving] = useState(null);
 
+  // Folios admitted by an automatic first deposit before share money was taken.
+  const collectShares = async (m) => {
+    if (!window.confirm(`Take the unpaid share money for ${m.name} (folio ${m.folio_no}) from their savings account?`)) return;
+    try { toast.success((await api.registerCollectShares({ user_id: m.folio_no })).message); load(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not collect the share money'); }
+  };
+
   const load = useCallback(async () => {
     try {
       setData(await api.registerMembers({
@@ -84,13 +91,14 @@ export default function MemberRegisterPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Kpi label="Active members" value={data.summary.active} />
         <Kpi label="Shares issued" value={data.summary.total_shares} />
         <Kpi label="Paid-up capital"
           value={`₹${Number(data.summary.paid_up_capital).toLocaleString('en-IN')}`} />
         <Kpi label="Never screened" value={data.summary.unscreened} tone={data.summary.unscreened ? 'warn' : 'ok'} />
         <Kpi label="Below minimum" value={data.summary.below_minimum} tone={data.summary.below_minimum ? 'bad' : 'ok'} />
+        <Kpi label="Share money unpaid" value={data.summary.share_money_due} tone={data.summary.share_money_due ? 'bad' : 'ok'} />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
@@ -165,6 +173,12 @@ export default function MemberRegisterPage() {
                   </td>
                   {canWrite && (
                     <td className="p-3 text-right whitespace-nowrap">
+                      {m.share_money_due && (
+                        <button data-testid={`register-collect-${m.folio_no}`} onClick={() => collectShares(m)}
+                          className="mr-3 text-amber-700 font-semibold hover:underline" title="Shares were allotted without payment">
+                          Collect share money
+                        </button>
+                      )}
                       <button data-testid={`register-shares-${m.folio_no}`} onClick={() => setMoving(m)}
                         className="text-[#0b3b8c] font-semibold hover:underline inline-flex items-center gap-1">
                         <Layers3 className="w-3 h-3" /> Move

@@ -27,11 +27,25 @@ export default function StatementsPage() {
     finally { setDownloading(false); }
   };
 
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const setRange = (days) => {
     const now = new Date();
     const from = new Date(); from.setDate(now.getDate() - days);
-    setStart(from.toISOString().slice(0, 10));
-    setEnd(now.toISOString().slice(0, 10));
+    setStart(ymd(from));
+    setEnd(ymd(now));
+  };
+  // The Indian financial year runs from 1 April.
+  const setFinancialYear = () => {
+    const now = new Date();
+    setStart(`${now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1}-04-01`);
+    setEnd(ymd(now));
+  };
+  // The passbook: every entry since the account was opened.
+  const setPassbook = () => {
+    const opened = accounts.find((a) => a.account_number === acc)?.created_at;
+    setStart(opened ? String(opened).slice(0, 10) : '2000-01-01');
+    setEnd(ymd(new Date()));
+    toast.success('Whole passbook selected. Download it as PDF or Excel below.');
   };
 
   return (
@@ -70,9 +84,11 @@ export default function StatementsPage() {
               { l: 'Last 7 days', d: 7 },
               { l: 'Last 30 days', d: 30 },
               { l: 'Last 90 days', d: 90 },
-              { l: 'This financial year', d: 365 }
+              { l: 'This financial year', d: 'fy' },
+              { l: 'Full passbook (since opening)', d: 'all' }
             ].map(o => (
-              <button key={o.d} data-testid={`stmt-range-${o.d}`} onClick={() => setRange(o.d)}
+              <button key={o.d} data-testid={`stmt-range-${o.d}`}
+                onClick={() => (o.d === 'fy' ? setFinancialYear() : o.d === 'all' ? setPassbook() : setRange(o.d))}
                 className="px-3 py-1.5 rounded-full border border-slate-200 hover:border-[#0b3b8c] text-xs text-slate-700 hover:text-[#0b3b8c]">
                 {o.l}
               </button>

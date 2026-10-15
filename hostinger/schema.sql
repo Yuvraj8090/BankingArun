@@ -1263,3 +1263,17 @@ CREATE TABLE IF NOT EXISTS loan_emis (
     UNIQUE KEY uq_loan_emi (loan_id, n),
     INDEX idx_emis_due (paid_on, due_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Saved payees. A transfer above NEW_PAYEE_LIMIT goes only to a payee saved at least
+-- NEW_PAYEE_HOURS earlier (modules/banking.php), so a stolen login cannot empty an
+-- account to a brand-new destination in one go.
+CREATE TABLE IF NOT EXISTS beneficiaries (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    account_number VARCHAR(30) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    nickname VARCHAR(60),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME,
+    UNIQUE KEY uq_payee (user_id, account_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

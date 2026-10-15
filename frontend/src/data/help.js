@@ -38,9 +38,11 @@ const MEMBER = {
       ['Beneficiary full name', 'As it appears on their account.'],
       ['Amount to transfer', 'In rupees, up to your available balance.'],
       ['Payment remarks', 'Optional. Shown on both statements.'],
-      ['Transaction password', 'Required for every payment.']
+      ['Transaction password', 'Required for every payment.'],
+      ['Member account number', 'Under Saved payees: the account to save. You see a shortened name to check it is the right person.']
     ],
     tips: [
+      'Payments above ₹25,000 go only to a payee saved at least 24 hours earlier, so a stolen password cannot empty your account to a new person.',
       'The reference on a member payment starts with UTR-INTERNAL.',
       'Your account must be KYC-verified before it can send money.'
     ]
@@ -492,7 +494,8 @@ const ACTIONS = {
   dashboard: [['Pay a member', 'Opens a quick form to send money to another member.'],
     ['+ Book New FD', 'Takes you to Deposits to open a fixed deposit or a plan.'],
     ['Full Passbook', 'Opens every entry on your account, with transfers.']],
-  transfer: [['Authorize & Transfer', 'Sends the money once every field is filled in and your transaction password is correct. It cannot be undone.']],
+  transfer: [['Save payee', 'Saves the account so you can pay it with one tap; large payments to it open after 24 hours.'],
+    ['Authorize & Transfer', 'Sends the money once every field is filled in and your transaction password is correct. It cannot be undone.']],
   deposits: [['Book', 'Opens the deposit and takes today\'s amount from the account you chose.'],
     ['View earnings', 'Shows what that deposit has earned, day by day.'],
     ['Close Early', 'Ends the deposit before maturity. You get back what you paid in, plus interest at a lower rate with an early-exit penalty.']],
@@ -504,6 +507,7 @@ const ACTIONS = {
   referrals: [['Copy', 'Copies your invite link to share it yourself.'],
     ['WhatsApp', 'Opens WhatsApp with your invite link ready to send.']],
   statements: [['Last 30 days', 'Fills in the dates for you. The other range buttons work the same way.'],
+    ['Full passbook', 'Selects every entry since the account was opened: download it as your passbook.'],
     ['Download PDF', 'Downloads the statement as a PDF.'], ['Download Excel', 'Downloads the same statement as an Excel sheet.']],
   security: [['Register passkey', 'Adds this device\'s fingerprint or face sign-in.'],
     ['Change password', 'Saves your new password; other devices are signed out.'],
@@ -515,10 +519,11 @@ const ACTIONS = {
     ['Reject', 'Asks for the reason, which the member sees.']],
   staff: [['Credit Account', 'Credits the cash or cheque to the member\'s account at once.']],
   crm: [['Members / Leads / My Tasks', 'Switches between your members, your enquiries and today\'s calls.']],
-  'member-register': [['Admit a member', 'Opens the form to allot shares to a new member.']],
+  'member-register': [['Admit a member', 'Opens the form to allot shares to a new member.'],
+    ['Collect share money', 'Shown on folios admitted by a first deposit before share money was taken: takes the ₹100 from their savings.']],
   screening: [['Screen everyone now', 'Checks every member and lead against the loaded lists.'],
     ['Watchlist', 'Shows and loads the names to screen against.']],
-  reports: [['Apply', 'Runs the report with your filters.'], ['CSV', 'Exports it as CSV. Exports are audited.'],
+  reports: [['Apply', 'Runs the report with your filters. FIU-IND CTR and STR, and the NDH return figures, are reports here too.'], ['CSV', 'Exports it as CSV. Exports are audited.'],
     ['Excel', 'Exports it as an Excel sheet.']],
   agents: [['New agent', 'Adds a field agent.']],
   schemes: [['New scheme', 'Opens the plan form. Choose the type first.'],

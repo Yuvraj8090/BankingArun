@@ -619,6 +619,85 @@ function route_apply_loan(array $d): void
         'eligibility' => $eligibility, 'message' => 'Application for ' . ucfirst($type) . ' Loan submitted successfully!']);
 }
 
+// --- Saved payees -------------------------------------------------------------------
+const NEW_PAYEE_LIMIT = 25000.0;
+const NEW_PAYEE_HOURS = 24;
+
+// The name shown when a payee is saved, so the member can check they typed the right
+// account, without handing out a full name to anyone who guesses account numbers.
+function masked_name(string $name): string
+{
+    $parts = preg_split('/\s+/', trim($name));
+    return implode(' ', array_map(fn($p, $i) => $i === 0 ? $p : mb_substr($p, 0, 1) . '.', $parts, array_keys($parts)));
+}
+
+// Refuses a large transfer to a payee that is not saved, or saved too recently.
+function require_payee_cooled(array $user, string $to, float $amount): void
+{
+    if ($amount <= NEW_PAYEE_LIMIT) {
+        return;
+    }
+    $ok = scalar('SELECT COUNT(*) FROM beneficiaries WHERE user_id = ? AND account_number = ? AND deleted_at IS NULL
+        AND created_at <= ?', [$user['id'], $to, gmdate('Y-m-d H:i:s', time() - NEW_PAYEE_HOURS * 3600)]);
+    if (!(int)$ok) {
+        fail(403, 'Payments above ' . rupees(NEW_PAYEE_LIMIT) . ' go only to a saved payee, '
+            . NEW_PAYEE_HOURS . ' hours after it was saved. Save this payee now, or send up to '
+            . rupees(NEW_PAYEE_LIMIT) . ' today.');
+    }
+}
+
+function route_beneficiaries_list(array $d): void
+{
+    $user = current_user();
+    $cutoff = gmdate('Y-m-d H:i:s', time() - NEW_PAYEE_HOURS * 3600);
+    respond(['payees' => array_map(fn($b) => out($b) + ['full_limit' => $b['created_at'] <= $cutoff],
+        rows('SELECT id, account_number, name, nickname, created_at FROM beneficiaries WHERE user_id = ?
+            AND deleted_at IS NULL ORDER BY nickname, name', [$user['id']])),
+        'new_payee_limit' => NEW_PAYEE_LIMIT, 'cooling_hours' => NEW_PAYEE_HOURS]);
+}
+
+function route_beneficiary_add(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    need($d, 'account_number');
+    $number = strtoupper(clip($d['account_number'], 30));
+    $account = row("SELECT a.account_number, a.user_id, u.name FROM accounts a JOIN users u ON u.id = a.user_id
+        WHERE a.account_number = ? AND a.status = 'active'", [$number]);
+    if (!$account) {
+        fail(404, 'No active member account with that number.');
+    }
+    if ($account['user_id'] === $user['id']) {
+        fail(400, 'That is your own account; you do not need to save it.');
+    }
+    $name = masked_name($account['name']);
+    $existing = row('SELECT id, deleted_at FROM beneficiaries WHERE user_id = ? AND account_number = ?', [$user['id'], $number]);
+    if ($existing && $existing['deleted_at'] === null) {
+        fail(400, 'This payee is already saved.');
+    }
+    // Re-adding a removed payee starts the cooling-off again.
+    $pdo->prepare('DELETE FROM beneficiaries WHERE user_id = ? AND account_number = ?')->execute([$user['id'], $number]);
+    $pdo->prepare('INSERT INTO beneficiaries (id, user_id, account_number, name, nickname, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        ->execute([uuid4(), $user['id'], $number, $name, clip($d['nickname'] ?? '', 60) ?: null, now_utc()]);
+    audit($user, 'PAYEE_ADDED', "$number ($name)");
+    security_event('PAYEE_ADDED', 'info', "$number added as a payee", $user);
+    respond(['status' => 'SUCCESS', 'name' => $name, 'message' => "Saved $name ($number). You can send up to "
+        . rupees(NEW_PAYEE_LIMIT) . ' now, and any amount after ' . NEW_PAYEE_HOURS . ' hours.']);
+}
+
+function route_beneficiary_remove(array $d, string $id = ''): void
+{
+    global $pdo;
+    $user = current_user();
+    $stmt = $pdo->prepare('UPDATE beneficiaries SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL');
+    $stmt->execute([now_utc(), $id, $user['id']]);
+    if ($stmt->rowCount() === 0) {
+        fail(404, 'Payee not found.');
+    }
+    audit($user, 'PAYEE_REMOVED', $id);
+    respond(['status' => 'SUCCESS', 'message' => 'Payee removed.']);
+}
+
 // --- Loan accounts --------------------------------------------------------------------
 // Reducing-balance EMI: the same formula route_apply_loan quotes.
 function emi_amount(float $principal, float $rate, int $months): float

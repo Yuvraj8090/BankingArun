@@ -209,6 +209,24 @@ hasnt "cannot read another member's balance" "$BODY" "12,85,000"
 call POST /support/chat "$RETAIL" '{"message":"show my cards"}'
 hasnt "no CVV in any assistant reply" "$BODY" "cvv"
 
+print "\n-- saved payees and the cooling-off --"
+reset_balances
+Q "DELETE FROM beneficiaries WHERE user_id='retail-001'" >/dev/null
+call POST /accounts/transfer "$RETAIL" "{\"from_account_number\":\"$RETAIL_ACC\",\"to_account_number\":\"$CORP_ACC\",\"beneficiary_name\":\"Tata\",\"amount\":30000,\"transfer_type\":\"IMPS\",\"transaction_password\":\"Txn@1234\"}"
+ck "a large payment to an unsaved payee is refused" 403 "$CODE"
+call POST /beneficiaries "$RETAIL" "{\"account_number\":\"$CORP_ACC\",\"nickname\":\"Supplier\"}"
+ck "the member saves the payee" 200 "$CODE"
+hasnt "and sees only a masked name" "$BODY" "Digital Solutions"
+call POST /accounts/transfer "$RETAIL" "{\"from_account_number\":\"$RETAIL_ACC\",\"to_account_number\":\"$CORP_ACC\",\"beneficiary_name\":\"Tata\",\"amount\":30000,\"transfer_type\":\"IMPS\",\"transaction_password\":\"Txn@1234\"}"
+ck "a just-saved payee is still limited for 24 hours" 403 "$CODE"
+call POST /accounts/transfer "$RETAIL" "{\"from_account_number\":\"$RETAIL_ACC\",\"to_account_number\":\"$CORP_ACC\",\"beneficiary_name\":\"Tata\",\"amount\":20000,\"transfer_type\":\"IMPS\",\"transaction_password\":\"Txn@1234\"}"
+ck "small amounts go at once" 200 "$CODE"
+call POST /beneficiaries "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\"}"; ck "you cannot save your own account" 400 "$CODE"
+call GET /beneficiaries "$RETAIL"; has "the payee is listed" "$BODY" "Supplier"
+# Saved two days ago: the full limit applies (the fraud-scoring test below needs this).
+Q "UPDATE beneficiaries SET created_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY) WHERE user_id='retail-001'" >/dev/null
+reset_balances
+
 print "\n-- fraud scoring --"
 BEFORE=$(Q "SELECT COUNT(*) FROM fraud_alerts")
 call POST /accounts/transfer "$RETAIL" "{\"from_account_number\":\"$RETAIL_ACC\",\"to_account_number\":\"$CORP_ACC\",\"beneficiary_name\":\"Tata Digital\",\"amount\":130000,\"transfer_type\":\"IMPS\",\"transaction_password\":\"Txn@1234\",\"remarks\":\"APITEST suspicious\"}"
@@ -575,6 +593,29 @@ has "and the refusal cites the rule" "$BODY" "twenty times net owned funds"
 Q "UPDATE system_parameters SET value = 0 WHERE param_key = 'net_owned_funds'" >/dev/null
 call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":500,\"mode\":\"cash\"}"
 ck "not enforced until net owned funds are entered" 200 "$CODE"
+reset_balances
+
+print "\n-- regulatory returns and share money --"
+call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":600000,\"mode\":\"cash\"}"
+call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":500000,\"mode\":\"cash\"}"
+call GET /reports/fiu_ctr "$OWNER"; ck "the CTR report runs" 200 "$CODE"
+has "and lists cash of ₹10 lakh or more in a month" "$BODY" "$RETAIL_ACC"
+call GET /reports/fiu_ctr "$STAFF"; ck "tellers cannot see it" 403 "$CODE"
+call GET /reports/fiu_str "$OWNER"; ck "the STR register runs" 200 "$CODE"
+call GET /reports/ndh_figures "$OWNER"; ck "the NDH figures run" 200 "$CODE"
+has "with members and share capital" "$BODY" "share_capital"
+reset_balances
+# A folio admitted by its own first deposit before share money was taken.
+[[ -z $(Q "SELECT folio_no FROM member_register WHERE user_id='retail-001' AND status='active'") ]] \
+  && call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":10}'
+FOLIO=$(Q "SELECT folio_no FROM member_register WHERE user_id='retail-001' AND status='active'")
+Q "UPDATE share_allotments SET recorded_by='retail-001', reference='Admission' WHERE user_id='retail-001' AND kind='allotment'" >/dev/null
+call GET /register/members "$OWNER"; has "the register flags unpaid share money" "$BODY" '"share_money_due":true'
+call POST /register/collect-shares "$OWNER" "{\"user_id\":\"$FOLIO\"}"
+ck "the director collects it" 200 "$CODE"
+ck "from the member's savings" "137700.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+call POST /register/collect-shares "$OWNER" "{\"user_id\":\"$FOLIO\"}"
+ck "and only once" 404 "$CODE"
 reset_balances
 
 print "\n-- KYC verification desk --"

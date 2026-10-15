@@ -375,10 +375,48 @@ function route_register_shares(array $d): void
         'message' => "{$member['folio_no']} now holds $after shares."]);
 }
 
+// Folios admitted automatically (by the member's own deposit) before share money was
+// collected: allotted by the member themselves, under the default "Admission"
+// reference. A teller's admission is recorded by staff, who took the cash.
+const SHARE_MONEY_DUE_SQL = "EXISTS (SELECT 1 FROM share_allotments sa WHERE sa.member_id = m.id
+    AND sa.kind = 'allotment' AND sa.recorded_by = m.user_id AND sa.reference = 'Admission')";
+
+function route_register_collect_shares(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(REGISTER_WRITE_ROLES);
+    need($d, 'user_id');
+    $pdo->beginTransaction();
+    $m = row('SELECT m.* FROM member_register m WHERE (m.user_id = ? OR m.folio_no = ?) AND ' . SHARE_MONEY_DUE_SQL
+        . ' FOR UPDATE', [clip($d['user_id'], 36), clip($d['user_id'], 20)]);
+    if (!$m) {
+        $pdo->rollBack();
+        fail(404, 'No unpaid share money on that folio.');
+    }
+    $due = round((float)scalar("SELECT COALESCE(SUM(shares * face_value), 0) FROM share_allotments
+        WHERE member_id = ? AND kind = 'allotment' AND recorded_by = ? AND reference = 'Admission'", [$m['id'], $m['user_id']]), 2);
+    $acc = row("SELECT * FROM accounts WHERE user_id = ? AND status = 'active' ORDER BY created_at, id LIMIT 1 FOR UPDATE",
+        [$m['user_id']]);
+    if (!$acc || (float)$acc['balance'] < $due) {
+        $pdo->rollBack();
+        fail(400, 'The member\'s savings account does not hold the ' . rupees($due) . ' due. Collect it in cash instead.');
+    }
+    $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$due, $acc['id']]);
+    $pdo->prepare("UPDATE share_allotments SET reference = 'Paid from account' WHERE member_id = ? AND kind = 'allotment'
+        AND recorded_by = ? AND reference = 'Admission'")->execute([$m['id'], $m['user_id']]);
+    insert_txn(['user_id' => $m['user_id'], 'account_number' => $acc['account_number'], 'type' => 'debit',
+        'mode' => 'SHARE_ALLOTMENT', 'amount' => $due, 'balance_after' => round((float)$acc['balance'] - $due, 2),
+        'counterparty_name' => 'Share capital', 'counterparty_acc' => $m['folio_no'], 'ref_number' => $m['certificate_no'],
+        'description' => "Share money for folio {$m['folio_no']}"]);
+    audit($staff, 'SHARE_MONEY_COLLECTED', "{$m['folio_no']} " . rupees($due));
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'message' => rupees($due) . " share money taken for folio {$m['folio_no']}."]);
+}
+
 function route_register_list(array $d): void
 {
     staff_user(REGISTER_READ_ROLES);
-    $sql = "SELECT m.*, u.name, u.email, u.phone, u.kyc_status, u.pan_number
+    $sql = "SELECT m.*, u.name, u.email, u.phone, u.kyc_status, u.pan_number, " . SHARE_MONEY_DUE_SQL . " AS share_money_due
         FROM member_register m JOIN users u ON u.id = m.user_id WHERE 1 = 1";
     $params = [];
     foreach ([['status', 'm.status'], ['risk_category', 'm.risk_category'],
@@ -401,6 +439,7 @@ function route_register_list(array $d): void
             $m['paid_up'] = round((int)$m['shares_held'] * (float)$m['share_face_value'], 2);
             $m['risk_reasons'] = $m['risk_reasons'] ? (json_decode((string)$m['risk_reasons'], true) ?: []) : [];
             $m['is_pep'] = (bool)$m['is_pep'];
+            $m['share_money_due'] = (bool)$m['share_money_due'];
             unset($m['pan_number']);   // the register does not need to carry it
             return $m;
         }, $members),
@@ -413,6 +452,7 @@ function route_register_list(array $d): void
             'high_risk' => (int)scalar("SELECT COUNT(*) FROM member_register WHERE risk_category = 'high' AND status = 'active'"),
             'unscreened' => (int)scalar("SELECT COUNT(*) FROM member_register WHERE screening_status = 'not_screened'"),
             'below_minimum' => (int)scalar("SELECT COUNT(*) FROM member_register WHERE status = 'active' AND shares_held < " . MIN_SHARES),
+            'share_money_due' => (int)scalar("SELECT COUNT(*) FROM member_register m WHERE m.status = 'active' AND " . SHARE_MONEY_DUE_SQL),
         ],
         'minimum_shares' => MIN_SHARES,
         'share_face_value' => SHARE_FACE_VALUE,

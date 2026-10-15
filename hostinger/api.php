@@ -988,6 +988,7 @@ function route_transfer(array $d): void
     if ($mode === 'UPI') {
         require_capability('upi');
     }
+    require_payee_cooled($user, $to, $amount);
     if ($receiver === null) {
         require_capability('payment_systems');
     } else {
@@ -1137,6 +1138,8 @@ $routes = [
     'POST /loans/apply' => 'route_apply_loan',
     'GET /loans/my-applications' => 'route_my_loans',
     'POST /loans/pay-emi' => 'route_loan_pay_emi',
+    'GET /beneficiaries' => 'route_beneficiaries_list',
+    'POST /beneficiaries' => 'route_beneficiary_add',
     'POST /support/complaint' => 'route_complaint',
     'GET /support/my-tickets' => 'route_my_tickets',
     'POST /support/chat' => 'route_chat',
@@ -1245,6 +1248,7 @@ $routes = [
     'POST /register/account' => 'route_register',
     'POST /register/admit' => 'route_register_admit',
     'POST /register/shares' => 'route_register_shares',
+    'POST /register/collect-shares' => 'route_register_collect_shares',
     'GET /screening/watchlist' => 'route_watchlist_list',
     'POST /screening/watchlist' => 'route_watchlist_add',
     'POST /screening/run' => 'route_screening_run',
@@ -1286,6 +1290,7 @@ $paramRoutes = [
     ['GET', '#^/kyc/video/([\w-]{1,64})$#', 'route_kyc_detail'],
     ['PATCH', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_update'],
     ['POST', '#^/schemes/([\w-]{1,64})/reprice$#', 'route_scheme_reprice'],
+    ['DELETE', '#^/beneficiaries/([\w-]{1,64})$#', 'route_beneficiary_remove'],
     ['DELETE', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_delete'],
     ['PATCH', '#^/parameters/([\w-]{1,64})$#', 'route_parameter_update'],
     ['DELETE', '#^/parameters/([\w-]{1,64})$#', 'route_parameter_delete'],

@@ -319,7 +319,34 @@ existed. Now:
 - **Fake ratio removed.** The branch dashboard's "CRR 4.5% · SLR 18% · Basel III"
   tile is now the real NOF : deposits ratio.
 
-## Still open
+### 22. Regulatory returns, passbook, saved payees, share money  ✅
+- **FIU-IND CTR:** members whose cash paid in reached ₹10 lakh in a month, ready
+  for the Principal Officer to key into FINnet by the 15th.
+- **FIU-IND STR:** the register of escalated fraud alerts, with reasons, for
+  filing within 7 days.
+- **NDH-1 / NDH-3 figures:** members, share capital, savings / fixed / recurring
+  deposits, gold and property loans, NPA, net owned funds and branches, as at
+  today. Run it on the period's last day. These are reports in Reports, and
+  exports are audited.
+- **Passbook:** Statements has "Full passbook (since opening)" for PDF or Excel.
+  Also fixed: "This financial year" used to mean the last 365 days; it now starts
+  from 1 April.
+- **Saved payees with a cooling-off period:** payments above ₹25,000 go only to a
+  payee saved 24 or more hours earlier. When saving, the member sees a masked
+  name to confirm the account. Adding a payee is logged as a security event.
+- **Unpaid share money:** the member register flags folios admitted by an
+  automatic deposit before share money was taken, and "Collect share money"
+  takes the ₹100 from savings, once.
+
+## Not done, deliberately
+- **Reversing ₹500 referral bonuses already paid.** Taking money back out of
+  members' accounts without their agreement needs a decision, and legal advice.
+- **Dropping the old card and investment tables.** No code reads them any more,
+  so they are inert. Dropping them would permanently delete records you may need
+  for audit; archive them first if you want them gone.
+- **MLM / binary commission plan:** illegal for a Nidhi.
+
+## Earlier "Still open" list (kept for history)
 - FIU-IND submission files (CTR/STR XML), NDH-1/NDH-3 returns, passbook printing,
   and beneficiary (saved payee) management.
 - **Your decisions:**

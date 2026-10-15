@@ -19,6 +19,20 @@ export default function TransferPage() {
   // Single Transfer Form State
   const [fromAcc, setFromAcc] = useState('');
   const [toAcc, setToAcc] = useState('');
+  // Saved payees: above the new-payee limit, money only goes to one saved a day earlier.
+  const [payees, setPayees] = useState({ payees: [], new_payee_limit: 25000, cooling_hours: 24 });
+  const [newPayee, setNewPayee] = useState({ account_number: '', nickname: '' });
+  const loadPayees = () => api.payees().then(setPayees).catch(() => {});
+  useEffect(() => { loadPayees(); }, []);
+  const savePayee = async () => {
+    try { toast.success((await api.payeeAdd(newPayee)).message); setNewPayee({ account_number: '', nickname: '' }); loadPayees(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not save the payee'); }
+  };
+  const removePayee = async (p) => {
+    if (!window.confirm(`Remove ${p.nickname || p.name}? Saving them again restarts the ${payees.cooling_hours}-hour wait.`)) return;
+    try { toast.success((await api.payeeRemove(p.id)).message); loadPayees(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not remove the payee'); }
+  };
   const [beneficiaryName, setBeneficiaryName] = useState('');
   const [ifsc, setIfsc] = useState('AJSP0000042');
   const [transferType, setTransferType] = useState('IMPS');
@@ -107,6 +121,40 @@ export default function TransferPage() {
         {/* Transfer Form Box */}
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl">
           
+            <div className="mb-5 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-3" data-testid="saved-payees">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-900 text-sm">Saved payees</h2>
+                <span className="text-[10px] text-slate-500">
+                  Over ₹{Number(payees.new_payee_limit).toLocaleString('en-IN')} only to a payee saved {payees.cooling_hours}+ hours ago
+                </span>
+              </div>
+              {payees.payees.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {payees.payees.map((p) => (
+                    <span key={p.id} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white pl-3 pr-1 py-1">
+                      <button type="button" onClick={() => { setToAcc(p.account_number); setBeneficiaryName(p.name); }}
+                        className="font-semibold text-[#0b3b8c]" title={`Pay ${p.name} (${p.account_number})`}>
+                        {p.nickname || p.name}
+                      </button>
+                      {!p.full_limit && <span className="text-[9px] text-amber-700">new</span>}
+                      <button type="button" onClick={() => removePayee(p)} aria-label={`Remove ${p.nickname || p.name}`}
+                        className="px-1.5 text-slate-400 hover:text-[#c8102e]">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,auto] gap-2">
+                <input value={newPayee.account_number} onChange={(e) => setNewPayee({ ...newPayee, account_number: e.target.value })}
+                  placeholder="Member account number" aria-label="Payee account number"
+                  className="bg-white border border-slate-200 rounded-lg px-3 py-2 font-mono" />
+                <input value={newPayee.nickname} onChange={(e) => setNewPayee({ ...newPayee, nickname: e.target.value })}
+                  placeholder="Nickname (optional)" aria-label="Payee nickname"
+                  className="bg-white border border-slate-200 rounded-lg px-3 py-2" />
+                <button type="button" onClick={savePayee} disabled={!newPayee.account_number.trim()}
+                  className="px-4 py-2 rounded-lg bg-[#0b3b8c] text-white font-semibold disabled:opacity-50">Save payee</button>
+              </div>
+            </div>
+
           {(
             <form onSubmit={handleSingleTransfer} className="space-y-4 text-xs">
               <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center justify-between">

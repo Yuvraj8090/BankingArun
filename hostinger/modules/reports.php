@@ -255,6 +255,67 @@ function report_definitions(): array
                 'status' => 'text', 'review_note' => 'text'],
             'totals' => ['amount'],
         ],
+        // PMLA, 2002 / FIU-IND: a cash transaction report covers cash of ₹10 lakh or more
+        // in one month for one member (single or connected deposits). This is the data
+        // the Principal Officer keys into FIU-IND's FINnet utility; it is not the XML itself.
+        'fiu_ctr' => [
+            'name' => 'FIU-IND cash transactions (CTR)',
+            'note' => 'Members whose cash paid in reached ₹10,00,000 or more in a calendar month: counter cash, and cash paid in when an account was opened. File with FIU-IND by the 15th of the next month.',
+            'roles' => ['admin', 'branch_manager', 'bank_owner'],
+            'sql' => "SELECT * FROM (SELECT DATE_FORMAT(t.timestamp, '%Y-%m') AS month, u.name, u.pan_number,
+                    t.account_number, COUNT(*) AS cash_entries, SUM(t.amount) AS cash_total
+                FROM transactions t JOIN users u ON u.id = t.user_id
+                WHERE t.type = 'credit' AND ((t.mode = 'COUNTER_DEPOSIT' AND t.description LIKE 'Cash%')
+                    OR t.mode = 'ACCOUNT_OPENING')
+                GROUP BY month, t.user_id, t.account_number, u.name, u.pan_number
+                HAVING SUM(t.amount) >= 1000000) c WHERE 1 = 1",
+            'filters' => ['month' => ['c.month = ?', 'exact'], 'q' => ['c.name LIKE ? OR c.account_number LIKE ? OR c.pan_number LIKE ?', 'like3']],
+            'order' => 'c.month DESC, c.cash_total DESC',
+            'columns' => ['month' => 'text', 'name' => 'text', 'pan_number' => 'text', 'account_number' => 'text',
+                'cash_entries' => 'int', 'cash_total' => 'money'],
+            'totals' => ['cash_total'],
+        ],
+        // Suspicious transactions the review desk escalated: what goes to FIU-IND as an STR
+        // within 7 days of the decision. Members are never told (tipping off is an offence).
+        'fiu_str' => [
+            'name' => 'FIU-IND suspicious transactions (STR)',
+            'note' => 'Alerts escalated after review, with the reasons. File each with FIU-IND within 7 days of escalation. Never tell the member.',
+            'roles' => ['admin', 'branch_manager', 'bank_owner'],
+            'sql' => "SELECT f.reviewed_at, u.name, u.pan_number, f.account_number, f.ref_number, f.amount,
+                    f.counterparty_name, f.score, f.reasons, f.review_note
+                FROM fraud_alerts f LEFT JOIN users u ON u.id = f.user_id WHERE f.status = 'escalated'",
+            'filters' => ['from_date' => ['f.reviewed_at >= ?', 'date_start'], 'to_date' => ['f.reviewed_at <= ?', 'date_end']],
+            'order' => 'f.reviewed_at DESC',
+            'columns' => ['reviewed_at' => 'datetime', 'name' => 'text', 'pan_number' => 'text', 'account_number' => 'text',
+                'ref_number' => 'text', 'amount' => 'money', 'counterparty_name' => 'text', 'score' => 'int',
+                'reasons' => 'text', 'review_note' => 'text'],
+            'totals' => ['amount'],
+        ],
+        // The figures Form NDH-1 (yearly, within 90 days of the year end) and NDH-3
+        // (half-yearly, within 30 days) ask for, as they stand today. Run it on the last
+        // day of the period, or export it then, and copy the figures onto the MCA form.
+        'ndh_figures' => [
+            'name' => 'Nidhi return figures (NDH-1 / NDH-3)',
+            'note' => 'Members, share capital, deposits, loans and the net owned funds test, as at today. Run it on the last day of the half-year or year and copy the figures into the MCA form.',
+            'roles' => ['admin', 'branch_manager', 'bank_owner'],
+            'sql' => "SELECT * FROM (SELECT CURDATE() AS as_on,
+                    (SELECT COUNT(*) FROM member_register WHERE status = 'active') AS members,
+                    (SELECT COALESCE(SUM(shares_held * share_face_value), 0) FROM member_register WHERE status = 'active') AS share_capital,
+                    (SELECT COALESCE(SUM(balance), 0) FROM accounts) AS savings_deposits,
+                    (SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active' AND instalment_amount IS NULL) AS fixed_deposits,
+                    (SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active' AND instalment_amount IS NOT NULL) AS recurring_deposits,
+                    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'gold') AS gold_loans,
+                    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'home') AS property_loans,
+                    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status = 'npa') AS npa_loans,
+                    (SELECT value FROM system_parameters WHERE param_key = 'net_owned_funds') AS net_owned_funds,
+                    (SELECT COUNT(*) FROM branches WHERE deleted_at IS NULL) AS branches) n WHERE 1 = 1",
+            'filters' => [],
+            'order' => 'n.as_on',
+            'columns' => ['as_on' => 'date', 'members' => 'int', 'share_capital' => 'money', 'savings_deposits' => 'money',
+                'fixed_deposits' => 'money', 'recurring_deposits' => 'money', 'gold_loans' => 'money',
+                'property_loans' => 'money', 'npa_loans' => 'money', 'net_owned_funds' => 'money', 'branches' => 'int'],
+            'totals' => [],
+        ],
         'audit_trail' => [
             'name' => 'Audit trail',
             'note' => 'Who did what, and from where.',

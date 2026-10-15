@@ -41,6 +41,7 @@ export const api = {
   // Member register and share allotment (Nidhi Rules 11)
   registerMembers: async (params) => (await axios.get(`${API}/register/members`, { ...getAuthHeaders(), params })).data,
   registerAdmit: async (payload) => (await axios.post(`${API}/register/admit`, payload, getAuthHeaders())).data,
+  registerCollectShares: async (payload) => (await axios.post(`${API}/register/collect-shares`, payload, getAuthHeaders())).data,
   registerShares: async (payload) => (await axios.post(`${API}/register/shares`, payload, getAuthHeaders())).data,
 
   // Sanctions / PEP screening
@@ -65,6 +66,9 @@ export const api = {
     const url = accountNumber ? `${API}/accounts/transactions?account_number=${accountNumber}` : `${API}/accounts/transactions`;
     return (await axios.get(url, getAuthHeaders())).data;
   },
+  payees: async () => (await axios.get(`${API}/beneficiaries`, getAuthHeaders())).data,
+  payeeAdd: async (payload) => (await axios.post(`${API}/beneficiaries`, payload, getAuthHeaders())).data,
+  payeeRemove: async (id) => (await axios.delete(`${API}/beneficiaries/${id}`, getAuthHeaders())).data,
   transferFunds: async (payload) => (await axios.post(`${API}/accounts/transfer`, payload, getAuthHeaders())).data,
   // Staff-only: crediting a member's account for cash/cheque handed over at the counter.
   counterDeposit: async (payload) => (await axios.post(`${API}/accounts/counter-deposit`, payload, getAuthHeaders())).data,
