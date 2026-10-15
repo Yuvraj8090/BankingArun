@@ -6,6 +6,7 @@ import Pagination from '../components/Pagination';
 import { api } from '../services/api';
 import { inr } from '../utils/format';
 import { toast } from 'sonner';
+import ReferralDemo from './ReferralDemo';
 
 // The colour carries no meaning beyond making the ladder readable at a glance;
 // the rank name is always present, so nothing depends on distinguishing them.
@@ -300,6 +301,11 @@ export default function MemberRanksPage() {
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </div>
+
+      {canEdit && <details className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-[#0b3b8c]">Five-level referral demo · plans, percentages & Silver / Gold</summary>
+        <div className="mt-4"><ReferralDemo /></div>
+      </details>}
 
       <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-900">
         <Info className="w-4 h-4 shrink-0 mt-0.5" />

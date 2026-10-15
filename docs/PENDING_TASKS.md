@@ -1,20 +1,21 @@
-# Pending tasks: audit of 14 Oct 2026
+# Pending tasks: checked 15 Oct 2026
 
 How this list was made: every backend suite was run, a new role test signed in
 as all 7 roles and called every read endpoint, and every menu page was opened in
 the browser for every role. Each item below is something that run found.
 
-**Tests (run `zsh hostinger/tests/run_all.sh` with the PHP API on :8002):**
+**Latest checks (15 Oct; run `zsh hostinger/tests/run_all.sh` with the PHP API on :8002):**
 
 | Suite | Result |
 |---|---|
-| `api_test.sh`: API regression | 190 / 190 |
-| `cron_test.sh`: daily jobs, interest, maturity | 31 / 31 |
-| `role_smoke.sh` (new): 7 roles × 71 GET routes, every menu page, every report | 572 / 572 |
+| `api_test.sh`: API regression | 279 / 279 |
+| `cron_test.sh`: daily jobs, interest, maturity | 43 / 43 |
+| `role_smoke.sh`: role, menu and report checks | 534 / 534 |
 | `market_rates_test.php` | ok |
 | `pyapi` pytest | 43 / 43 |
 | Frontend production build | compiles |
-| Browser walk: every menu page, every role | all render, guards redirect correctly |
+| Referral demo calculation / access check | passes (`cd frontend && CI=true npm test -- --watchAll=false --runInBand`) |
+| Browser walk: every menu page, every role | passed in the original 14 Oct audit |
 
 Before this audit the API suite failed 163 of 190 tests. The tests had not been
 updated after the login captcha and the separate staff sign-in were added, so
@@ -22,6 +23,16 @@ they could not sign in. The cron suite was also failing 5 of 31, from a
 config-setup bug in the test itself. Both are fixed.
 
 Work through the list top to bottom. Type **next** to fix the next open item.
+
+## Current open work
+- FIU-IND upload/submission files are still missing. CTR/STR figures are built;
+  they are not validated FINnet submission files.
+- NDH figures are available as at today. Historical period-end snapshots and
+  completed MCA filing forms are not built.
+- The new five-level referral feature is a Director-only simulation. Live
+  deposit commissions remain disabled under Nidhi Rule 6(k). Demo Silver/Gold
+  thresholds are editable examples, not agreed business rules.
+- Historical ₹500 bonus reversals and removal of old tables remain deferred.
 
 ---
 
@@ -338,13 +349,36 @@ existed. Now:
   automatic deposit before share money was taken, and "Collect share money"
   takes the ₹100 from savings, once.
 
+## Round 4 (15 Oct): referral demo and version check
+
+### 23. Five-level referral demo, editable plans and Silver / Gold ✅
+Director → Member Standings → **Five-level referral demo**:
+- Defaults to 5% of the amount received for each of five ancestors: 25% total.
+  Signup alone allocates ₹0; the old ₹500 signup bonus stays disabled.
+- FD, RD and MLM-labelled fictional plans, with a form to add or edit names,
+  types and all five percentages. RD uses only the instalment received now.
+- Reuses the existing network chart for a binary path through five ancestors,
+  with empty right positions. No pair-matching or spillover payout is assumed.
+- Silver/Gold follow cumulative simulated earnings. Initial example thresholds
+  are ₹500 / ₹2,500 and are editable; rank does not override the plan percentage.
+- Plans and thresholds save in this browser. Simulated totals reset on leaving
+  the page. No booking, balance, referral record or live rank is changed.
+- Amounts and percentages are validated, combined percentages cannot exceed
+  100%, and individual allocations round down to paisa.
+
+At the start of this check, the live `version.txt` and local `HEAD` both pointed
+to `8bcc1e53a5909ca2bb68a8d0dc861a3d9dbcca0b`; there was no version mismatch.
+Also corrected stale deployment instructions: the existing deployment script
+already applies migrations after a backup and before swapping releases.
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.
 - **Dropping the old card and investment tables.** No code reads them any more,
   so they are inert. Dropping them would permanently delete records you may need
   for audit; archive them first if you want them gone.
-- **MLM / binary commission plan:** illegal for a Nidhi.
+- **Live MLM / binary deposit commissions:** disabled under Nidhi Rule 6(k).
+  The Director's fictional demo is separate from live banking.
 
 ## Earlier "Still open" list (kept for history)
 - FIU-IND submission files (CTR/STR XML), NDH-1/NDH-3 returns, passbook printing,

@@ -7,13 +7,12 @@ revision=$(git rev-parse HEAD)
 scp .deploy/release.tar.gz "$VPS_USER@$VPS_HOST:/srv/ajspay/incoming/$revision.tar.gz"
 scp scripts/backup-db.sh "$VPS_USER@$VPS_HOST:/srv/ajspay/backup-db.sh"
 # The release package deliberately carries no .sql files — they have no business
-# inside a web root — so the migration is delivered beside it instead, ready to
-# run by hand. Applying it is never automatic: a schema change lands when
-# someone decides it should, not as a side effect of shipping a frontend.
+# inside a web root — so the migration is delivered beside it instead. The
+# remote deployment applies it after the backup and before the release swap.
 scp hostinger/migrate.sql "$VPS_USER@$VPS_HOST:/srv/ajspay/migrate.sql"
 # The scheduler's unit files travel with the release so provision-cron.sh has
 # something to install. Shipping them does not schedule anything -- enabling the
-# timer stays a deliberate root action, like the migration above.
+# timer stays a deliberate root action.
 #
 # They land beside migrate.sql rather than in a directory of their own: the
 # deploy account can write files into /srv/ajspay but cannot create directories

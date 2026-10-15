@@ -59,6 +59,10 @@ function NetworkTree() {
       .catch(() => setTree(null));
   }, []);
 
+  return <NetworkTreeChart tree={tree} total={total} />;
+}
+
+export function NetworkTreeChart({ tree, total, title = 'Your Network' }) {
   if (!tree) return null;
   const hasNetwork = tree.children?.length > 0;
   const { placed, leafCount, maxDepth } = hasNetwork ? layoutTree(tree) : { placed: [], leafCount: 1, maxDepth: 0 };
@@ -72,14 +76,14 @@ function NetworkTree() {
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-5" data-testid="referral-network-tree">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-          <Users className="w-4 h-4 text-[#0b3b8c]" /> Your Network
+          <Users className="w-4 h-4 text-[#0b3b8c]" /> {title}
         </h2>
-        <span className="text-[11px] text-slate-500">{total} member{total === 1 ? '' : 's'} in your tree</span>
+        {total !== undefined && <span className="text-[11px] text-slate-500">{total} member{total === 1 ? '' : 's'} in your tree</span>}
       </div>
       {hasNetwork ? (
         <div className="overflow-x-auto">
           <div className="relative mx-auto" style={{ width, height }}>
-            <svg className="absolute inset-0" width={width} height={height}>
+            <svg aria-hidden="true" className="absolute inset-0" width={width} height={height}>
               {placed.filter((p) => p.node.parent_id).map((p) => {
                 const parent = byId[p.node.parent_id];
                 if (!parent) return null;
@@ -101,6 +105,7 @@ function NetworkTree() {
                 </div>
                 <div className="mt-1.5 text-center">
                   <p className="text-[11px] font-semibold text-slate-900 truncate" style={{ maxWidth: LABEL_W }}>{p.node.name}</p>
+                  {p.node.detail && <p className="text-[10px] text-slate-600">{p.node.detail}</p>}
                   {!!p.node.direct_count && (
                     <span className="inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                       {p.node.direct_count} joined

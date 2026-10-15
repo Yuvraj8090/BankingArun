@@ -84,12 +84,10 @@ Each deploy, in order:
 
 To skip a deploy, put `[skip ci]` in the commit message.
 
-**Schema changes are never automatic.** `migrate.sql` is delivered to
-`/srv/ajspay/migrate.sql` but applied by hand, deliberately:
-
-```bash
-mariadb ajspay < /srv/ajspay/migrate.sql
-```
+**Each deployment applies `migrate.sql` after the database backup and before
+the release swap.** It is delivered outside the public web root, at
+`/srv/ajspay/migrate.sql`. The deploy fails if the migration credentials are
+missing or migration fails. Review migrations before pushing to `main`.
 
 ---
 
