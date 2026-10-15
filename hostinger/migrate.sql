@@ -1406,8 +1406,26 @@ UPDATE deposits d JOIN schemes s ON s.code = d.scheme_code
             WHERE t.ref_number = d.deposit_number AND t.mode = 'DEPOSIT_BOOKING' AND t.type = 'debit'),
             ROUND(d.principal_amount / (IF(s.scheme_type = 'daily', 30, 1)
                 * COALESCE(s.contribution_months, d.tenure_months)), 2)),
-        d.paid_amount = COALESCE((SELECT SUM(t.amount) FROM transactions t
+        -- Cash a field agent collected for this plan counts as paid, the way the reports counted
+        -- it, so the first nightly run never charges a member's savings for money already handed over.
+        d.paid_amount = LEAST(d.principal_amount, COALESCE((SELECT SUM(t.amount) FROM transactions t
             WHERE t.ref_number = d.deposit_number AND t.mode = 'DEPOSIT_BOOKING' AND t.type = 'debit'), 0)
+          + COALESCE((SELECT SUM(c.amount) FROM agent_collections c
+            WHERE c.scheme_id = s.id AND c.account_number = d.source_account
+              AND c.collected_on >= DATE(d.created_at)), 0))
     WHERE d.deposit_type = 'recurring' AND d.paid_amount = 0 AND d.instalment_every IS NULL;
 UPDATE deposits SET paid_amount = principal_amount
     WHERE paid_amount = 0 AND instalment_every IS NULL;
+-- If an earlier deploy backfilled without the agents' cash, add it now, but only while
+-- paid_amount is still exactly the booking debits and no instalment has been auto-debited
+-- (so it applies once, before run_instalments could charge anyone twice).
+UPDATE deposits d JOIN schemes s ON s.code = d.scheme_code
+    SET d.paid_amount = LEAST(d.principal_amount, d.paid_amount
+        + (SELECT COALESCE(SUM(c.amount), 0) FROM agent_collections c
+            WHERE c.scheme_id = s.id AND c.account_number = d.source_account
+              AND c.collected_on >= DATE(d.created_at)))
+    WHERE d.instalment_every IS NOT NULL AND d.status = 'active'
+      AND d.paid_amount = COALESCE((SELECT SUM(t.amount) FROM transactions t
+            WHERE t.ref_number = d.deposit_number AND t.mode = 'DEPOSIT_BOOKING' AND t.type = 'debit'), 0)
+      AND NOT EXISTS (SELECT 1 FROM transactions t2 WHERE t2.mode = 'DEPOSIT_INSTALMENT'
+            AND t2.counterparty_acc = d.deposit_number);
