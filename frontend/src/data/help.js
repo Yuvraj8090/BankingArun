@@ -70,19 +70,21 @@ const MEMBER = {
   },
   loans: {
     title: 'Loans',
-    what: 'Work out an EMI and apply for a loan. As a Nidhi we lend only against gold jewellery or property.',
+    what: 'Work out an EMI, apply for a loan, and manage the loans you have. As a Nidhi we lend only against gold jewellery or property.',
     steps: [
       'Choose Gold or Home loan.',
       'Move the sliders for amount and tenure to see the EMI.',
       'Fill in your income, employment and purpose, then apply.',
-      'Track your applications in the list below.'
+      'Once the loan is disbursed, the money arrives in your savings account and the loan appears under "Your loans".',
+      'Each EMI is taken from your savings on its due date. You can also pay the next one early.'
     ],
     fields: [
       ['Monthly in-hand net income', 'What you take home each month, after tax and deductions.'],
       ['Employment type', 'Salaried, self-employed and so on.'],
       ['Purpose of loan', 'What the money is for.']
     ],
-    tips: ['Unsecured personal and vehicle loans are not offered.']
+    tips: ['Unsecured personal and vehicle loans are not offered.',
+      'An EMI that cannot be taken stays overdue and is retried every night. After 90 days a loan is classed as a non-performing asset.']
   },
   'standing-instructions': {
     title: 'Standing Instructions',
@@ -351,15 +353,17 @@ const MANAGER = {
   },
   'loan-dept': {
     title: 'Loan Pipeline',
-    what: 'Every loan application with its EMI, the applicant\'s income and a risk grade.',
-    steps: ['Open an application.', 'Check the security (gold or property) and the documents.', 'Record your decision.'],
+    what: 'Every loan application with its EMI, the applicant\'s income and a risk grade, plus the outstanding book and its NPA share.',
+    steps: ['Check the security (gold or property) and the documents.', 'Approve, ask for documents, or reject.',
+      'Disburse an approved loan: the amount is credited to the member\'s savings and its EMI schedule starts. Only approved applications can be disbursed, and disbursal is final.'],
     fields: [],
     tips: ['Only gold and home loans can be applied for.']
   },
   collection: {
     title: 'Collections',
-    what: 'Loans in arrears, by days past due (DPD), with the last contact for each.',
-    steps: ['Work the cases with the highest DPD first.', 'Record each follow-up or settlement on the case.'],
+    what: 'Every loan with an EMI past its due date, worst first: days past due (DPD), the amount overdue and the last contact.',
+    steps: ['Work the cases with the highest DPD first.', 'Record each reminder, legal notice or settlement on the case.',
+      'A case leaves this list by itself once the member\'s EMIs are paid (from savings, every night).'],
     fields: [],
     tips: ['Cases at 90 days past due or more count as NPA risk.']
   },
@@ -493,7 +497,9 @@ const ACTIONS = {
     ['View earnings', 'Shows what that deposit has earned, day by day.'],
     ['Close Early', 'Ends the deposit before maturity. You get back what you paid in, plus interest at a lower rate with an early-exit penalty.']],
   loans: [['Gold Loan / Home Loan', 'Chooses the kind of loan; the EMI updates as you move the sliders.'],
-    ['Apply for', 'Sends your application to the loan desk. Its status shows in the list below.']],
+    ['Apply for', 'Sends your application to the loan desk. Its status shows in the list below.'],
+    ['Pay EMI now', 'Pays your next EMI from savings straight away, instead of on its due date.'],
+    ['View EMI schedule', 'Shows every EMI: when it is due, how much is principal and interest, and what has been paid.']],
   'standing-instructions': [['New Instruction', 'Opens the form to set up a repeating payment.']],
   referrals: [['Copy', 'Copies your invite link to share it yourself.'],
     ['WhatsApp', 'Opens WhatsApp with your invite link ready to send.']],

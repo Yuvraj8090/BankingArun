@@ -1136,6 +1136,7 @@ $routes = [
     'POST /deposits/earnings' => 'route_deposit_earnings',
     'POST /loans/apply' => 'route_apply_loan',
     'GET /loans/my-applications' => 'route_my_loans',
+    'POST /loans/pay-emi' => 'route_loan_pay_emi',
     'POST /support/complaint' => 'route_complaint',
     'GET /support/my-tickets' => 'route_my_tickets',
     'POST /support/chat' => 'route_chat',

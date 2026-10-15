@@ -18,9 +18,20 @@ export default function LoansPage() {
   // page, or comes back to apply for a second loan, has no way to see what
   // they already applied for; the success card above only lives in state.
   const [myLoans, setMyLoans] = useState([]);
+  // Disbursed loans, each with its EMI schedule (GET /loans/my-applications -> accounts).
+  const [loanAccounts, setLoanAccounts] = useState([]);
+  const [openSchedule, setOpenSchedule] = useState('');
+  const [paying, setPaying] = useState('');
 
   const loadMyLoans = () => {
-    api.getMyLoans().then((res) => setMyLoans(res.loans || [])).catch(() => {});
+    api.getMyLoans().then((res) => { setMyLoans(res.loans || []); setLoanAccounts(res.accounts || []); }).catch(() => {});
+  };
+
+  const payEmi = async (loanNumber) => {
+    setPaying(loanNumber);
+    try { toast.success((await api.payLoanEmi(loanNumber)).message); loadMyLoans(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Could not pay the EMI'); }
+    finally { setPaying(''); }
   };
 
   useEffect(() => {
@@ -261,6 +272,77 @@ export default function LoansPage() {
         </div>
 
       </div>
+
+      {loanAccounts.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-xl" data-testid="loan-accounts">
+          <div className="p-5 border-b border-slate-200">
+            <h2 className="font-bold text-slate-900 text-sm">Your loans</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">Each EMI is taken from your savings account on its due date. Keep enough there, or pay it now.</p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {loanAccounts.map((l) => {
+              const next = (l.schedule || []).find((e) => !e.paid_on);
+              return (
+                <div key={l.loan_number} className="p-5 text-xs space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm capitalize">{l.loan_type} loan · <span className="font-mono">{l.loan_number}</span></p>
+                      <p className="text-slate-500 mt-0.5">₹{Number(l.principal).toLocaleString('en-IN')} at {l.roi}% for {l.tenure_months} months · {l.emis_paid} of {l.tenure_months} EMIs paid</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${l.status === 'closed' ? 'bg-slate-50 text-slate-600 border-slate-200'
+                      : l.dpd > 0 ? 'bg-rose-50 text-[#c8102e] border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                      {l.status === 'closed' ? 'repaid' : l.dpd > 0 ? `${l.dpd} days overdue` : 'on time'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200"><p className="text-slate-500">Still owed</p>
+                      <p className="font-bold text-slate-900 text-base">₹{Number(l.outstanding).toLocaleString('en-IN')}</p></div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200"><p className="text-slate-500">Next EMI</p>
+                      <p className="font-bold text-slate-900 text-base">{next ? `₹${Number(next.emi).toLocaleString('en-IN')}` : '—'}</p>
+                      {next && <p className="text-[10px] text-slate-500">due {new Date(next.due_date).toLocaleDateString('en-IN')}</p>}</div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200"><p className="text-slate-500">Interest paid</p>
+                      <p className="font-bold text-slate-900 text-base">₹{Number(l.interest_paid).toLocaleString('en-IN')}</p></div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {next && (
+                      <button data-testid={`pay-emi-${l.loan_number}`} disabled={paying === l.loan_number} onClick={() => payEmi(l.loan_number)}
+                        className="px-4 py-2 rounded-lg bg-[#0b3b8c] text-white font-semibold disabled:opacity-50">
+                        {paying === l.loan_number ? 'Paying…' : `Pay EMI now · ₹${Number(next.emi).toLocaleString('en-IN')}`}
+                      </button>
+                    )}
+                    <button onClick={() => setOpenSchedule(openSchedule === l.loan_number ? '' : l.loan_number)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 font-semibold text-slate-700">
+                      {openSchedule === l.loan_number ? 'Hide schedule' : 'View EMI schedule'}
+                    </button>
+                  </div>
+                  {openSchedule === l.loan_number && (
+                    <div className="overflow-x-auto max-h-72 overflow-y-auto border border-slate-200 rounded-lg">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="bg-slate-50 text-slate-600 sticky top-0"><tr>
+                          <th className="p-2">#</th><th className="p-2">Due</th><th className="p-2 text-right">EMI</th>
+                          <th className="p-2 text-right">Principal</th><th className="p-2 text-right">Interest</th>
+                          <th className="p-2 text-right">Owed after</th><th className="p-2">Paid</th></tr></thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {l.schedule.map((e) => (
+                            <tr key={e.n}>
+                              <td className="p-2">{e.n}</td><td className="p-2">{new Date(e.due_date).toLocaleDateString('en-IN')}</td>
+                              <td className="p-2 text-right">₹{Number(e.emi).toLocaleString('en-IN')}</td>
+                              <td className="p-2 text-right">₹{Number(e.principal_part).toLocaleString('en-IN')}</td>
+                              <td className="p-2 text-right">₹{Number(e.interest_part).toLocaleString('en-IN')}</td>
+                              <td className="p-2 text-right">₹{Number(e.balance_after).toLocaleString('en-IN')}</td>
+                              <td className="p-2">{e.paid_on ? new Date(e.paid_on).toLocaleDateString('en-IN') : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Application History */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xl">

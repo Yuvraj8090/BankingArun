@@ -216,6 +216,49 @@ function run_instalments(string $today, bool $dryRun, bool $verbose): array
     return [$collected, $short];
 }
 
+// Loans: every EMI that has fallen due is taken from the borrower's savings account,
+// oldest first, while the balance covers a whole EMI. What cannot be taken stays
+// unpaid and ages: dpd is the days since the oldest unpaid EMI fell due, and at 90
+// the loan is NPA. Collections works from exactly these numbers.
+function run_loan_emis(string $today, bool $dryRun, bool $verbose): array
+{
+    global $pdo;
+    $paid = $short = 0;
+    foreach (rows("SELECT DISTINCT l.* FROM loans l JOIN loan_emis e ON e.loan_id = l.id
+            WHERE l.status <> 'closed' AND e.paid_on IS NULL AND e.due_date <= ?
+            LIMIT " . CRON_BATCH, [$today]) as $loan) {
+        if ($dryRun) {
+            say("  would take EMIs due on {$loan['loan_number']}");
+            continue;
+        }
+        $pdo->beginTransaction();
+        $locked = row('SELECT * FROM loans WHERE id = ? FOR UPDATE', [$loan['id']]);
+        foreach (rows('SELECT * FROM loan_emis WHERE loan_id = ? AND paid_on IS NULL AND due_date <= ? ORDER BY n',
+                [$loan['id'], $today]) as $emi) {
+            if (!pay_loan_emi($locked, $emi, $today)) {
+                $short++;
+                if ($verbose) {
+                    say("  short      EMI {$emi['n']} on {$loan['loan_number']}; balance too low");
+                }
+                break;
+            }
+            $paid++;
+            if ($verbose) {
+                say("  took       EMI {$emi['n']} " . rupees((float)$emi['emi']) . " on {$loan['loan_number']}");
+            }
+        }
+        refresh_loan_ageing($loan['id'], $today);
+        $pdo->commit();
+    }
+    // Ageing moves every day even when nothing is paid, so refresh every open loan.
+    if (!$dryRun) {
+        foreach (rows("SELECT id FROM loans WHERE status <> 'closed'") as $l) {
+            refresh_loan_ageing($l['id'], $today);
+        }
+    }
+    return [$paid, $short];
+}
+
 // --- Deposit interest and maturity ------------------------------------------------
 // Monthly-payout deposits pay simple interest on the principal each month; every
 // deposit pays out its maturity value on or after its maturity date. Both are
@@ -713,6 +756,7 @@ try {
     }
     $capped = run_cap_rerate($today, $dryRun, $verbose);
     [$instTaken, $instShort] = run_instalments($today, $dryRun, $verbose);
+    [$emiPaid, $emiShort] = run_loan_emis($today, $dryRun, $verbose);
     [$intDone, $intFailed] = run_deposit_interest($today, $dryRun, $verbose);
     [$dailyAccrued, $dailyReleased, $dailyFailed] = run_daily_interest_accrual($today, $dryRun, $verbose);
     [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
@@ -736,6 +780,7 @@ say("Standing instructions: $siDone run, $siFailed failed. "
     . "Scheduled transfers: $payDone run, $payFailed failed. "
     . "Plans re-priced to the cap: $repriced. Deposits re-rated to the cap: $capped. "
     . "Instalments: $instTaken collected, $instShort short of funds. "
+    . "Loan EMIs: $emiPaid taken, $emiShort short of funds. "
     . "Deposit interest: $intDone paid, $intFailed failed. "
     . "Daily interest: $dailyAccrued accrued, $dailyReleased released, $dailyFailed failed. "
     . "Maturities: $matDone paid, $matFailed failed. "
@@ -750,6 +795,7 @@ $pdo->prepare('UPDATE cron_runs SET finished_at = NOW(), status = ?, jobs = ? WH
         'scheduled_payments' => ['done' => $payDone, 'failed' => $payFailed],
         'cap_rerate' => ['done' => $capped + $repriced, 'failed' => 0],
         'instalments' => ['done' => $instTaken, 'failed' => 0, 'short_of_funds' => $instShort],
+        'loan_emis' => ['done' => $emiPaid, 'failed' => 0, 'short_of_funds' => $emiShort],
         'deposit_interest' => ['done' => $intDone, 'failed' => $intFailed],
         'daily_interest' => ['accrued' => $dailyAccrued, 'released' => $dailyReleased, 'failed' => $dailyFailed],
         'deposit_maturities' => ['done' => $matDone, 'failed' => $matFailed],

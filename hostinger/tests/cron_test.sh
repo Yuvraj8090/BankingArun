@@ -18,6 +18,8 @@ ck() { if [[ "$2" == "$3" ]]; then print "  ok   $1"; pass=$((pass+1)); else pri
 cleanup() {
   Q "DELETE FROM transactions WHERE description LIKE '%CRONTEST%' OR counterparty_name LIKE 'CRONTEST%' OR ref_number LIKE 'MAT-CRONTEST%' OR ref_number LIKE 'INT-CRONTEST%' OR ref_number LIKE 'DINT-CRONTEST%' OR ref_number LIKE 'INS-CRONTEST%';
      DELETE FROM accounts WHERE account_number = 'CRONTESTLOW';
+     DELETE FROM loan_emis WHERE loan_id LIKE 'crontest-%'; DELETE FROM loans WHERE id LIKE 'crontest-%';
+     DELETE FROM transactions WHERE ref_number LIKE 'EMI-CRONTEST%';
      DELETE FROM rail_transactions WHERE counterparty_name LIKE 'CRONTEST%' OR ref_number IN (SELECT ref_number FROM scheduled_payments WHERE id LIKE 'crontest-%' AND ref_number IS NOT NULL);
      DELETE FROM standing_instructions WHERE id LIKE 'crontest-%';
      DELETE FROM scheduled_payments WHERE id LIKE 'crontest-%';
@@ -92,7 +94,15 @@ Q "UPDATE deposits SET paid_amount=principal_amount WHERE deposit_number LIKE 'C
    UPDATE deposits SET instalment_amount=1000, instalment_every='month', paid_amount=1000 WHERE deposit_number='CRONTEST-INS-MON';
    UPDATE deposits SET instalment_amount=100, instalment_every='day', paid_amount=100 WHERE deposit_number IN ('CRONTEST-INS-DAY','CRONTEST-INS-LOW');
    UPDATE deposits SET instalment_amount=1000, instalment_every='month', paid_amount=6000 WHERE deposit_number='CRONTEST-INS-MAT';
-   INSERT INTO accounts (id,user_id,account_number,account_type,account_name,balance,status) VALUES ('crontest-low','retail-001','CRONTESTLOW','Savings','CRONTEST low',150.00,'active');" >/dev/null
+   INSERT INTO accounts (id,user_id,account_number,account_type,account_name,balance,status) VALUES ('crontest-low','retail-001','CRONTESTLOW','Savings','CRONTEST low',150.00,'active');
+   INSERT INTO loans (id,application_id,user_id,loan_number,loan_type,account_number,principal,roi,tenure_months,emi,disbursed_on,outstanding) VALUES
+     ('crontest-loan-ok','crontest-app-ok','retail-001','CRONTEST-LN-OK','gold','$RETAIL_ACC',1200.00,10.00,3,500.00,DATE_SUB(CURDATE(),INTERVAL 3 MONTH),1200.00),
+     ('crontest-loan-npa','crontest-app-npa','retail-001','CRONTEST-LN-NPA','gold','CRONTESTLOW',3000.00,10.00,3,1000.00,DATE_SUB(CURDATE(),INTERVAL 125 DAY),3000.00);
+   INSERT INTO loan_emis (id,loan_id,n,due_date,emi,principal_part,interest_part,balance_after) VALUES
+     ('crontest-e1','crontest-loan-ok',1,DATE_SUB(CURDATE(),INTERVAL 60 DAY),500.00,490.00,10.00,710.00),
+     ('crontest-e2','crontest-loan-ok',2,DATE_SUB(CURDATE(),INTERVAL 30 DAY),500.00,494.00,6.00,216.00),
+     ('crontest-e3','crontest-loan-ok',3,DATE_ADD(CURDATE(),INTERVAL 5 DAY),218.00,216.00,2.00,0.00),
+     ('crontest-e4','crontest-loan-npa',1,DATE_SUB(CURDATE(),INTERVAL 95 DAY),1000.00,975.00,25.00,2025.00);" >/dev/null
 
 print "\n-- dry run changes nothing --"
 CRON --dry-run >/dev/null
@@ -146,6 +156,12 @@ ck "a short balance takes the whole instalments it covers" "200.00|50.00" \
   "$(Q "SELECT CONCAT_WS('|',(SELECT paid_amount FROM deposits WHERE deposit_number='CRONTEST-INS-LOW'),(SELECT balance FROM accounts WHERE account_number='CRONTESTLOW'))")"
 ck "a half-paid plan matures at half its maturity" "6500.00" "$(Q "SELECT amount FROM transactions WHERE ref_number='MAT-CRONTEST-INS-MAT'")"
 
+print "\n-- loan EMIs --"
+ck "both overdue EMIs taken from savings, the future one left" "2|216.00|active|0" \
+  "$(Q "SELECT CONCAT_WS('|',emis_paid,outstanding,status,dpd) FROM loans WHERE id='crontest-loan-ok'")"
+ck "an EMI the account cannot cover stays unpaid and ages to NPA" "0|npa|95" \
+  "$(Q "SELECT CONCAT_WS('|',emis_paid,status,dpd) FROM loans WHERE id='crontest-loan-npa'")"
+
 print "\n-- daily interest accrual --"
 ck "under threshold: accrues, no payout" "110.00|active" \
   "$(Q "SELECT CONCAT_WS('|',accrued_interest,status) FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"
@@ -165,12 +181,12 @@ print "\n-- balance reconciles --"
 # out: 100 daily + 300 clamp + 250 scheduled + 400 external scheduled = 1050
 # in: 10725 maturity + 600 interest + 104.17 re-rated interest + 139.50 daily interest released
 #     (155 - 10% TDS) + 50045 daily-plan maturity (50000 principal + 50 accrued - 10% TDS)
-#     + 6500 half-paid instalment maturity = 68113.67; out also 2000 + 400 instalments
-ck "balance = 137800 - 1050 - 2400 + 68113.67" "202463.67" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+#     + 6500 half-paid instalment maturity = 68113.67; out also 2000 + 400 instalments + 1000 EMIs
+ck "balance = 137800 - 1050 - 2400 - 1000 + 68113.67" "201463.67" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 
 print "\n-- a second run the same day is a no-op --"
 CRON >/dev/null 2>&1
-ck "nothing paid twice" "202463.67" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "nothing paid twice" "201463.67" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 ck "maturity credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number='MAT-CRONTEST-MAT'")"
 ck "interest credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE mode='DEPOSIT_INTEREST' AND ref_number LIKE 'INT-CRONTEST-MON%'")"
 ck "daily interest not accrued twice" "110.00" "$(Q "SELECT accrued_interest FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"

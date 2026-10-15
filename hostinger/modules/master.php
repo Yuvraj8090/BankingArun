@@ -1149,6 +1149,7 @@ const CRON_JOB_LABELS = [
     'scheduled_payments' => 'Scheduled transfers',
     'cap_rerate' => 'Deposits brought down to the 12.5% cap',
     'instalments' => 'Instalment plans: due instalments taken from savings',
+    'loan_emis' => 'Loan EMIs taken from savings; overdue days and NPA updated',
     'deposit_interest' => 'Deposit interest (MIS monthly payouts)',
     'daily_interest' => 'Daily interest (daily-plan accruals and payouts)',
     'deposit_maturities' => 'Maturities',

@@ -16,10 +16,19 @@ export default function LoanDeptPanel() {
   const load = () => api.getLoanDeptPanel().then(setData).catch(() => toast.error('Access denied'));
   useEffect(() => { load(); }, []);
 
-  const decide = async (id, decision, label) => {
-    try { await api.loanDecision({ application_id: id, decision }); toast.success(`${label} recorded`); load(); }
-    catch { toast.error('Decision failed'); }
+  const decide = async (id, decision) => {
+    if (decision === 'disburse' && !window.confirm('Disburse this loan? The amount is credited to the member\'s savings account now and EMIs start next month.')) return;
+    try { toast.success((await api.loanDecision({ application_id: id, decision })).message); load(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Decision failed'); }
   };
+  // Same as LOAN_TRANSITIONS in modules/staff.php: only offer what the server allows.
+  const NEXT = {
+    submitted: ['request_docs', 'approve', 'reject'], under_review: ['request_docs', 'approve', 'reject'],
+    documentation: ['approve', 'reject'], approved: ['disburse', 'reject'],
+  };
+  // Old unsecured applications (personal, vehicle...) can be rejected but never approved or paid out.
+  const actionsFor = (a) => (NEXT[a.status] || [])
+    .filter((x) => !['disburse', 'approve'].includes(x) || ['gold', 'home'].includes(String(a.loan_type).toLowerCase()));
 
   if (!data) return <div className="p-10 flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" /> Loading loan pipeline…</div>;
 
@@ -33,11 +42,12 @@ export default function LoanDeptPanel() {
         <p className="text-xs text-slate-500 mt-1">Application processing · Credit score · Documentation · Disbursement</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Kpi label="Applications" value={k.total_applications} icon={FileSearch} />
         <Kpi label="Disbursed" value={`₹${Number(k.disbursed_amount).toLocaleString('en-IN')}`} icon={TrendingUp} color="text-emerald-700" />
         <Kpi label="In Review" value={k.in_review} icon={GanttChartSquare} color="text-amber-700" />
-        <Kpi label="NPA Ratio" value={k.npa_ratio} icon={Calculator} color="text-[#c8102e]" />
+        <Kpi label="Outstanding" value={`₹${Number(k.outstanding || 0).toLocaleString('en-IN')}`} icon={Calculator} />
+        <Kpi label="NPA (90+ days)" value={`${k.npa_ratio ?? 0}%`} icon={Calculator} color="text-[#c8102e]" />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
@@ -78,10 +88,11 @@ export default function LoanDeptPanel() {
                   </td>
                   <td className="p-3">
                     <div className="flex items-center justify-end gap-1">
-                      <IconBtn testId={`loan-docs-${a.id}`} icon={FileSearch} title="Request docs" onClick={() => decide(a.id, 'request_docs', 'Docs request')} />
-                      <IconBtn testId={`loan-approve-${a.id}`} icon={Check} title="Approve" color="text-emerald-700" onClick={() => decide(a.id, 'approve', 'Approval')} />
-                      <IconBtn testId={`loan-reject-${a.id}`} icon={X} title="Reject" color="text-[#c8102e]" onClick={() => decide(a.id, 'reject', 'Rejection')} />
-                      <IconBtn testId={`loan-disburse-${a.id}`} icon={Send} title="Disburse" color="text-slate-900" onClick={() => decide(a.id, 'disburse', 'Disbursement')} />
+                      {actionsFor(a).includes('request_docs') && <IconBtn testId={`loan-docs-${a.id}`} icon={FileSearch} title="Request docs" onClick={() => decide(a.id, 'request_docs')} />}
+                      {actionsFor(a).includes('approve') && <IconBtn testId={`loan-approve-${a.id}`} icon={Check} title="Approve" color="text-emerald-700" onClick={() => decide(a.id, 'approve')} />}
+                      {actionsFor(a).includes('reject') && <IconBtn testId={`loan-reject-${a.id}`} icon={X} title="Reject" color="text-[#c8102e]" onClick={() => decide(a.id, 'reject')} />}
+                      {actionsFor(a).includes('disburse') && <IconBtn testId={`loan-disburse-${a.id}`} icon={Send} title="Disburse" color="text-slate-900" onClick={() => decide(a.id, 'disburse')} />}
+                      {!NEXT[a.status] && <span className="text-[10px] text-slate-400">final</span>}
                     </div>
                   </td>
                 </tr>

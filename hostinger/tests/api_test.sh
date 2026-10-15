@@ -441,6 +441,41 @@ ck "cannot cease while deposits are live" 400 "$CODE"
 call GET /register/members "$RETAIL"; ck "a member cannot read the register" 403 "$CODE"
 call GET /register/members "$OWNER";  ck "the owner can read the register" 200 "$CODE"
 
+print "\n-- loans: approve, disburse, repay --"
+reset_balances
+call POST /loans/apply "$RETAIL" '{"loan_type":"gold","amount_requested":12000,"tenure_months":12,"monthly_income":40000,"employment_type":"salaried","purpose":"APITEST loan"}'
+ck "a member applies for a gold loan" 200 "$CODE"
+LAPP=$(Q "SELECT id FROM loan_applications WHERE purpose='APITEST loan' ORDER BY created_at DESC LIMIT 1")
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"disburse\"}"
+ck "an application cannot be disbursed before approval" 400 "$CODE"
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"approve\"}"
+ck "the loan desk approves it" 200 "$CODE"
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"disburse\"}"
+ck "and disburses it" 200 "$CODE"
+has "naming the new loan account" "$BODY" "Disbursed as loan LA"
+ck "the money reaches the member's savings" "149800.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "with twelve EMIs that repay exactly the principal" "12|12000.00" \
+  "$(Q "SELECT CONCAT_WS('|',COUNT(*),SUM(principal_part)) FROM loan_emis e JOIN loans l ON l.id=e.loan_id WHERE l.application_id='$LAPP'")"
+LNO=$(Q "SELECT loan_number FROM loans WHERE application_id='$LAPP'")
+OLDAPP=$(Q "SELECT id FROM loan_applications WHERE loan_type NOT IN ('gold','home') LIMIT 1")
+if [[ -n $OLDAPP ]]; then
+  Q "UPDATE loan_applications SET status='approved' WHERE id='$OLDAPP'" >/dev/null
+  call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$OLDAPP\",\"decision\":\"disburse\"}"
+  ck "an old approved unsecured loan cannot be paid out" 400 "$CODE"
+fi
+call POST /loans/pay-emi "$RETAIL" "{\"loan_number\":\"$LNO\"}"
+ck "the member can pay an EMI now" 200 "$CODE"
+ck "which reduces what is owed" "1" "$(Q "SELECT emis_paid = 1 AND outstanding < 12000 FROM loans WHERE loan_number='$LNO'")"
+call POST /loans/pay-emi "$STAFF" "{\"loan_number\":\"$LNO\"}"
+ck "nobody else can pay it from their account" 404 "$CODE"
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"reject\"}"
+ck "a disbursed loan cannot be rejected" 400 "$CODE"
+call GET /loans/my-applications "$RETAIL"
+has "the member sees the loan and its schedule" "$BODY" '"schedule"'
+Q "DELETE e FROM loan_emis e JOIN loans l ON l.id=e.loan_id WHERE l.application_id='$LAPP';
+   DELETE FROM loans WHERE application_id='$LAPP'; DELETE FROM loan_applications WHERE id='$LAPP';" >/dev/null
+reset_balances
+
 print "\n-- sanctions and PEP screening --"
 call POST /screening/run "$OWNER" '{}'
 ck "screening refuses to run on an empty list" 400 "$CODE"

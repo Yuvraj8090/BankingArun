@@ -62,19 +62,22 @@ function route_panel_staff(array $d): void
     ]);
 }
 
+// Collections works the loans that are actually behind: any with an unpaid EMI past
+// its due date (run_loan_emis keeps dpd current). Worst first.
 function route_panel_collection(array $d): void
 {
     staff_user(['collection_agent', ...ADMIN_ROLES]);
-    // The KPIs are over the whole book, not just the page shown below them --
-    // otherwise "Total Cases" would silently become "cases on this page".
-    [$cases, $meta] = paginate('SELECT * FROM collection_cases ORDER BY dpd_days DESC', [], 25, 100);
+    $overdue = "FROM loans l JOIN users u ON u.id = l.user_id WHERE l.status <> 'closed' AND l.dpd > 0";
+    [$cases, $meta] = paginate("SELECT l.id, u.name AS borrower, u.phone, l.loan_number AS loan_ref, l.loan_type,
+            l.outstanding, l.emi, l.dpd AS dpd_days, l.status AS loan_status,
+            COALESCE(l.collection_status, IF(l.dpd >= 90, 'npa_risk', 'overdue')) AS status, l.last_contact,
+            (SELECT COALESCE(SUM(e.emi), 0) FROM loan_emis e WHERE e.loan_id = l.id AND e.paid_on IS NULL
+                AND e.due_date <= CURDATE()) AS overdue_amount
+        $overdue ORDER BY l.dpd DESC", [], 25, 100);
     respond([
-        'kpis' => ['total_cases' => (int)scalar('SELECT COUNT(*) FROM collection_cases'),
-            'total_outstanding' => (float)scalar('SELECT COALESCE(SUM(outstanding), 0) FROM collection_cases'),
-            'npa_risk_count' => (int)scalar("SELECT COUNT(*) FROM collection_cases
-                WHERE status = 'npa_risk' OR dpd_days >= 90")],
-        // No recovery target or recovered-this-month figure: nothing records a loan
-        // recovery yet, and the two numbers that used to sit here were typed in.
+        'kpis' => ['total_cases' => (int)scalar("SELECT COUNT(*) $overdue"),
+            'total_outstanding' => (float)scalar("SELECT COALESCE(SUM(l.outstanding), 0) $overdue"),
+            'npa_risk_count' => (int)scalar("SELECT COUNT(*) $overdue AND l.dpd >= 90")],
         'cases' => out_all($cases),
         'pagination' => $meta,
     ]);
@@ -89,13 +92,13 @@ function route_collection_action(array $d): void
     if ($status === null) {
         fail(422, 'action must be reminder, legal_notice or settle.');
     }
-    $case = row('SELECT * FROM collection_cases WHERE id = ?', [clip($d['case_id'], 36)]);
-    if (!$case) {
+    $loan = row('SELECT l.*, u.name FROM loans l JOIN users u ON u.id = l.user_id WHERE l.id = ?', [clip($d['case_id'], 36)]);
+    if (!$loan) {
         fail(404, 'Case not found');
     }
-    $pdo->prepare('UPDATE collection_cases SET status = ?, last_contact = UTC_DATE() WHERE id = ?')->execute([$status, $case['id']]);
-    audit($user, 'COLLECTION_' . strtoupper($d['action']), "{$case['loan_ref']} {$case['borrower']}");
-    respond(['status' => 'SUCCESS', 'message' => "Action '{$d['action']}' recorded for {$case['borrower']}."]);
+    $pdo->prepare('UPDATE loans SET collection_status = ?, last_contact = UTC_DATE() WHERE id = ?')->execute([$status, $loan['id']]);
+    audit($user, 'COLLECTION_' . strtoupper($d['action']), "{$loan['loan_number']} {$loan['name']}");
+    respond(['status' => 'SUCCESS', 'message' => "Action '{$d['action']}' recorded for {$loan['name']}."]);
 }
 
 function route_panel_loan_dept(array $d): void
@@ -112,12 +115,13 @@ function route_panel_loan_dept(array $d): void
     $graded = array_filter($apps, fn($a) => $a['risk_score'] !== null);
     respond([
         'kpis' => ['total_applications' => count($apps),
-            'disbursed_amount' => (float)array_sum(array_column(array_filter($apps, fn($a) => $a['status'] === 'disbursed'), 'amount')),
+            'disbursed_amount' => (float)scalar('SELECT COALESCE(SUM(principal), 0) FROM loans'),
+            'outstanding' => (float)scalar("SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed'"),
+            // Share of the book (by outstanding principal) that is 90+ days past due.
+            'npa_ratio' => (($book = (float)scalar("SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed'")) > 0)
+                ? round((float)scalar("SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status = 'npa'") / $book * 100, 2) : 0.0,
             'in_review' => $byStatus['under_review'] ?? 0, 'documentation' => $byStatus['documentation'] ?? 0,
             'approved' => $byStatus['approved'] ?? 0,
-            // A real NPA ratio needs repayment and ageing data, which this system
-            // does not track, so we report what is actually measured instead of
-            // printing a number nobody computed.
             'graded' => count($graded),
             'avg_risk_score' => $graded ? (int)round(array_sum(array_column($graded, 'risk_score')) / count($graded)) : null,
             'high_risk' => count(array_filter($graded, fn($a) => in_array($a['risk_grade'], ['D', 'E'], true)))],
@@ -125,6 +129,15 @@ function route_panel_loan_dept(array $d): void
         'by_status' => (object)$byStatus,
     ]);
 }
+
+// Which decision can follow which. A rejected or disbursed application is final, and
+// money only moves from an approved one.
+const LOAN_TRANSITIONS = [
+    'submitted' => ['documentation', 'approved', 'rejected'],
+    'under_review' => ['documentation', 'approved', 'rejected'],
+    'documentation' => ['under_review', 'approved', 'rejected'],
+    'approved' => ['disbursed', 'rejected'],
+];
 
 function route_loan_decision(array $d): void
 {
@@ -136,14 +149,30 @@ function route_loan_decision(array $d): void
     if ($status === null) {
         fail(400, 'Invalid decision');
     }
-    $app = row('SELECT id, loan_type, applicant FROM loan_applications WHERE id = ?', [clip($d['application_id'], 36)]);
+    $pdo->beginTransaction();
+    $app = row('SELECT * FROM loan_applications WHERE id = ? FOR UPDATE', [clip($d['application_id'], 36)]);
     if (!$app) {
+        $pdo->rollBack();
         fail(404, 'Application not found');
     }
+    if (!in_array($status, LOAN_TRANSITIONS[$app['status']] ?? [], true)) {
+        $pdo->rollBack();
+        fail(400, "An application that is {$app['status']} cannot be marked $status."
+            . ($status === 'disbursed' ? ' Approve it first.' : ''));
+    }
+    if ($status === 'approved' && !in_array(strtolower($app['loan_type']), NIDHI_LOAN_TYPES, true)) {
+        $pdo->rollBack();
+        fail(400, 'A ' . $app['loan_type'] . ' loan cannot be approved: a Nidhi lends only against gold or property.');
+    }
+    $loan = $status === 'disbursed' ? disburse_loan($app, $user) : null;
     $pdo->prepare('UPDATE loan_applications SET status = ?, decision_note = ? WHERE id = ?')
         ->execute([$status, clip($d['remark'] ?? '', 255), $app['id']]);
     audit($user, 'LOAN_' . strtoupper($status), "{$app['applicant']} {$app['loan_type']}");
-    respond(['status' => 'SUCCESS', 'message' => "Loan application marked as $status."]);
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'loan' => $loan, 'message' => $loan
+        ? "Disbursed as loan {$loan['loan_number']}: " . rupees((float)$app['amount']) . ' credited to the member\'s savings; '
+            . 'EMI ' . rupees($loan['emi']) . ' from ' . date('j M Y', strtotime($loan['first_due'])) . ', taken automatically.'
+        : "Loan application marked as $status."]);
 }
 
 // --- Branch admin & compliance ----------------------------------------------------------
@@ -157,7 +186,8 @@ function route_admin_overview(array $d): void
             'active_deposits' => (int)scalar('SELECT COUNT(*) FROM deposits'),
             'pending_kyc_count' => (int)scalar("SELECT COUNT(*) FROM users WHERE kyc_status = 'pending_approval'"),
             'total_liquidity' => (float)scalar('SELECT COALESCE(SUM(balance), 0) FROM accounts'),
-            'statutory_crr_slr_status' => 'Compliant (CRR: 4.50%, SLR: 18.00%)',
+            // Bank reserve ratios (CRR/SLR) do not apply to a Nidhi; its own test is NOF : deposits.
+            'statutory_crr_slr_status' => nidhi_statutory_checks()['nof_to_deposits_ratio'],
         ],
         'high_value_transactions' => out_all(rows('SELECT * FROM transactions WHERE amount >= 50000
             ORDER BY timestamp DESC, seq DESC LIMIT 10')),

@@ -301,11 +301,25 @@ New money (counter cash, account opening, funding at KYC) is refused if it would
 take deposits above 20 × net owned funds. It applies once the Director enters NOF
 in Business Parameters.
 
+### 21. Loan accounts, EMIs, collections  ✅
+Disbursing used to only change a status label: no money moved and no loan
+existed. Now:
+- **Approvals follow the proper order.** Each decision can only follow the ones
+  before it (under review → documents → approved → disbursed). Rejected and
+  disbursed are final, and unsecured loan types can't be approved or paid out.
+- **Disbursal is real.** It requires a KYC-verified member, credits the principal
+  to their savings, and writes a reducing-balance EMI schedule (`loans`,
+  `loan_emis`).
+- **EMIs are collected nightly.** `run_loan_emis` takes due EMIs from savings and
+  tracks days past due; at 90 days the loan is NPA.
+- **Members manage their loan.** The Loans page shows what's owed, the next EMI,
+  a "Pay EMI now" button and the schedule. EMI reminders appear in the bell.
+- **Collections works real overdue loans** instead of typed-in demo cases. The
+  loan desk shows the real outstanding book and NPA %.
+- **Fake ratio removed.** The branch dashboard's "CRR 4.5% · SLR 18% · Basel III"
+  tile is now the real NOF : deposits ratio.
+
 ## Still open
-- **Loans have no disbursement or repayment ledger.** Applications are approved,
-  but no loan account, EMI schedule, repayment posting or outstanding balance
-  exists, and collections cases are typed in. This is the biggest banking gap
-  left.
 - FIU-IND submission files (CTR/STR XML), NDH-1/NDH-3 returns, passbook printing,
   and beneficiary (saved payee) management.
 - **Your decisions:**

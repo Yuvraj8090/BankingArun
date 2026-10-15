@@ -296,6 +296,14 @@ function route_notifications(array $d): void
                     . date('j M Y', strtotime($o['next_due'])) . ', taken from your savings.', 'deposits');
             }
         }
+        foreach (rows("SELECT l.loan_number, l.dpd, e.emi, e.due_date FROM loans l JOIN loan_emis e ON e.loan_id = l.id
+                WHERE l.user_id = ? AND l.status <> 'closed' AND e.paid_on IS NULL
+                AND e.n = (SELECT MIN(n) FROM loan_emis x WHERE x.loan_id = l.id AND x.paid_on IS NULL)", [$user['id']]) as $l) {
+            $add($l['dpd'] > 0 ? "EMI overdue on {$l['loan_number']}" : "Next EMI on {$l['loan_number']}",
+                $l['dpd'] > 0 ? "{$l['dpd']} days late. Keep " . rupees((float)$l['emi']) . ' in savings, or pay it now on the Loans page.'
+                    : rupees((float)$l['emi']) . ' on ' . date('j M Y', strtotime($l['due_date'])) . ', taken from your savings.',
+                'loans', $l['dpd'] > 0 ? 'warn' : 'info');
+        }
         foreach (rows("SELECT details, timestamp FROM audit_logs WHERE user_id = ? AND action = 'DEPOSIT_RERATED_TO_CAP'
                 AND timestamp >= ? ORDER BY timestamp DESC LIMIT 3", [$user['id'], gmdate('Y-m-d', strtotime('-90 days'))]) as $r) {
             $add('Your deposit rate changed', $r['details'] . '. 12.5% a year is the most a Nidhi may pay; interest '
@@ -327,7 +335,7 @@ function route_notifications(array $d): void
             $add('Loans waiting', "$n application" . ($n === 1 ? '' : 's') . ' waiting for a decision.', 'loan-dept');
         }
         if (in_array($user['role'], ['collection_agent', ...ADMIN_ROLES], true)
-            && ($n = $count('SELECT COUNT(*) FROM collection_cases WHERE dpd_days >= 90'))) {
+            && ($n = $count("SELECT COUNT(*) FROM loans WHERE status <> 'closed' AND dpd >= 90"))) {
             $add('Cases past 90 days', "$n loan" . ($n === 1 ? ' is' : 's are') . ' 90 or more days past due.', 'collection', 'warn');
         }
         if ($user['role'] === 'bank_owner') {

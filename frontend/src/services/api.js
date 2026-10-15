@@ -87,6 +87,7 @@ export const api = {
   // Loans
   applyLoan: async (payload) => (await axios.post(`${API}/loans/apply`, payload, getAuthHeaders())).data,
   getMyLoans: async () => (await axios.get(`${API}/loans/my-applications`, getAuthHeaders())).data,
+  payLoanEmi: async (loanNumber) => (await axios.post(`${API}/loans/pay-emi`, { loan_number: loanNumber }, getAuthHeaders())).data,
 
   // Support & Branches
   registerComplaint: async (payload) => (await axios.post(`${API}/support/complaint`, payload, getAuthHeaders())).data,

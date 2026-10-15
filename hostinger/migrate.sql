@@ -1460,3 +1460,44 @@ UPDATE deposits d JOIN schemes s ON s.code = d.scheme_code
             WHERE t.ref_number = d.deposit_number AND t.mode = 'DEPOSIT_BOOKING' AND t.type = 'debit'), 0)
       AND NOT EXISTS (SELECT 1 FROM transactions t2 WHERE t2.mode = 'DEPOSIT_INSTALMENT'
             AND t2.counterparty_acc = d.deposit_number);
+
+-- A disbursed loan and its EMI schedule. route_loan_decision creates both when a loan is
+-- disbursed (the principal is credited to the borrower's savings account); run_loan_emis
+-- in cron.php takes each due EMI from that account and keeps dpd / status current.
+CREATE TABLE IF NOT EXISTS loans (
+    id VARCHAR(36) PRIMARY KEY,
+    application_id VARCHAR(36) NOT NULL UNIQUE,
+    user_id VARCHAR(36) NOT NULL,
+    loan_number VARCHAR(30) NOT NULL UNIQUE,
+    loan_type VARCHAR(20) NOT NULL,
+    account_number VARCHAR(30) NOT NULL,          -- savings account credited, and debited for EMIs
+    principal DECIMAL(15,2) NOT NULL,
+    roi DECIMAL(5,2) NOT NULL,
+    tenure_months INT NOT NULL,
+    emi DECIMAL(15,2) NOT NULL,
+    disbursed_on DATE NOT NULL,
+    outstanding DECIMAL(15,2) NOT NULL,           -- principal not yet repaid
+    interest_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    emis_paid INT NOT NULL DEFAULT 0,
+    status VARCHAR(10) NOT NULL DEFAULT 'active', -- active | npa (90+ days past due) | closed
+    dpd INT NOT NULL DEFAULT 0,                   -- days past due on the oldest unpaid EMI
+    collection_status VARCHAR(20),                -- last collections action: reminder_sent | legal_notice | settled
+    last_contact DATE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_loans_user (user_id),
+    INDEX idx_loans_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS loan_emis (
+    id VARCHAR(36) PRIMARY KEY,
+    loan_id VARCHAR(36) NOT NULL,
+    n INT NOT NULL,
+    due_date DATE NOT NULL,
+    emi DECIMAL(15,2) NOT NULL,
+    principal_part DECIMAL(15,2) NOT NULL,
+    interest_part DECIMAL(15,2) NOT NULL,
+    balance_after DECIMAL(15,2) NOT NULL,
+    paid_on DATE,
+    UNIQUE KEY uq_loan_emi (loan_id, n),
+    INDEX idx_emis_due (paid_on, due_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

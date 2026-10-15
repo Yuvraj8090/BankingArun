@@ -619,13 +619,162 @@ function route_apply_loan(array $d): void
         'eligibility' => $eligibility, 'message' => 'Application for ' . ucfirst($type) . ' Loan submitted successfully!']);
 }
 
+// --- Loan accounts --------------------------------------------------------------------
+// Reducing-balance EMI: the same formula route_apply_loan quotes.
+function emi_amount(float $principal, float $rate, int $months): float
+{
+    $r = $rate / 12 / 100;
+    return $r == 0.0 ? round($principal / $months, 2)
+        : round($principal * $r * (1 + $r) ** $months / ((1 + $r) ** $months - 1), 2);
+}
+
+// The schedule, month by month from the disbursal date. Each EMI pays the month's
+// interest on what is still owed and the rest off the principal; the last one
+// absorbs the rounding so the loan ends at exactly zero.
+function loan_schedule(float $principal, float $rate, int $months, string $start): array
+{
+    $emi = emi_amount($principal, $rate, $months);
+    $r = $rate / 12 / 100;
+    $balance = $principal;
+    $rows = [];
+    $from = new DateTimeImmutable($start);
+    for ($n = 1; $n <= $months; $n++) {
+        $interest = round($balance * $r, 2);
+        $pay = $n === $months ? round($balance + $interest, 2) : $emi;
+        $principalPart = round($pay - $interest, 2);
+        $balance = round($balance - $principalPart, 2);
+        $rows[] = ['n' => $n, 'due_date' => $from->modify("+$n months")->format('Y-m-d'), 'emi' => $pay,
+            'principal_part' => $principalPart, 'interest_part' => $interest, 'balance_after' => max(0.0, $balance)];
+    }
+    return $rows;
+}
+
+// Opens the loan account: credits the principal to the borrower's savings account
+// and writes the whole EMI schedule. Called inside the caller's transaction.
+function disburse_loan(array $app, array $staff): array
+{
+    global $pdo;
+    // Applications taken before lending was limited to secured loans can still be
+    // sitting at "approved"; none of them may be paid out.
+    if (!in_array(strtolower($app['loan_type']), NIDHI_LOAN_TYPES, true)) {
+        fail(400, 'A ' . $app['loan_type'] . ' loan cannot be disbursed: a Nidhi lends only against gold or property. '
+            . 'Reject this application.');
+    }
+    $borrower = row('SELECT * FROM users WHERE id = ?', [$app['user_id']]);
+    if (!$borrower || $borrower['kyc_status'] !== 'verified') {
+        fail(400, 'The borrower\'s KYC is not verified, so the loan cannot be disbursed.');
+    }
+    // Nidhi Rules, 2014: a Nidhi lends to its members only.
+    if (!membership_of($borrower['id'])) {
+        fail(400, 'The borrower is not on the member register. Admit them before disbursing.');
+    }
+    $account = row("SELECT * FROM accounts WHERE user_id = ? AND status = 'active' ORDER BY created_at, id LIMIT 1 FOR UPDATE",
+        [$borrower['id']]);
+    if (!$account) {
+        fail(400, 'The borrower has no active account to receive the loan.');
+    }
+    $principal = (float)$app['amount'];
+    $rate = (float)$app['roi'];
+    $months = (int)$app['tenure_months'];
+    $today = (new DateTimeImmutable('now', new DateTimeZone(IST)))->format('Y-m-d');
+    $schedule = loan_schedule($principal, $rate, $months, $today);
+    $loanId = uuid4();
+    $number = 'LA' . random_int(10000000, 99999999);
+    $pdo->prepare('INSERT INTO loans (id, application_id, user_id, loan_number, loan_type, account_number, principal,
+            roi, tenure_months, emi, disbursed_on, outstanding) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$loanId, $app['id'], $borrower['id'], $number, $app['loan_type'], $account['account_number'],
+            $principal, $rate, $months, $schedule[0]['emi'], $today, $principal]);
+    $insert = $pdo->prepare('INSERT INTO loan_emis (id, loan_id, n, due_date, emi, principal_part, interest_part,
+        balance_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    foreach ($schedule as $row) {
+        $insert->execute([uuid4(), $loanId, $row['n'], $row['due_date'], $row['emi'], $row['principal_part'],
+            $row['interest_part'], $row['balance_after']]);
+    }
+    $pdo->prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?')->execute([$principal, $account['id']]);
+    insert_txn(['user_id' => $borrower['id'], 'account_number' => $account['account_number'], 'type' => 'credit',
+        'mode' => 'LOAN_DISBURSAL', 'amount' => $principal, 'balance_after' => round((float)$account['balance'] + $principal, 2),
+        'counterparty_name' => ucfirst($app['loan_type']) . ' loan', 'counterparty_acc' => $number, 'ref_number' => $number,
+        'description' => ucfirst($app['loan_type']) . " loan $number disbursed: $months EMIs of " . rupees($schedule[0]['emi'])]);
+    audit($staff, 'LOAN_DISBURSED', "$number " . rupees($principal) . " to {$account['account_number']}");
+    return ['loan_number' => $number, 'emi' => $schedule[0]['emi'], 'first_due' => $schedule[0]['due_date']];
+}
+
+// Takes one EMI from the borrower's account if it holds enough. Called inside a
+// transaction with the loan row locked. Returns false, changing nothing, when short.
+function pay_loan_emi(array $loan, array $emi, string $today): bool
+{
+    global $pdo;
+    $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$loan['account_number']]);
+    if (!$account || $account['status'] !== 'active' || (float)$account['balance'] < (float)$emi['emi']) {
+        return false;
+    }
+    $amount = (float)$emi['emi'];
+    $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$amount, $account['id']]);
+    $pdo->prepare('UPDATE loan_emis SET paid_on = ? WHERE id = ?')->execute([$today, $emi['id']]);
+    $pdo->prepare("UPDATE loans SET outstanding = GREATEST(0, outstanding - ?), interest_paid = interest_paid + ?,
+            emis_paid = emis_paid + 1, status = IF(emis_paid >= tenure_months, 'closed', status) WHERE id = ?")
+        // MySQL applies SET left to right, so status already sees the new emis_paid.
+        ->execute([(float)$emi['principal_part'], (float)$emi['interest_part'], $loan['id']]);
+    insert_txn(['user_id' => $account['user_id'], 'account_number' => $account['account_number'], 'type' => 'debit',
+        'mode' => 'LOAN_EMI', 'amount' => $amount, 'balance_after' => round((float)$account['balance'] - $amount, 2),
+        'counterparty_name' => ucfirst($loan['loan_type']) . ' loan', 'counterparty_acc' => $loan['loan_number'],
+        'ref_number' => 'EMI-' . $loan['loan_number'] . '-' . $emi['n'],
+        'description' => "EMI {$emi['n']} of {$loan['tenure_months']} on {$loan['loan_number']}: "
+            . rupees((float)$emi['principal_part']) . ' principal + ' . rupees((float)$emi['interest_part']) . ' interest']);
+    return true;
+}
+
+// Days past due on the oldest unpaid EMI, and the status that follows (NPA at 90).
+function refresh_loan_ageing(string $loanId, string $today): void
+{
+    global $pdo;
+    $oldest = scalar('SELECT MIN(due_date) FROM loan_emis WHERE loan_id = ? AND paid_on IS NULL AND due_date <= ?',
+        [$loanId, $today]);
+    $dpd = $oldest ? (int)(new DateTimeImmutable($oldest))->diff(new DateTimeImmutable($today))->days : 0;
+    $pdo->prepare("UPDATE loans SET dpd = ?, status = CASE WHEN status = 'closed' THEN 'closed'
+            WHEN ? >= 90 THEN 'npa' ELSE 'active' END WHERE id = ?")->execute([$dpd, $dpd, $loanId]);
+}
+
+// The member pays their next EMI now, from their savings, instead of waiting for the
+// nightly debit. Pays the oldest unpaid EMI, due or not.
+function route_loan_pay_emi(array $d): void
+{
+    global $pdo;
+    $user = current_user();
+    require_kyc_verified($user);
+    need($d, 'loan_number');
+    $today = (new DateTimeImmutable('now', new DateTimeZone(IST)))->format('Y-m-d');
+    $pdo->beginTransaction();
+    $loan = row("SELECT * FROM loans WHERE loan_number = ? AND user_id = ? AND status <> 'closed' FOR UPDATE",
+        [clip($d['loan_number'], 30), $user['id']]);
+    if (!$loan) {
+        $pdo->rollBack();
+        fail(404, 'No open loan with that number.');
+    }
+    $emi = row('SELECT * FROM loan_emis WHERE loan_id = ? AND paid_on IS NULL ORDER BY n LIMIT 1', [$loan['id']]);
+    if (!$emi || !pay_loan_emi($loan, $emi, $today)) {
+        $pdo->rollBack();
+        fail(400, 'Your savings account does not hold the ' . rupees((float)($emi['emi'] ?? 0)) . ' this EMI needs.');
+    }
+    refresh_loan_ageing($loan['id'], $today);
+    audit($user, 'LOAN_EMI_PAID', "{$loan['loan_number']} EMI {$emi['n']}");
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'message' => "EMI {$emi['n']} of " . rupees((float)$emi['emi'])
+        . " paid on {$loan['loan_number']}."]);
+}
+
 function route_my_loans(array $d): void
 {
     $user = current_user();
     respond(['loans' => out_all(rows('SELECT id, loan_application_no, loan_type, amount AS amount_requested,
             roi AS interest_rate, tenure_months, calculated_emi, monthly_income, employment_type, purpose,
             eligibility_status, status, created_at
-        FROM loan_applications WHERE user_id = ? ORDER BY created_at DESC', [$user['id']]))]);
+        FROM loan_applications WHERE user_id = ? ORDER BY created_at DESC', [$user['id']])),
+        // The loan accounts behind disbursed applications, each with its schedule.
+        'accounts' => array_map(fn($l) => out($l) + ['schedule' => out_all(rows('SELECT n, due_date, emi,
+                principal_part, interest_part, balance_after, paid_on FROM loan_emis WHERE loan_id = ? ORDER BY n',
+                [$l['id']]))],
+            rows('SELECT * FROM loans WHERE user_id = ? ORDER BY created_at DESC', [$user['id']]))]);
 }
 
 // --- Support, branches & chatbot --------------------------------------------------------

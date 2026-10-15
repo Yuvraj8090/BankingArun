@@ -124,8 +124,8 @@ export default function AdminPortal() {
               sub="Active ledger balances" color="text-emerald-700" />
             <StatCard icon={UserCheck} label="Pending KYC" value={overview?.stats?.pending_kyc_count}
               sub="Awaiting compliance sign-off" color="text-[#c8102e]" />
-            <StatCard icon={Database} label="Statutory Reserves"
-              value="CRR 4.5% · SLR 18%" sub="Basel III compliant" color="text-slate-800" small />
+            <StatCard icon={Database} label="NOF : Deposits"
+              value={overview?.stats?.statutory_crr_slr_status} sub="Nidhi Rules limit 1:20" color="text-slate-800" small />
           </div>
 
           <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
