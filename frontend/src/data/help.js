@@ -78,7 +78,7 @@ const MEMBER = {
       'Track your applications in the list below.'
     ],
     fields: [
-      ['Monthly in-hand income', 'What you take home each month.'],
+      ['Monthly in-hand net income', 'What you take home each month, after tax and deductions.'],
       ['Employment type', 'Salaried, self-employed and so on.'],
       ['Purpose of loan', 'What the money is for.']
     ],
@@ -482,7 +482,59 @@ const DIRECTOR = {
   }
 };
 
-const GUIDES = { ...MEMBER, ...COUNTER, ...MANAGER, ...DIRECTOR };
+// The buttons on each page and what pressing them does. The text is matched against
+// the button's visible label (start of it), so "Book" finds "Book Fixed deposit · ₹50,000 today".
+const ACTIONS = {
+  dashboard: [['Pay a member', 'Opens a quick form to send money to another member.'],
+    ['+ Book New FD', 'Takes you to Deposits to open a fixed deposit or a plan.'],
+    ['Full Passbook', 'Opens every entry on your account, with transfers.']],
+  transfer: [['Authorize & Transfer', 'Sends the money once every field is filled in and your transaction password is correct. It cannot be undone.']],
+  deposits: [['Book', 'Opens the deposit and takes today\'s amount from the account you chose.'],
+    ['View earnings', 'Shows what that deposit has earned, day by day.'],
+    ['Close Early', 'Ends the deposit before maturity. You get back what you paid in, plus interest at a lower rate with an early-exit penalty.']],
+  loans: [['Gold Loan / Home Loan', 'Chooses the kind of loan; the EMI updates as you move the sliders.'],
+    ['Apply for', 'Sends your application to the loan desk. Its status shows in the list below.']],
+  'standing-instructions': [['New Instruction', 'Opens the form to set up a repeating payment.']],
+  referrals: [['Copy', 'Copies your invite link to share it yourself.'],
+    ['WhatsApp', 'Opens WhatsApp with your invite link ready to send.']],
+  statements: [['Last 30 days', 'Fills in the dates for you. The other range buttons work the same way.'],
+    ['Download PDF', 'Downloads the statement as a PDF.'], ['Download Excel', 'Downloads the same statement as an Excel sheet.']],
+  security: [['Register passkey', 'Adds this device\'s fingerprint or face sign-in.'],
+    ['Change password', 'Saves your new password; other devices are signed out.'],
+    ['Send OTP', 'Sends a one-time code to check your phone or email works.']],
+  kyc: [['Update Nominee', 'Saves the nominee after your transaction password is checked.']],
+  'video-kyc': [['Start Camera', 'Turns on your camera. Allow it when the browser asks.'],
+    ['Capture', 'Takes the photo for the current step. You can retake it.']],
+  'kyc-desk': [['Approve', 'Marks the KYC verified. You can also enrol them in a plan and take the first deposit.'],
+    ['Reject', 'Asks for the reason, which the member sees.']],
+  staff: [['Credit Account', 'Credits the cash or cheque to the member\'s account at once.']],
+  crm: [['Members / Leads / My Tasks', 'Switches between your members, your enquiries and today\'s calls.']],
+  'member-register': [['Admit a member', 'Opens the form to allot shares to a new member.']],
+  screening: [['Screen everyone now', 'Checks every member and lead against the loaded lists.'],
+    ['Watchlist', 'Shows and loads the names to screen against.']],
+  reports: [['Apply', 'Runs the report with your filters.'], ['CSV', 'Exports it as CSV. Exports are audited.'],
+    ['Excel', 'Exports it as an Excel sheet.']],
+  agents: [['New agent', 'Adds a field agent.']],
+  schemes: [['New scheme', 'Opens the plan form. Choose the type first.'],
+    ['Re-price', 'Brings an over-cap plan down to 12.5% a year, keeping its name and amounts.'],
+    ['Edit', 'Changes a plan. Deposits already booked keep their own terms.']],
+  admin: [['Pending KYC', 'The verification desk.'], ['Regulatory Reports', 'Cash and suspicious transaction reports.'],
+    ['Audit Trails', 'Who did what, when.'], ['User Access', 'Create staff logins and reset passwords.']],
+  owner: [['Propose change', 'Opens Business Parameters to change a rate or fee.']],
+  'security-center': [['Re-run', 'Runs every check again.'], ['Seal current files', 'Records today\'s files as the good copy, so later changes are spotted.']],
+  'support-view': [['Open read-only', 'Opens that member\'s app after you give a reason.']],
+  fraud: [['Open / Escalated / Cleared', 'Filters the alerts by where they are in review.']],
+  'branch-admin': [['New branch', 'Adds a branch to the public locator.']],
+  'public-pages': [['New page', 'Adds a product page to the public site.']],
+  'member-ranks': [['Add a rank', 'Adds a rung to the ladder.']],
+  rails: [['Test connection', 'Checks the partner\'s details work, without moving money.'], ['Save changes', 'Saves the rail settings.']],
+  'admin-config': [['Send test SMS', 'Sends a test message to the number you typed.'], ['Save changes', 'Saves the settings.']],
+  parameters: [['New parameter', 'Adds a rate, fee or limit.'], ['Edit', 'Changes a value. Every change is audited.']],
+  'book-deposit': [['Book', 'Opens the deposit and takes today\'s amount from the member\'s savings.']],
+};
+
+const GUIDES = Object.fromEntries(Object.entries({ ...MEMBER, ...COUNTER, ...MANAGER, ...DIRECTOR })
+  .map(([key, guide]) => [key, { ...guide, actions: ACTIONS[key] || [] }]));
 
 const COUNTER_ROLES = ['staff', 'admin', 'branch_manager', 'bank_owner'];
 

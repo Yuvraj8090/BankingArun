@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, RefreshCw } from 'lucide-react';
+import { CurrentPageGuide } from './HelpGuide';
 
 // Shared dialog for the create/edit forms. The scrim is translucent on purpose:
 // the record being acted on stays readable behind it, and an opaque panel here
@@ -43,9 +44,12 @@ export default function Modal({ title, subtitle, onClose, children, footer, test
             <h3 className="text-sm font-bold text-slate-900">{title}</h3>
             {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-800 shrink-0">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <CurrentPageGuide />
+            <button onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-800">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         {/* The form scrolls inside the dialog rather than the page behind it. */}
         <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">{children}</div>

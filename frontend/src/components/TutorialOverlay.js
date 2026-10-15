@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
@@ -12,7 +12,34 @@ import { toast } from 'sonner';
 const CARD_W = 320;
 const GAP = 14;
 
-export default function TutorialOverlay({ state, onClose }) {
+// A step points at its target one of three ways: `anchor`, a data-testid; `label`,
+// the visible text of a form label (the field around it is highlighted); or
+// `button`, the visible text of a button. Page guides (components/HelpGuide.js)
+// use the last two so no page needs ids added. Several alternatives can be given
+// as "A / B". Hidden elements are ignored, and a step whose target is not on
+// screen centres its card instead of pointing at nothing.
+const norm = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// Never the guide's own card, whose title repeats the text being searched for.
+const visible = (el) => el && el.offsetParent !== null && !el.closest('[data-testid="tutorial-overlay"]');
+export function findTarget(step) {
+  if (step?.anchor) return document.querySelector(`[data-testid="${step.anchor}"]`);
+  const options = norm(step?.label || step?.button).split(' / ').filter(Boolean);
+  if (!options.length) return null;
+  // Real form labels first; table headings and section titles only if no label matches.
+  const pool = step.label
+    ? [...document.querySelectorAll('label'), ...document.querySelectorAll('legend, dt, th, h3')]
+    : [...document.querySelectorAll('button, a[role="button"]')];
+  for (const want of options) {
+    const hit = pool.find((el) => visible(el) && norm(el.textContent).startsWith(want))
+      || pool.find((el) => visible(el) && norm(el.textContent).includes(want));
+    if (hit) return step.label ? (hit.closest('div') || hit) : hit;
+  }
+  return null;
+}
+
+// `local`: a page guide. Nothing is saved to the server, Skip closes at once, and
+// `title` names the page in the card's header.
+export default function TutorialOverlay({ state, onClose, local = false, title }) {
   const [index, setIndex] = useState(state.step || 0);
   const [rect, setRect] = useState(null);
   const [confirmSkip, setConfirmSkip] = useState(false);
@@ -23,19 +50,18 @@ export default function TutorialOverlay({ state, onClose }) {
 
   // Re-measure on scroll and resize, so the card tracks its target.
   const measure = useCallback(() => {
-    if (!step?.anchor) { setRect(null); return; }
-    const el = document.querySelector(`[data-testid="${step.anchor}"]`);
+    const el = findTarget(step);
     if (!el) { setRect(null); return; }
     const r = el.getBoundingClientRect();
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
   }, [step]);
 
   useEffect(() => {
-    if (step?.anchor) {
-      document.querySelector(`[data-testid="${step.anchor}"]`)
-        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
-  }, [step]);
+    findTarget(step)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // The smooth scroll moves the target; measure again once it has settled.
+    const t = setTimeout(() => measure(), 400);
+    return () => clearTimeout(t);
+  }, [step, measure]);
 
   useEffect(() => {
     measure();
@@ -51,8 +77,9 @@ export default function TutorialOverlay({ state, onClose }) {
   useEffect(() => {
     const onKey = (e) => {
       if (confirmSkip) { if (e.key === 'Escape') setConfirmSkip(false); return; }
-      if (e.key === 'Escape') setConfirmSkip(true);
+      if (e.key === 'Escape') skip();
       if (e.key === 'ArrowRight' || e.key === 'Enter') next();
+      if (e.key === 'ArrowLeft') back();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -63,10 +90,14 @@ export default function TutorialOverlay({ state, onClose }) {
     const to = index + 1;
     setIndex(to);
     // Fire and forget: a lost progress save must not interrupt the tour.
-    api.tutorialProgress(to).catch(() => {});
+    if (!local) api.tutorialProgress(to).catch(() => {});
   };
+  const back = () => setIndex((i) => Math.max(0, i - 1));
+  // A page guide is a quick look, so Skip just closes it; the first-login tour asks first.
+  const skip = () => (local ? onClose() : setConfirmSkip(true));
 
   const finish = async (skipped) => {
+    if (local) return onClose();
     try {
       const res = await api.tutorialFinish(skipped, index);
       if (skipped) toast.success(res.message);
@@ -96,7 +127,7 @@ export default function TutorialOverlay({ state, onClose }) {
           backdrop stays transparent while a target is spotlit — the ring's
           box-shadow is what dims, and the hole has to show the live page. */}
       <div className={`absolute inset-0 ${rect ? '' : 'bg-slate-900/60'}`}
-        onClick={() => setConfirmSkip(true)} />
+        onClick={skip} />
       {rect && (
         <div
           className="absolute rounded-lg pointer-events-none transition-all duration-300"
@@ -110,41 +141,49 @@ export default function TutorialOverlay({ state, onClose }) {
       )}
 
       <div
-        className="absolute bg-white rounded-xl shadow-2xl p-5 transition-all duration-300"
+        className="absolute bg-white rounded-2xl shadow-2xl p-5 transition-all duration-300 max-w-[calc(100vw-28px)]"
         style={{ ...cardStyle, width: CARD_W }}
+        data-testid="tutorial-card"
       >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-sm font-bold text-slate-900" data-testid="tutorial-title">{step.title}</h3>
-          <button onClick={() => setConfirmSkip(true)} aria-label="Close tour"
-            className="text-slate-600 hover:text-slate-600 shrink-0">
-            <X className="w-4 h-4" />
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            {title ? `${title} · ` : ''}Step {index + 1} of {steps.length}
+          </p>
+          <button data-testid="tutorial-skip" onClick={skip}
+            className="text-xs font-semibold text-amber-700 hover:text-amber-800">
+            Skip
           </button>
         </div>
-        <p className="text-xs text-slate-600 mt-2 leading-relaxed" data-testid="tutorial-body">{step.body}</p>
+        <h3 className="text-sm font-bold text-slate-900 mt-2" data-testid="tutorial-title">{step.title}</h3>
+        <p className="text-xs text-slate-600 mt-1.5 leading-relaxed whitespace-pre-line" data-testid="tutorial-body">{step.body}</p>
+        {!rect && (step.label || step.button) && (
+          <p className="text-[10px] text-slate-500 italic mt-1.5">
+            Not on screen right now: it is in a form that opens from a button on this page.
+          </p>
+        )}
 
-        <div className="flex items-center gap-1.5 mt-4">
+        <div className="flex items-center gap-1.5 mt-4" aria-hidden="true">
           {steps.map((_, i) => (
             <span key={i} className={`h-1.5 rounded-full transition-all ${
-              i === index ? 'w-5 bg-[#0b3b8c]' : i < index ? 'w-1.5 bg-[#0b3b8c]/40' : 'w-1.5 bg-slate-200'
+              i === index ? 'w-5 bg-amber-500' : i < index ? 'w-1.5 bg-amber-300' : 'w-1.5 bg-slate-200'
             }`} />
           ))}
-          <span className="ml-auto text-[10px] text-slate-500">{index + 1} of {steps.length}</span>
         </div>
 
         <div className="flex items-center justify-between gap-3 mt-4">
-          <button
-            data-testid="tutorial-skip"
-            onClick={() => setConfirmSkip(true)}
-            className="text-xs text-slate-500 hover:text-slate-800 font-medium"
-          >
-            Skip all
-          </button>
+          {index > 0 ? (
+            <button data-testid="tutorial-back" onClick={back}
+              className="px-3 py-2 rounded-full text-xs font-semibold text-slate-600 hover:bg-slate-100 flex items-center gap-1.5">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </button>
+          ) : <span />}
           <button
             data-testid="tutorial-next"
             onClick={next}
-            className="px-5 py-2 rounded-full bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5"
+            autoFocus
+            className="px-5 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow"
           >
-            {isLast ? <>Finish <Check className="w-3.5 h-3.5" /></> : <>Next <ArrowRight className="w-3.5 h-3.5" /></>}
+            {isLast ? <>Done <Check className="w-3.5 h-3.5" /></> : <>Next <ArrowRight className="w-3.5 h-3.5" /></>}
           </button>
         </div>
       </div>

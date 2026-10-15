@@ -53,7 +53,7 @@ export default function Navbar({ onNavigate, activeTab }) {
 
           {/* Right */}
           <div className="flex items-center gap-2">
-            {user && activeTab && <GuideButton tab={activeTab} role={user.role} onOpenHelp={() => onNavigate('help')} />}
+            {user && activeTab && <GuideButton tab={activeTab} role={user.role} />}
             <div className="relative">
               <button
                 data-testid="notification-bell-btn"
