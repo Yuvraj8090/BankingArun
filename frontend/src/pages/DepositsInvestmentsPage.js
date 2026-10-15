@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator } from 'lucide-react';
 import { api } from '../services/api';
+import PlanPicker from '../components/PlanPicker';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
 
@@ -65,29 +66,9 @@ export default function DepositsInvestmentsPage() {
   const [closingNumber, setClosingNumber] = useState('');
 
   // FD Booking Form
-  const [fdAmount, setFdAmount] = useState(50000);
-  const [fdTenure, setFdTenure] = useState(12);
-  const [fdType, setFdType] = useState('fixed');
   const [fdNominee, setFdNominee] = useState('Registered Nominee');
   const [selectedAcc, setSelectedAcc] = useState('');
   const [booking, setBooking] = useState(false);
-  // Monthly Income Scheme: a published plan, priced by its own printed slabs
-  // rather than the generic tenure tiers, so it books against a fixed
-  // denomination instead of a freeform amount.
-  const [misScheme, setMisScheme] = useState(null);
-  const [misPlans, setMisPlans] = useState([]);
-  const [misUnit, setMisUnit] = useState('');
-  const selectPlan = (plan) => {
-    setMisScheme(plan);
-    setMisUnit(String(plan.slabs?.[0]?.unit || ''));
-    setMisAmount(String(plan.principal_amount || ''));
-  };
-  // A daily-% plan (misScheme.daily_rate_percent set) has no slab table -- any
-  // amount at or above the minimum qualifies, so it is typed rather than
-  // picked from a dropdown of printed denominations.
-  const [misAmount, setMisAmount] = useState('');
-  const isDailyMis = fdType === 'mis' && misScheme?.daily_rate_percent != null;
-
   const loadAccounts = async () => {
     const accRes = await api.getAccounts();
     if (accRes.accounts?.length > 0) {
@@ -106,99 +87,23 @@ export default function DepositsInvestmentsPage() {
         toast.error('Could not load your accounts');
         return;
       }
-      try {
-        const schemeRes = await api.publicSchemes();
-        // Every plan-priced scheme, not just the first: there are now two
-        // MIS-type plans, and .find() was returning only whichever sorted first.
-        const plans = (schemeRes.schemes || []).filter(s => s.scheme_type === 'mis' || s.daily_rate_percent != null);
-        setMisPlans(plans);
-        if (plans[0]) selectPlan(plans[0]);
-      } catch (err) {
-        // The plan-priced schemes are a bonus on this page, not the page's
-        // reason to exist — fixed/recurring booking still works without it.
-      }
     };
     init();
   }, []);
 
-  const misSlab = fdType === 'mis' && !isDailyMis
-    ? (misScheme?.slabs || []).find(s => String(s.unit) === String(misUnit)) : null;
-
-  // FD Maturity Calculator formula: A = P(1 + r/4)^(4*t)
-  const calculateMaturity = () => {
-    if (isDailyMis) {
-      const p = parseFloat(misAmount) || 0;
-      const daily = Math.round(p * (misScheme.daily_rate_percent / 100) * 100) / 100;
-      return {
-        rate: misScheme.effective_rate_pa ?? 0,
-        dailyAmount: daily,
-        threshold: misScheme.withdrawal_threshold || null,
-        total: Math.round(p),
-      };
-    }
-    if (fdType === 'mis') {
-      if (!misSlab) return { rate: 0, interest: 0, total: 0, monthlyPayout: 0 };
-      // misSlab.maturity is the sum of monthly payouts only (schema note: "the
-      // maturity column is the total received"). The locked principal is repaid
-      // separately at term end (cron.php pays out principal_amount on top), so
-      // the true total received over the term is principal + monthly payouts.
-      return {
-        rate: misSlab.effective_rate_pa ?? 0,
-        interest: Math.round(misSlab.maturity),
-        total: Math.round(misSlab.deposit + misSlab.maturity),
-        monthlyPayout: misSlab.monthly_payout ?? 0,
-      };
-    }
-    const rate = fdTenure < 12 ? 6.50 : fdTenure <= 24 ? 7.25 : fdTenure <= 36 ? 7.50 : 7.10;
-    const p = parseFloat(fdAmount) || 0;
-    const t = fdTenure / 12.0;
-    const r = rate / 100.0;
-    const maturity = p * Math.pow((1 + r / 4), (4 * t));
-    return {
-      rate,
-      interest: Math.round(maturity - p),
-      total: Math.round(maturity)
-    };
-  };
-
-  const maturityCalc = calculateMaturity();
-
-  const handleBookDeposit = async (e) => {
+  const handleBookDeposit = async (e, choice) => {
     e.preventDefault();
     if (!selectedAcc) {
       toast.error("Select an account to debit");
       return;
     }
-    if (isDailyMis) {
-      if (!misScheme || !misAmount || parseFloat(misAmount) < misScheme.principal_amount) {
-        toast.error(`Minimum deposit for this plan is ₹${Number(misScheme?.principal_amount || 0).toLocaleString('en-IN')}`);
-        return;
-      }
-    } else if (fdType === 'mis') {
-      if (!misScheme || !misSlab) {
-        toast.error("Choose an MIS amount");
-        return;
-      }
-    } else if (!fdAmount || fdAmount < 5000) {
-      toast.error("Minimum deposit amount is ₹5,000");
+    if (!choice.valid) {
+      toast.error('Choose a plan and an amount it allows');
       return;
     }
     setBooking(true);
     try {
-      const res = await api.bookDeposit(
-        fdType === 'mis'
-          ? {
-              account_number: selectedAcc, scheme_code: misScheme.code,
-              amount: isDailyMis ? parseFloat(misAmount) : misSlab.unit, nominee_name: fdNominee,
-            }
-          : {
-              account_number: selectedAcc,
-              deposit_type: fdType,
-              amount: parseFloat(fdAmount),
-              tenure_months: parseInt(fdTenure),
-              nominee_name: fdNominee
-            }
-      );
+      const res = await api.bookDeposit({ ...choice.payload, account_number: selectedAcc, nominee_name: fdNominee });
       toast.success(res.message);
       loadAccounts();
     } catch (err) {
@@ -254,18 +159,18 @@ export default function DepositsInvestmentsPage() {
 
       </div>
 
-      {(
+      <PlanPicker>
+        {({ inputs, breakdown, choice }) => (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Booking Form */}
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-4">
             <h2 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex justify-between items-center">
-              <span>Book Online Fixed / Recurring Deposit</span>
+              <span>Open a deposit</span>
               <span className="text-[#0b3b8c] text-xs font-mono">Member deposits</span>
             </h2>
 
-            <form onSubmit={handleBookDeposit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={(e) => handleBookDeposit(e, choice)} className="space-y-4 text-xs">
                 <div>
                   <label className="block text-slate-500 mb-1">Debit From Savings Account</label>
                   <select
@@ -280,100 +185,7 @@ export default function DepositsInvestmentsPage() {
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-slate-500 mb-1">Deposit Type</label>
-                  <select
-                    data-testid="deposit-type-select"
-                    value={fdType === 'mis' && misScheme ? `mis:${misScheme.code}` : fdType}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v.startsWith('mis:')) {
-                        selectPlan(misPlans.find(p => p.code === v.slice(4)));
-                        setFdType('mis');
-                      } else {
-                        setFdType(v);
-                      }
-                    }}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
-                  >
-                    <option value="fixed">Fixed Deposit (Lumpsum Principal)</option>
-                    <option value="recurring">Recurring Deposit (Monthly Installment)</option>
-                    {misPlans.map(p => (
-                      <option key={p.code} value={`mis:${p.code}`}>
-                        {p.daily_rate_percent != null ? `Daily Income Plan (${p.name})` : `Monthly Income Scheme (${p.name})`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {isDailyMis ? (
-                <div>
-                  <label className="block text-slate-500 mb-1">
-                    Amount to Lock (₹, minimum ₹{Number(misScheme.principal_amount).toLocaleString('en-IN')})
-                  </label>
-                  <input
-                    data-testid="mis-daily-amount-input"
-                    type="number"
-                    min={misScheme.principal_amount}
-                    step="1000"
-                    required
-                    value={misAmount}
-                    onChange={(e) => setMisAmount(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
-                  />
-                </div>
-              ) : fdType === 'mis' ? (
-                <div>
-                  <label className="block text-slate-500 mb-1">Amount to Lock (₹)</label>
-                  <select
-                    data-testid="mis-unit-select"
-                    value={misUnit}
-                    onChange={(e) => setMisUnit(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
-                  >
-                    {(misScheme?.slabs || []).map(sl => (
-                      <option key={sl.unit} value={sl.unit}>
-                        ₹{sl.unit.toLocaleString('en-IN')} → ₹{sl.monthly_payout?.toLocaleString('en-IN')}/month for {misScheme.tenure_months} months
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-slate-500 mb-1">Deposit Principal Amount (₹)</label>
-                    <input
-                      data-testid="fd-amount-input"
-                      type="number"
-                      min="5000"
-                      step="1000"
-                      required
-                      value={fdAmount}
-                      onChange={(e) => setFdAmount(e.target.value)}
-                      placeholder="e.g. 50000"
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-500 mb-1">Tenure (Months)</label>
-                    <select
-                      data-testid="fd-tenure-select"
-                      value={fdTenure}
-                      onChange={(e) => setFdTenure(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold"
-                    >
-                      <option value={6}>6 Months (6.50% p.a.)</option>
-                      <option value={12}>12 Months / 1 Year (7.25% p.a.)</option>
-                      <option value={24}>24 Months / 2 Years (7.25% p.a.)</option>
-                      <option value={36}>36 Months / 3 Years (7.50% p.a.)</option>
-                      <option value={60}>60 Months / 5 Years (7.10% Tax Saver)</option>
-                    </select>
-                  </div>
-                </div>
-              )}
+              {inputs}
 
               <div>
                 <label className="block text-slate-500 mb-1">Nominee Details</label>
@@ -389,92 +201,26 @@ export default function DepositsInvestmentsPage() {
               <button
                 data-testid="book-fd-btn"
                 type="submit"
-                disabled={booking}
-                className={`w-full py-3 rounded-xl ${currentTheme.buttonTheme} font-bold text-sm shadow-xl`}
+                disabled={booking || !choice.valid}
+                className={`w-full py-3 rounded-xl ${currentTheme.buttonTheme} font-bold text-sm shadow-xl disabled:opacity-50`}
               >
-                {booking
-                  ? 'Issuing Deposit Certificate...'
-                  : isDailyMis
-                    ? `Instantly Book for ₹${(parseFloat(misAmount) || 0).toLocaleString('en-IN')}`
-                    : fdType === 'mis'
-                      ? `Instantly Book MIS for ₹${(misSlab?.unit || 0).toLocaleString('en-IN')}`
-                      : `Instantly Book ${fdType.toUpperCase()} for ₹${parseFloat(fdAmount || 0).toLocaleString('en-IN')}`}
+                {booking ? 'Booking…' : `Book ${choice.planName} · ₹${Number(choice.dueToday || 0).toLocaleString('en-IN')} today`}
               </button>
             </form>
           </div>
 
-          {/* Calculator Card */}
+          {/* What the member gets */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl text-xs space-y-4">
             <h3 className="font-bold text-slate-900 text-sm pb-2 border-b border-slate-200 flex items-center gap-2">
               <Calculator className="w-4 h-4 text-[#0b3b8c]" />
-              Maturity Breakdown Calculator
+              What you get
             </h3>
-
-            <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
-              <div className="flex justify-between text-slate-500">
-                <span>Principal Locked:</span>
-                <span className="font-semibold text-slate-900">
-                  ₹{(isDailyMis ? (parseFloat(misAmount) || 0) : fdType === 'mis' ? (misSlab?.unit || 0) : parseFloat(fdAmount || 0)).toLocaleString('en-IN')}
-                </span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Interest Rate:</span>
-                <span className="font-bold text-[#0b3b8c]">{maturityCalc.rate}% p.a.</span>
-              </div>
-              {isDailyMis ? (
-                <>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Daily Credit:</span>
-                    <span className="font-semibold text-emerald-700">
-                      + ₹{maturityCalc.dailyAmount.toLocaleString('en-IN')}/day
-                      {maturityCalc.threshold
-                        ? ` (paid out once it reaches ₹${Number(maturityCalc.threshold).toLocaleString('en-IN')})`
-                        : ' (paid out daily)'}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 -mt-1">
-                    Shown before tax. TDS is deducted from each payout under Section 194A, as applicable, before it reaches your account.
-                  </p>
-                </>
-              ) : fdType === 'mis' ? (
-                <>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Monthly Payout:</span>
-                    <span className="font-semibold text-emerald-700">₹{(maturityCalc.monthlyPayout || 0).toLocaleString('en-IN')}/mo</span>
-                  </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Total Monthly Payouts:</span>
-                    <span className="font-semibold text-emerald-700">+ ₹{maturityCalc.interest.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span>Principal Repaid at Maturity:</span>
-                    <span className="font-semibold text-slate-900">+ ₹{(misSlab?.deposit || 0).toLocaleString('en-IN')}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex justify-between text-slate-500">
-                  <span>Estimated Interest:</span>
-                  <span className="font-semibold text-emerald-700">+ ₹{maturityCalc.interest.toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              <div className="pt-2 border-t border-slate-200 flex justify-between text-sm">
-                <span className="font-bold text-slate-900">
-                  {isDailyMis ? 'Principal Repaid at Maturity:' : fdType === 'mis' ? 'Total Received Over Term:' : 'Maturity Value:'}
-                </span>
-                <span data-testid="fd-maturity-value" className="font-extrabold text-emerald-700">
-                  ₹{maturityCalc.total.toLocaleString('en-IN')}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/20 text-[11px] text-[#0b3b8c] space-y-1">
-              <p className="font-semibold">Senior Citizen Benefit:</p>
-              <p>Additional 0.50% interest auto-applied for customers aged 60+ as per our deposit policy.</p>
-            </div>
+            {breakdown}
           </div>
 
         </div>
-      )}
+        )}
+      </PlanPicker>
 
       {myDeposits.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xl mt-6">
@@ -530,6 +276,13 @@ export default function DepositsInvestmentsPage() {
                     </td>
                     <td className="py-2 pr-3 text-right text-slate-900 font-semibold">
                       ₹{Number(dep.principal_amount).toLocaleString('en-IN')}
+                      {dep.instalment_amount != null && (
+                        // An instalment plan: what has come in so far, and what the nightly job takes next.
+                        <span className="block text-[10px] font-normal text-slate-500" data-testid={`paid-${dep.deposit_number}`}>
+                          paid ₹{Number(dep.paid_amount).toLocaleString('en-IN')} so far ·
+                          ₹{Number(dep.instalment_amount).toLocaleString('en-IN')} a {dep.instalment_every} from savings
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3 text-slate-600">
                       {new Date(dep.maturity_date).toLocaleDateString('en-IN')}

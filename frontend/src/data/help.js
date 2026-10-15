@@ -49,21 +49,22 @@ const MEMBER = {
     title: 'Deposits',
     what: 'Open a fixed or recurring deposit or one of our plans, and see what each deposit has earned.',
     steps: [
-      'Pick the plan or deposit type.',
-      'Choose the account to pay from, the amount and the tenure.',
-      'Add a nominee and confirm.',
+      'Choose the savings account to pay from.',
+      'Pick a plan: a plain fixed deposit, a plan paid by monthly or daily instalments (Masik, Daily Yojana, Shubh Lakshmi), a monthly-income plan or a daily-interest plan.',
+      'Choose the amount (or the instalment). The panel on the right shows what you get and what is taken today.',
+      'Add a nominee and book.',
       'Click any of your deposits to see what it has earned day by day.'
     ],
     fields: [
-      ['Debit from savings account', 'Where the deposit money comes from.'],
-      ['Deposit type', 'Fixed (one payment) or recurring (monthly instalments).'],
-      ['Amount / principal', 'The amount to deposit. Plans are sold in fixed amounts.'],
-      ['Tenure', 'How many months until maturity.'],
+      ['Debit from savings account', 'Where the deposit money, or each instalment, comes from.'],
+      ['Plan', 'Plans are grouped by type. Each one shows its tenure and its yearly return.'],
+      ['Amount / Instalment', 'A plain FD takes any amount from ₹1,000 and a tenure. A plan is sold in fixed amounts; for an instalment plan this is the amount per month or per day.'],
       ['Nominee details', 'Who receives the money if something happens to you.']
     ],
     tips: [
       'No deposit pays more than 12.5% a year: that is the legal limit for a Nidhi.',
-      'Your first deposit makes you a member with 10 equity shares, as the Nidhi Rules require.',
+      'Your first deposit makes you a member with 10 equity shares (₹100), as the Nidhi Rules require.',
+      'Instalment plans take the first instalment today and the rest from your savings every month or day. Keep enough there; a plan not fully paid matures at the same share of its value.',
       'Interest is credited automatically. On daily plans, 10% TDS is deducted when interest is released.'
     ]
   },
@@ -244,14 +245,13 @@ const COUNTER = {
     what: 'Book a fixed, recurring or plan deposit for a member who is at the counter.',
     steps: [
       'Type the member\'s account number. Their details load by themselves.',
-      'Choose the deposit type or plan, the amount, the tenure and a nominee.',
-      'Book it. The amount is taken from their savings account.'
+      'Pick any plan (the same list members see), the amount or instalment, and a nominee.',
+      'Book it. Today\'s amount is taken from their savings account; an instalment plan collects the rest automatically.'
     ],
     fields: [
       ['Member account number', 'The savings account to debit.'],
-      ['Deposit type', 'Fixed, recurring or MIS, or a named plan.'],
-      ['Amount / Principal', 'Plans are sold in fixed amounts.'],
-      ['Tenure', 'Months until maturity.'],
+      ['Plan', 'A plain FD, or any live plan, grouped by type.'],
+      ['Amount / Instalment', 'Plans are sold in fixed amounts. For an instalment plan, the amount per month or per day.'],
       ['Nominee details', 'Who receives it if needed.']
     ],
     tips: ['An identical booking within a minute is refused, so pressing twice cannot book twice.']
@@ -367,9 +367,9 @@ const MANAGER = {
     title: 'Scheme Master',
     what: 'The deposit plans staff can sell. Each one shows its true annual return.',
     steps: [
-      'Add a plan: code, name, type, tenure and the amounts it is sold in.',
-      'Save it as a draft first, and check the effective rate.',
-      'Set it to active only if it is within 12.5%.'
+      'Choose the type first: the form then asks only for what that kind of plan needs.',
+      'Fill in the tenure and the amounts it is sold in, or paste the amounts and one rate and click Generate table.',
+      'Save it as a draft, check the effective rate, then set it active. A plan above 12.5% shows "Re-price to 12.5%", which fixes it in one click.'
     ],
     fields: [
       ['Code / Name / Type', 'Type is daily, recurring, fixed or MIS.'],

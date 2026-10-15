@@ -75,6 +75,16 @@ COMPANY_IDENTITY = {
 }
 
 
+FD_RATE_DEFAULTS = {"under_1y": 6.50, "1y_to_2y": 7.25, "2y_to_3y": 7.50, "over_3y": 7.10}
+
+
+def fd_rates() -> list[dict]:
+    """deposit_tier_rate()'s rate card from modules/banking.php, read the same way."""
+    stored = {r["param_key"]: float(r["value"]) for r in rows(
+        "SELECT param_key, value FROM system_parameters WHERE param_key LIKE 'deposit_rate_%'")}
+    return [{"tier": t, "rate": stored.get(f"deposit_rate_{t}", d)} for t, d in FD_RATE_DEFAULTS.items()]
+
+
 @router.get("/public/schemes")
 def public_schemes() -> dict:
     found = rows(
@@ -89,6 +99,8 @@ def public_schemes() -> dict:
         "company": COMPANY_IDENTITY,
         "schemes": [s for s in shaped if not s["exceeds_cap"]],
         "max_rate_pa": NIDHI_MAX_DEPOSIT_RATE,
+        # The plain fixed deposit's rate card (Business Parameters), same as PHP.
+        "fd_rates": fd_rates(),
         "disclosure": "Returns are the amounts the scheme itself promises.",
     }
 

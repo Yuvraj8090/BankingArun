@@ -158,6 +158,70 @@ function credit(string $accountNumber, float $amount, string $mode, string $coun
     return [true, $ref];
 }
 
+// Instalment plans (Masik / Daily Yojana / Shubh Lakshmi): each instalment that has
+// fallen due is taken from the member's savings account, the way a bank collects a
+// recurring deposit. Instalment k (k = 1..N, N = contracted total / instalment) is
+// due k-1 days or months after booking. A short balance takes as many whole
+// instalments as it covers and leaves the rest for the next night, so arrears catch
+// up on their own once the member pays cash in at the counter.
+function run_instalments(string $today, bool $dryRun, bool $verbose): array
+{
+    global $pdo;
+    $collected = $short = 0;
+    $due = rows("SELECT * FROM deposits WHERE status = 'active' AND instalment_amount > 0
+        AND paid_amount < principal_amount AND maturity_date > ? AND source_account IS NOT NULL
+        ORDER BY created_at LIMIT " . CRON_BATCH, [$today]);
+    $ist = new DateTimeZone(IST);
+    foreach ($due as $deposit) {
+        $unit = (float)$deposit['instalment_amount'];
+        $booked = (new DateTimeImmutable($deposit['created_at'], new DateTimeZone('UTC')))->setTimezone($ist)
+            ->setTime(0, 0);
+        $gap = $booked->diff(new DateTimeImmutable($today, $ist));
+        $elapsed = $deposit['instalment_every'] === 'day' ? (int)$gap->days : $gap->y * 12 + $gap->m;
+        $total = (int)round((float)$deposit['principal_amount'] / $unit);
+        $owed = round(min($total, $elapsed + 1) * $unit - (float)$deposit['paid_amount'], 2);
+        if ($owed < $unit - 0.005) {
+            continue;
+        }
+        $label = "Deposit {$deposit['deposit_number']} instalments " . rupees($owed) . ' due';
+        if ($dryRun) {
+            say("  would take $label");
+            $collected++;
+            continue;
+        }
+        $pdo->beginTransaction();
+        $locked = row("SELECT * FROM deposits WHERE id = ? AND status = 'active' FOR UPDATE", [$deposit['id']]);
+        $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$deposit['source_account']]);
+        $owed = round(min($total, $elapsed + 1) * $unit - (float)$locked['paid_amount'], 2);
+        $take = $account && $account['status'] === 'active'
+            ? min($owed, floor((float)$account['balance'] / $unit) * $unit) : 0.0;
+        if ($take < $unit - 0.005) {
+            $pdo->rollBack();
+            $short++;
+            if ($verbose) {
+                say("  short      $label, balance too low; retried tomorrow");
+            }
+            continue;
+        }
+        $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$take, $account['id']]);
+        $pdo->prepare('UPDATE deposits SET paid_amount = paid_amount + ? WHERE id = ?')->execute([$take, $locked['id']]);
+        $count = (int)round($take / $unit);
+        insert_txn(['user_id' => $account['user_id'], 'account_number' => $account['account_number'], 'type' => 'debit',
+            'mode' => 'DEPOSIT_INSTALMENT', 'amount' => $take,
+            'balance_after' => round((float)$account['balance'] - $take, 2),
+            'counterparty_name' => 'AJSPay Term Deposit', 'counterparty_acc' => $locked['deposit_number'],
+            'ref_number' => 'INS-' . $locked['deposit_number'] . '-' . str_replace('-', '', $today),
+            'description' => "$count instalment" . ($count === 1 ? '' : 's') . " to {$locked['deposit_number']}",
+            'timestamp' => now_utc()]);
+        $pdo->commit();
+        $collected++;
+        if ($verbose) {
+            say("  took       " . rupees($take) . " for {$locked['deposit_number']}");
+        }
+    }
+    return [$collected, $short];
+}
+
 // --- Deposit interest and maturity ------------------------------------------------
 // Monthly-payout deposits pay simple interest on the principal each month; every
 // deposit pays out its maturity value on or after its maturity date. Both are
@@ -415,7 +479,14 @@ function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): arr
             $tds = round($grossInterest * param_value('tds_rate_daily_interest', 10.0) / 100, 2);
             $payout = (float)$deposit['principal_amount'] + round($grossInterest - $tds, 2);
         } else {
-            $payout = (float)$deposit['maturity_amount'];
+            // An instalment plan pays its full maturity only if every instalment came in; a
+            // short one pays the same proportion of it.
+            // ponytail: pro rata by amount, not by when each instalment was paid. A member
+            // who missed only late instalments is slightly underpaid; per-instalment
+            // compounding is the upgrade if anyone disputes it.
+            $paidShare = $deposit['instalment_amount'] !== null && (float)$deposit['principal_amount'] > 0
+                ? min(1.0, (float)$deposit['paid_amount'] / (float)$deposit['principal_amount']) : 1.0;
+            $payout = round((float)$deposit['maturity_amount'] * $paidShare, 2);
         }
         $label = "Deposit {$deposit['deposit_number']} matured, " . rupees($payout);
         if ($dryRun) {
@@ -632,7 +703,22 @@ $pdo->prepare('INSERT INTO cron_runs (id, dry_run, status) VALUES (?, ?, ?)')
 try {
     [$siDone, $siFailed] = run_standing_instructions($today, $dryRun, $verbose);
     [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
+    // Plans first, so nothing priced above the cap is sold tomorrow.
+    $repriced = 0;
+    foreach (rows("SELECT * FROM schemes WHERE status = 'active' AND deleted_at IS NULL") as $scheme) {
+        // One plan that cannot be re-priced must not stop the night's interest and maturities.
+        try {
+            if (!$dryRun && ($summary = reprice_scheme_to_cap($scheme)) !== null) {
+                security_event('SCHEME_REPRICED_TO_CAP', 'warning', $summary);
+                say("  re-priced  $summary");
+                $repriced++;
+            }
+        } catch (Throwable $e) {
+            say("  FAILED     re-pricing {$scheme['code']}: " . $e->getMessage());
+        }
+    }
     $capped = run_cap_rerate($today, $dryRun, $verbose);
+    [$instTaken, $instShort] = run_instalments($today, $dryRun, $verbose);
     [$intDone, $intFailed] = run_deposit_interest($today, $dryRun, $verbose);
     [$dailyAccrued, $dailyReleased, $dailyFailed] = run_daily_interest_accrual($today, $dryRun, $verbose);
     [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
@@ -654,7 +740,8 @@ try {
 scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
 say("Standing instructions: $siDone run, $siFailed failed. "
     . "Scheduled transfers: $payDone run, $payFailed failed. "
-    . "Re-rated to the 12.5% cap: $capped. "
+    . "Plans re-priced to the cap: $repriced. Deposits re-rated to the cap: $capped. "
+    . "Instalments: $instTaken collected, $instShort short of funds. "
     . "Deposit interest: $intDone paid, $intFailed failed. "
     . "Daily interest: $dailyAccrued accrued, $dailyReleased released, $dailyFailed failed. "
     . "Maturities: $matDone paid, $matFailed failed. "
@@ -667,7 +754,8 @@ $pdo->prepare('UPDATE cron_runs SET finished_at = NOW(), status = ?, jobs = ? WH
     ->execute([$problems > 0 ? 'attention' : 'ok', json_encode([
         'standing_instructions' => ['done' => $siDone, 'failed' => $siFailed],
         'scheduled_payments' => ['done' => $payDone, 'failed' => $payFailed],
-        'cap_rerate' => ['done' => $capped, 'failed' => 0],
+        'cap_rerate' => ['done' => $capped + $repriced, 'failed' => 0],
+        'instalments' => ['done' => $instTaken, 'failed' => 0, 'short_of_funds' => $instShort],
         'deposit_interest' => ['done' => $intDone, 'failed' => $intFailed],
         'daily_interest' => ['accrued' => $dailyAccrued, 'released' => $dailyReleased, 'failed' => $dailyFailed],
         'deposit_maturities' => ['done' => $matDone, 'failed' => $matFailed],

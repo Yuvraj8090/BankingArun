@@ -297,6 +297,7 @@ function route_kyc_verify_and_fund(array $d): void
                 $account['account_number'], $terms['total_deposit'], $terms['interest_rate'],
                 $terms['tenure_months'], $terms['interest_payout'], $terms['maturity_amount'], $maturityDate,
                 clip($d['nominee_name'] ?? '', 150) ?: ($customer['nominee_name'] ?? null), 'active']);
+        record_funding($depositNumber, $terms['by_instalment'] ? 0.0 : $terms['due_today'], $terms);
         if (!$terms['by_instalment']) {
             $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE account_number = ?')
                 ->execute([$terms['due_today'], $account['account_number']]);

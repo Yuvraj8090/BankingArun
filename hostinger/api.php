@@ -645,6 +645,9 @@ function route_register(array $d): void
                 $accountNumber, $terms['total_deposit'], $terms['interest_rate'], $terms['tenure_months'],
                 $terms['interest_payout'], $terms['maturity_amount'], $maturityDate,
                 $nominee === '' ? null : $nominee, 'active']);
+        // An instalment plan takes nothing today: its first instalment is auto-debited from the
+        // opening cash tonight (run_instalments, cron.php).
+        record_funding($depositNumber, $terms['by_instalment'] ? 0.0 : $terms['due_today'], $terms);
         if (!$terms['by_instalment']) {
             $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE account_number = ?')
                 ->execute([$terms['due_today'], $accountNumber]);
@@ -1279,6 +1282,7 @@ $paramRoutes = [
     ['GET', '#^/kyc/video/([\w-]{1,64})/face-match$#', 'route_kyc_face_match'],
     ['GET', '#^/kyc/video/([\w-]{1,64})$#', 'route_kyc_detail'],
     ['PATCH', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_update'],
+    ['POST', '#^/schemes/([\w-]{1,64})/reprice$#', 'route_scheme_reprice'],
     ['DELETE', '#^/schemes/([\w-]{1,64})$#', 'route_scheme_delete'],
     ['PATCH', '#^/parameters/([\w-]{1,64})$#', 'route_parameter_update'],
     ['DELETE', '#^/parameters/([\w-]{1,64})$#', 'route_parameter_delete'],

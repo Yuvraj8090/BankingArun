@@ -20,10 +20,13 @@ def test_over_cap_and_deleted_plans_are_not_listed(monkeypatch) -> None:
     seen = {}
 
     def fake_rows(sql, params=None):
+        if 'system_parameters' in sql:
+            return [{'param_key': 'deposit_rate_under_1y', 'value': '6.75'}]
         seen['sql'] = sql
         return [INSIDE, ABOVE]
 
     monkeypatch.setattr(routes_public, 'rows', fake_rows)
-    codes = [s['code'] for s in routes_public.public_schemes()['schemes']]
-    assert codes == ['AJS-RD-1Y']
+    listed = routes_public.public_schemes()
+    assert [s['code'] for s in listed['schemes']] == ['AJS-RD-1Y']
+    assert listed['fd_rates'][0] == {'tier': 'under_1y', 'rate': 6.75}
     assert 'deleted_at IS NULL' in seen['sql']

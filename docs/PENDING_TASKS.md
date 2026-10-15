@@ -226,3 +226,45 @@ on exit, including on a failure or Ctrl-C, so a run leaves the data exactly as i
 found it (proved with a marker row in a table the suite empties). The local rows
 deleted by earlier runs had no seed and cannot be rebuilt. They were local test data
 only.
+
+---
+
+## Round 2 (15 Oct): plans and deposits
+
+### 13. Every plan bookable by members and by staff  ✅
+Before this round, members could book only a generic FD, a generic "RD" (which
+took the whole amount up front) and the monthly-income plans. Staff could book one
+MIS plan and one daily plan. Most plans (Masik, Daily Yojana, Shubh Lakshmi,
+Dwigun, Savadhi) could be booked only during account opening. Now one shared
+`PlanPicker` lists **every** live plan, grouped by type, on both the member's
+Deposits page and the teller's Book Member Deposit page. It shows the right amount
+control for each type, live FD rates from Business Parameters (no more typed-in
+rates), and a summary of what is taken today and what the member gets. The false
+"senior citizen +0.50%" promise is removed.
+
+### 14. Instalment plans actually collected  ✅
+Booking took only the first instalment. Nothing collected the rest, yet maturity
+paid the **full** amount. Now:
+- deposits record `paid_amount`, `instalment_amount` and `instalment_every`
+  (backfilled in migrate.sql);
+- the nightly `run_instalments` takes due and overdue instalments from savings,
+  and retries the next night when the balance is short;
+- maturity pays in proportion to what was paid in;
+- early closure of instalment plans works, using what was paid;
+- reports use the real paid figure.
+
+### 15. Over-cap plans re-priced to 12.5% (your decision)  ✅
+`reprice_scheme_to_cap()` keeps each plan's name, tenure and amounts and lowers
+what it pays to the cap, rounded down. It runs nightly, and Scheme Master has a
+"Re-price to 12.5%" button. All 16 plans are now within the cap and live. Also
+fixed: monthly-income plans were rated without counting the principal returned at
+maturity, so their true return was understated (Niyamit Aay 5Y showed 18.71% but
+paid about 30%).
+**Your call:** "Savadhi Yojana 3x in 8 years" and "Dwigun … doubles by year 6"
+no longer triple or double. Rename them so the name doesn't promise it.
+
+### 16. Plan creation form follows the plan type  ✅
+The Type dropdown explains each kind of plan and drives the form. Fixed, RD and
+daily plans pay at maturity; MIS chooses monthly payout or daily interest. Only
+the fields that type needs are shown, and "Generate table" now works for
+instalment plans. The server refuses mismatched type and payout combinations.

@@ -190,6 +190,7 @@ export const api = {
   schemesList: async () => (await axios.get(`${API}/schemes`, getAuthHeaders())).data,
   schemeCreate: async (payload) => (await axios.post(`${API}/schemes`, payload, getAuthHeaders())).data,
   schemeUpdate: async (id, payload) => (await axios.patch(`${API}/schemes/${id}`, payload, getAuthHeaders())).data,
+  schemeReprice: async (id) => (await axios.post(`${API}/schemes/${id}/reprice`, {}, getAuthHeaders())).data,
   schemeDelete: async (id) => (await axios.delete(`${API}/schemes/${id}`, getAuthHeaders())).data,
 
   // Field agents and their collection records (no commission)

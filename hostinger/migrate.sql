@@ -1392,3 +1392,22 @@ UPDATE site_products SET status = 'draft'
     WHERE status = 'active' AND (group_key IN ('corporate', 'investments')
        OR (group_key = 'personal' AND slug = 'debit-cards')
        OR (group_key = 'loans' AND slug IN ('personal-loan', 'vehicle-loan', 'education-loan')));
+
+-- Instalment plans (15 Oct 2026): track what has actually been paid in, so the
+-- rest can be auto-debited from savings and maturity pays only for what was paid.
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS instalment_amount DECIMAL(15,2) NULL;
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS instalment_every VARCHAR(5) NULL;
+-- Backfill, once (keyed on paid_amount = 0): a plan priced by instalment was funded by
+-- its booking debit(s) only; everything else was paid in full when booked.
+UPDATE deposits d JOIN schemes s ON s.code = d.scheme_code
+    SET d.instalment_every = IF(s.scheme_type = 'daily', 'day', 'month'),
+        d.instalment_amount = COALESCE((SELECT MIN(t.amount) FROM transactions t
+            WHERE t.ref_number = d.deposit_number AND t.mode = 'DEPOSIT_BOOKING' AND t.type = 'debit'),
+            ROUND(d.principal_amount / (IF(s.scheme_type = 'daily', 30, 1)
+                * COALESCE(s.contribution_months, d.tenure_months)), 2)),
+        d.paid_amount = COALESCE((SELECT SUM(t.amount) FROM transactions t
+            WHERE t.ref_number = d.deposit_number AND t.mode = 'DEPOSIT_BOOKING' AND t.type = 'debit'), 0)
+    WHERE d.deposit_type = 'recurring' AND d.paid_amount = 0 AND d.instalment_every IS NULL;
+UPDATE deposits SET paid_amount = principal_amount
+    WHERE paid_amount = 0 AND instalment_every IS NULL;

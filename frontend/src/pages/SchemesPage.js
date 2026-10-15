@@ -15,6 +15,21 @@ const BLANK = {
 };
 
 const TYPE_LABEL = { daily: 'Daily', recurring: 'Recurring', fixed: 'Fixed deposit', mis: 'Monthly income' };
+// What the form offers for each kind of plan. The server refuses any other pairing
+// (SCHEME_PAYOUTS, modules/master.php), so the form never offers one.
+const TYPE_OPTION = {
+  fixed: 'Fixed deposit: one lump sum, paid back with interest at maturity',
+  recurring: 'Recurring (RD / Masik): a fixed instalment every month',
+  daily: 'Daily collection (Daily Yojana): a fixed instalment every day',
+  mis: 'Monthly income (MIS): one lump sum, interest paid out as it goes',
+};
+const PAYOUTS = {
+  fixed: [['maturity', 'On maturity']],
+  recurring: [['maturity', 'On maturity']],
+  daily: [['maturity', 'On maturity']],
+  mis: [['monthly', 'Monthly payout (slab table)'], ['daily', 'Daily interest (% of the deposit)']],
+};
+const BY_INSTALMENT = (type) => type === 'recurring' || type === 'daily';
 
 // Slabs are edited as plain lines rather than JSON so a manager can paste a
 // column straight out of the brochure.
@@ -37,7 +52,9 @@ const parseSlabs = (text, monthly) => text.split('\n')
 // complaint this exists to fix: one rate applied to a pasted list of amounts
 // (just the first column -- what the brochure actually varies row to row) is
 // enough to work out the other two/three numbers for every row at once.
-const generateSlabs = (unitsText, rate, monthly, tenureMonths) => {
+// For an instalment plan the amount is one instalment, so the total paid in is that
+// times the number of instalments (pay-in months, or days for a daily plan).
+const generateSlabs = (unitsText, rate, monthly, tenureMonths, instalments = 1) => {
   const units = unitsText.split(/[\n,]+/).map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n > 0);
   if (!units.length || !Number.isFinite(rate) || rate <= 0) return null;
   return units.map(unit => {
@@ -45,7 +62,8 @@ const generateSlabs = (unitsText, rate, monthly, tenureMonths) => {
       const monthly_payout = Math.round(unit * rate) / 100;
       return { unit, deposit: unit, maturity: Math.round(monthly_payout * tenureMonths * 100) / 100, monthly_payout };
     }
-    return { unit, deposit: unit, maturity: Math.round(unit * (1 + rate / 100) * 100) / 100 };
+    const deposit = unit * instalments;
+    return { unit, deposit, maturity: Math.round(deposit * (1 + rate / 100) * 100) / 100 };
   }).sort((a, b) => a.unit - b.unit);
 };
 
@@ -92,6 +110,13 @@ export default function SchemesPage() {
       load();
     } catch (e) { toast.error(e.response?.data?.detail || 'Save failed'); }
     finally { setSaving(false); }
+  };
+
+  // Keeps the plan, its name, tenure and amounts; brings every figure down to the cap.
+  const reprice = async (scheme) => {
+    if (!window.confirm(`Re-price ${scheme.code} so it pays no more than ${data.max_rate_pa}% a year? Deposits already booked are brought to the cap separately.`)) return;
+    try { toast.success((await api.schemeReprice(scheme.id)).message); load(); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Re-pricing failed'); }
   };
 
   const remove = async (scheme) => {
@@ -229,6 +254,10 @@ export default function SchemesPage() {
                   <td className="p-3 text-right whitespace-nowrap">
                     <button onClick={() => { setForm({ ...s }); setAutoUnits(''); setAutoRate(''); setAutoMonthly(''); setAutoMultiple(''); }} data-testid={`scheme-edit-${s.code}`}
                       className="text-[#0b3b8c] font-semibold hover:underline py-1.5 px-1 -mx-1">Edit</button>
+                    {(s.exceeds_cap || s.slabs?.some(x => x.exceeds_cap)) && (
+                      <button data-testid={`scheme-reprice-${s.code}`} onClick={() => reprice(s)}
+                        className="ml-2 text-amber-700 font-semibold hover:underline py-1.5 px-1">Re-price to {data.max_rate_pa}%</button>
+                    )}
                     <button onClick={() => remove(s)} className="ml-2 text-[#c8102e] hover:underline inline-flex items-center gap-1 py-1.5 px-1">
                       <Trash2 className="w-3 h-3" /> Delete
                     </button>
@@ -260,21 +289,34 @@ export default function SchemesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Code" value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} testId="scheme-code" />
             <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} testId="scheme-name" />
-            <Select label="Type" value={form.scheme_type} options={data.types.map(t => [t, TYPE_LABEL[t] || t])}
-              onChange={v => setForm(f => ({ ...f, scheme_type: v }))} testId="scheme-type" />
+            <Select label="Type" value={form.scheme_type} options={data.types.map(t => [t, TYPE_OPTION[t] || t])}
+              onChange={v => setForm(f => ({ ...f, scheme_type: v,
+                payout_type: PAYOUTS[v].some(([p]) => p === f.payout_type) ? f.payout_type : PAYOUTS[v][0][0] }))}
+              testId="scheme-type" />
             <Field label="Tenure (months)" type="number" value={form.tenure_months} onChange={v => setForm(f => ({ ...f, tenure_months: v }))} testId="scheme-tenure" />
-            <Field label="Pay-in months (blank = whole tenure)" type="number" value={form.contribution_months ?? ''}
-              onChange={v => setForm(f => ({ ...f, contribution_months: v }))} testId="scheme-payin" />
-            <Field label="Per instalment (₹)" type="number" value={form.contribution_amount ?? ''} onChange={v => setForm(f => ({ ...f, contribution_amount: v }))} />
-            <Field label={form.payout_type === 'daily' ? 'Minimum deposit (₹)' : 'Lump sum principal (₹)'}
-              type="number" value={form.principal_amount ?? ''} onChange={v => setForm(f => ({ ...f, principal_amount: v }))} />
+            {BY_INSTALMENT(form.scheme_type) ? (<>
+              <Field label="Pay-in months (blank = the whole tenure)" type="number" value={form.contribution_months ?? ''}
+                onChange={v => setForm(f => ({ ...f, contribution_months: v }))} testId="scheme-payin" />
+              <Field label={`Example instalment (₹ per ${form.scheme_type === 'daily' ? 'day' : 'month'})`} type="number"
+                value={form.contribution_amount ?? ''} onChange={v => setForm(f => ({ ...f, contribution_amount: v }))} />
+            </>) : (
+              <Field label={form.payout_type === 'daily' ? 'Minimum deposit (₹)' : 'Example deposit (₹, one lump sum)'}
+                type="number" value={form.principal_amount ?? ''} onChange={v => setForm(f => ({ ...f, principal_amount: v }))} />
+            )}
             {form.payout_type !== 'daily' && (<>
-              <Field label="Total deposit (₹)" type="number" value={form.total_deposit} onChange={v => setForm(f => ({ ...f, total_deposit: v }))} testId="scheme-deposit" />
-              <Field label="Maturity amount (₹)" type="number" value={form.maturity_amount} onChange={v => setForm(f => ({ ...f, maturity_amount: v }))} testId="scheme-maturity" />
+              <Field label={BY_INSTALMENT(form.scheme_type) ? 'Total paid in over the plan (₹, example)' : 'Total deposit (₹, example)'}
+                type="number" value={form.total_deposit} onChange={v => setForm(f => ({ ...f, total_deposit: v }))} testId="scheme-deposit" />
+              <Field label={form.payout_type === 'monthly' ? 'Total monthly payouts over the term (₹, example)' : 'Maturity amount (₹, example)'}
+                type="number" value={form.maturity_amount} onChange={v => setForm(f => ({ ...f, maturity_amount: v }))} testId="scheme-maturity" />
             </>)}
-            <Select label="Payout" value={form.payout_type}
-              options={[['maturity', 'On maturity'], ['monthly', 'Monthly (slab table)'], ['daily', 'Daily % (simple)']]}
-              onChange={v => setForm(f => ({ ...f, payout_type: v }))} testId="scheme-payout" />
+            {PAYOUTS[form.scheme_type].length > 1 ? (
+              <Select label="How interest is paid" value={form.payout_type} options={PAYOUTS[form.scheme_type]}
+                onChange={v => setForm(f => ({ ...f, payout_type: v }))} testId="scheme-payout" />
+            ) : (
+              <p className="text-[11px] text-slate-600 self-end pb-2" data-testid="scheme-payout">
+                Pays out: <strong>{PAYOUTS[form.scheme_type][0][1].toLowerCase()}</strong>
+              </p>
+            )}
             {form.payout_type === 'daily' && (<>
               <Field label="Daily rate (%)" type="number" value={form.daily_rate_percent ?? ''}
                 onChange={v => setForm(f => ({ ...f, daily_rate_percent: v }))} testId="scheme-daily-rate" />
@@ -369,14 +411,11 @@ export default function SchemesPage() {
                     type="button"
                     data-testid="scheme-auto-generate-btn"
                     onClick={() => {
-                      // For an instalment plan the amount is one instalment and the
-                      // total deposit is that times the pay-in months, so "deposit =
-                      // the amount itself" would print a wrong table.
-                      if (['daily', 'recurring'].includes(form.scheme_type)) {
-                        toast.error('Auto-fill only works for lump-sum plans (Fixed deposit or Monthly income). Type instalment plans line by line.');
-                        return;
-                      }
-                      const generated = generateSlabs(autoUnits, Number(autoRate), form.payout_type === 'monthly', form.tenure_months);
+                      const payIn = Number(form.contribution_months) || Number(form.tenure_months);
+                      const instalments = BY_INSTALMENT(form.scheme_type)
+                        ? payIn * (form.scheme_type === 'daily' ? 30 : 1) : 1;
+                      const generated = generateSlabs(autoUnits, Number(autoRate), form.payout_type === 'monthly',
+                        form.tenure_months, instalments);
                       if (!generated) {
                         toast.error('Paste at least one amount and a rate greater than 0');
                         return;
@@ -392,7 +431,9 @@ export default function SchemesPage() {
                 <p className="text-[10px] text-slate-500">
                   {form.payout_type === 'monthly'
                     ? 'Deposit = the amount itself. Monthly payout = amount × rate ÷ 100. Maturity = monthly payout × tenure.'
-                    : 'Deposit = the amount itself. Maturity = amount × (1 + rate ÷ 100) — e.g. rate 200 triples it.'}
+                    : BY_INSTALMENT(form.scheme_type)
+                      ? `Each amount is one ${form.scheme_type === 'daily' ? 'day' : 'month'}'s instalment. Total deposit = instalment × ${form.scheme_type === 'daily' ? 'days (pay-in months × 30)' : 'pay-in months'}. Maturity = total × (1 + rate ÷ 100).`
+                      : 'Deposit = the amount itself. Maturity = amount × (1 + rate ÷ 100) — e.g. rate 200 triples it.'}
                   {' '}This fills in the table below, which you can still hand-edit afterwards.
                 </p>
               </div>

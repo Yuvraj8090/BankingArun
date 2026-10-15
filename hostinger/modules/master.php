@@ -13,6 +13,8 @@ declare(strict_types=1);
 const NIDHI_MAX_DEPOSIT_RATE = 12.5;
 const SCHEME_TYPES = ['daily', 'recurring', 'fixed', 'mis'];
 const SCHEME_STATUSES = ['active', 'draft', 'inactive'];
+const SCHEME_PAYOUTS = ['daily' => ['maturity'], 'recurring' => ['maturity'], 'fixed' => ['maturity'],
+    'mis' => ['monthly', 'daily']];
 const SCHEME_WRITE_ROLES = ['bank_owner'];
 const SCHEME_READ_ROLES = ['bank_owner', 'admin', 'branch_manager', 'staff'];
 const AGENT_WRITE_ROLES = ['bank_owner', 'admin', 'branch_manager'];
@@ -29,7 +31,9 @@ function effective_rate(array $scheme): ?float
     if ($months < 1 || $deposit <= 0 || $maturity <= 0) {
         return null;
     }
-    if ($maturity <= $deposit) {
+    // A monthly-income plan's maturity figure is only the payouts, so it can be below
+    // the deposit and still pay a return: the principal comes back on top.
+    if ($maturity <= $deposit && ($scheme['payout_type'] ?? 'maturity') !== 'monthly') {
         return 0.0;
     }
     if (($scheme['payout_type'] ?? 'maturity') === 'monthly' && $months < 2) {
@@ -60,12 +64,14 @@ function effective_rate(array $scheme): ?float
     // at the end, so the member has it years earlier and the scheme is paying a
     // far higher rate than the same two totals would imply on maturity.
     $monthlyPayout = ($scheme['payout_type'] ?? 'maturity') === 'monthly';
-    $paidOut = function (float $rate) use ($monthlyPayout, $months, $maturity): float {
+    // cron.php also returns the principal at the end of a monthly-payout plan, so
+    // that is part of what the member gets back.
+    $paidOut = function (float $rate) use ($monthlyPayout, $months, $maturity, $deposit): float {
         if (!$monthlyPayout) {
             return $maturity / (1 + $rate) ** $months;
         }
         $each = $maturity / $months;
-        $total = 0.0;
+        $total = $deposit / (1 + $rate) ** $months;
         for ($i = 1; $i <= $months; $i++) {
             $total += $each / (1 + $rate) ** $i;
         }
@@ -119,7 +125,8 @@ function cap_compliant_maturity(array $scheme): ?array
         if ($factor <= 0) {
             return null;
         }
-        $maturity = $paidIn * $months / $factor;
+        // The principal comes back at the end as well, so only the rest is paid out monthly.
+        $maturity = ($paidIn - $deposit / (1 + $r) ** $months) * $months / $factor;
         return ['maturity_amount' => round($maturity, 2),
             'monthly_payout' => round($maturity / $months, 2)];
     }
@@ -267,6 +274,8 @@ function scheme_deposit_terms(array $scheme, float $unit): array
         'interest_rate' => $rate,
         'tenure_months' => $months,
         'exceeds_cap' => $rate > NIDHI_MAX_DEPOSIT_RATE,
+        // A daily plan's slab unit is a day's instalment; a recurring plan's, a month's.
+        'instalment_every' => $byInstalment ? ($scheme['scheme_type'] === 'daily' ? 'day' : 'month') : null,
     ];
 }
 
@@ -286,6 +295,13 @@ function scheme_payload(array $d, array $existing = []): array
         fail(422, 'tenure_months must be between 1 and 360.');
     }
     $payout = $get('payout_type', 'maturity');
+    // What each kind of plan can pay out. A fixed deposit or an instalment plan pays
+    // once, at maturity; only a lump-sum income plan pays as it goes, monthly from
+    // a slab table or daily as a percent of the deposit.
+    $allowed = SCHEME_PAYOUTS[$type];
+    if (!in_array($payout, $allowed, true)) {
+        fail(422, ucfirst($type) . ' plans pay ' . implode(' or ', $allowed) . ', not ' . $payout . '.');
+    }
     $code = strtoupper(clip($get('code', ''), 20));
     $name = clip($get('name', ''), 120);
     if ($code === '' || $name === '') {
@@ -308,7 +324,10 @@ function scheme_payload(array $d, array $existing = []): array
     $lockRaw = array_key_exists('lock_in_months', $d) ? $d['lock_in_months'] : ($existing['lock_in_months'] ?? null);
     $lockIn = $lockRaw === null || $lockRaw === '' ? null : max(0, min((int)$lockRaw, $months));
     $dailyRateRaw = array_key_exists('daily_rate_percent', $d) ? $d['daily_rate_percent'] : $get('daily_rate_percent');
-    $dailyRate = $dailyRateRaw === null || $dailyRateRaw === '' ? null : (float)$dailyRateRaw;
+    $dailyRate = $payout !== 'daily' || $dailyRateRaw === null || $dailyRateRaw === '' ? null : (float)$dailyRateRaw;
+    if ($payout === 'daily' && $dailyRate === null) {
+        fail(422, 'A daily-interest plan needs its daily rate.');
+    }
     if ($dailyRate !== null) {
         if ($dailyRate <= 0 || $dailyRate > 5) {
             fail(422, 'daily_rate_percent must be greater than 0 and at most 5.');
@@ -534,6 +553,10 @@ function route_public_schemes(array $d): void
         'company' => COMPANY_IDENTITY,
         'schemes' => $schemes,
         'max_rate_pa' => NIDHI_MAX_DEPOSIT_RATE,
+        // The plain fixed deposit's rate card (Business Parameters), so the booking
+        // forms quote what deposit_tier_rate() will actually book.
+        'fd_rates' => array_map(fn($t) => ['tier' => $t, 'rate' => param_value("deposit_rate_$t", DEPOSIT_RATE_DEFAULTS[$t])],
+            array_keys(DEPOSIT_RATE_DEFAULTS)),
         'disclosure' => 'Returns are the amounts the scheme itself promises.',
     ]);
 }
@@ -570,6 +593,82 @@ function route_scheme_create(array $d): void
     audit($owner, 'SCHEME_CREATED', "{$scheme['code']} {$scheme['name']}");
     respond(['status' => 'SUCCESS', 'message' => "Scheme {$scheme['code']} created.",
         'scheme' => scheme_public(row('SELECT * FROM schemes WHERE id = ?', [$scheme['id']]))]);
+}
+
+// Brings a plan inside the 12.5% cap, keeping its name, tenure and denominations:
+// only what it pays changes. Each figure is rounded down to the rupee, so the
+// result is never above the cap. Returns a one-line summary, or null when the
+// plan was already within it. Deposits booked earlier keep their own stored terms
+// (run_cap_rerate in cron.php brings those down separately).
+function reprice_scheme_to_cap(array $scheme): ?string
+{
+    global $pdo;
+    $months = (int)$scheme['tenure_months'];
+    $cap = NIDHI_MAX_DEPOSIT_RATE;
+    $was = scheme_public($scheme);
+    $slabsOver = array_filter($was['slabs'], fn($x) => !empty($x['exceeds_cap']));
+    if (!$was['exceeds_cap'] && $slabsOver === []) {
+        return null;
+    }
+    $set = [];
+    if ($scheme['daily_rate_percent'] !== null) {
+        $daily = floor($cap / 365 * 100000) / 100000;
+        $set['daily_rate_percent'] = $daily;
+        $set['maturity_amount'] = round((float)$scheme['principal_amount'] * (1 + $daily / 100 * $months * 30), 2);
+        $summary = "daily rate {$scheme['daily_rate_percent']}% -> $daily%";
+    } else {
+        $monthly = ($scheme['payout_type'] ?? 'maturity') === 'monthly';
+        // A monthly-income plan returns the principal and pays the rate on it each month; anything
+        // else pays one sum at maturity, worth what the cap compounds to (cap_compliant_maturity).
+        $fix = function (float $deposit, float $maturity) use ($scheme, $monthly, $months, $cap): array {
+            if ($monthly) {
+                $payout = floor($deposit * ((1 + $cap / 100) ** (1 / 12) - 1));
+                return ['maturity' => $payout * $months, 'monthly_payout' => $payout];
+            }
+            $fixed = cap_compliant_maturity(['tenure_months' => $months, 'total_deposit' => $deposit,
+                'maturity_amount' => $maturity, 'scheme_type' => $scheme['scheme_type'], 'payout_type' => 'maturity',
+                'contribution_months' => $scheme['contribution_months'] ?? null]);
+            return ['maturity' => min($maturity, floor($fixed['maturity_amount']))];
+        };
+        if ($was['exceeds_cap']) {
+            $set['maturity_amount'] = $fix((float)$scheme['total_deposit'], (float)$scheme['maturity_amount'])['maturity'];
+        }
+        $slabs = json_decode((string)($scheme['slabs'] ?? ''), true) ?: [];
+        foreach ($slabs as $i => $slab) {
+            if (!empty($was['slabs'][$i]['exceeds_cap']) || ($monthly && $was['exceeds_cap'])) {
+                $slabs[$i] = array_merge($slab, $fix((float)$slab['deposit'], (float)$slab['maturity']));
+            }
+        }
+        if ($slabs !== []) {
+            $set['slabs'] = json_encode($slabs);
+        }
+        $summary = 'maturity ' . rupees((float)$scheme['maturity_amount'])
+            . (isset($set['maturity_amount']) ? ' -> ' . rupees((float)$set['maturity_amount']) : ' (unchanged)')
+            . ($slabsOver === [] ? '' : ', ' . count($slabsOver) . ' denomination(s) re-priced');
+    }
+    // The newest note first, so clipping to the column drops the oldest text, not this one.
+    $set['notes'] = mb_substr(trim('Re-priced to the 12.5% Nidhi cap on '
+        . (new DateTimeImmutable('now', new DateTimeZone(IST)))->format('j M Y') . ": $summary. "
+        . ($scheme['notes'] ?? '')), 0, 255);
+    $pdo->prepare('UPDATE schemes SET ' . implode(', ', array_map(fn($c) => "$c = ?", array_keys($set)))
+        . ' WHERE id = ?')->execute([...array_values($set), $scheme['id']]);
+    return "{$scheme['code']}: $summary";
+}
+
+// The director's "Re-price to 12.5%" button in Scheme Master.
+function route_scheme_reprice(array $d, string $id = ''): void
+{
+    $owner = staff_user(SCHEME_WRITE_ROLES);
+    $scheme = row('SELECT * FROM schemes WHERE id = ? AND deleted_at IS NULL', [$id]);
+    if (!$scheme) {
+        fail(404, 'Scheme not found.');
+    }
+    $summary = reprice_scheme_to_cap($scheme);
+    if ($summary !== null) {
+        audit($owner, 'SCHEME_REPRICED_TO_CAP', $summary);
+    }
+    respond(['status' => 'SUCCESS', 'message' => $summary === null ? 'This plan is already within the 12.5% cap.'
+        : "Re-priced. $summary", 'scheme' => scheme_public(row('SELECT * FROM schemes WHERE id = ?', [$id]))]);
 }
 
 function route_scheme_update(array $d, string $id = ''): void
@@ -1049,6 +1148,7 @@ const CRON_JOB_LABELS = [
     'standing_instructions' => 'Standing instructions',
     'scheduled_payments' => 'Scheduled transfers',
     'cap_rerate' => 'Deposits brought down to the 12.5% cap',
+    'instalments' => 'Instalment plans: due instalments taken from savings',
     'deposit_interest' => 'Deposit interest (MIS monthly payouts)',
     'daily_interest' => 'Daily interest (daily-plan accruals and payouts)',
     'deposit_maturities' => 'Maturities',

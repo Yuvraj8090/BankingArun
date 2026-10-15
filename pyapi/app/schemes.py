@@ -21,9 +21,9 @@ def effective_rate(scheme: dict[str, Any]) -> float | None:
     maturity = float(scheme['maturity_amount'] or 0)
     if months < 1 or deposit <= 0 or maturity <= 0:
         return None
-    if maturity <= deposit:
-        return 0.0
     payout_type = scheme.get('payout_type') or 'maturity'
+    if maturity <= deposit and payout_type != 'monthly':
+        return 0.0
     if payout_type == 'monthly' and months < 2:
         return None
 
@@ -47,11 +47,10 @@ def effective_rate(scheme: dict[str, Any]) -> float | None:
     def paid_out(rate: float) -> float:
         if not monthly_payout:
             return maturity / (1 + rate) ** months
-        # A monthly-payout plan hands the money over across the term rather than
-        # in one sum at the end, so the member has it years earlier and the plan
-        # is paying far more than the same two totals imply on maturity.
+        # A monthly-payout plan hands the payouts (maturity / months each) over across
+        # the term, and cron.php returns the principal on top at the end.
         each = maturity / months
-        return sum(each / (1 + rate) ** i for i in range(1, months + 1))
+        return sum(each / (1 + rate) ** i for i in range(1, months + 1)) + deposit / (1 + rate) ** months
 
     low, high = 0.0, 0.05  # up to 5% a month
     for _ in range(80):
@@ -91,7 +90,8 @@ def cap_compliant_maturity(scheme: dict[str, Any]) -> dict[str, Any] | None:
         factor = sum(1 / (1 + r) ** i for i in range(1, months + 1))
         if factor <= 0:
             return None
-        maturity = paid_in * months / factor
+        # The principal comes back at the end as well, so only the rest is paid out monthly.
+        maturity = (paid_in - deposit / (1 + r) ** months) * months / factor
         return {'maturity_amount': php_round(maturity, 2),
                 'monthly_payout': php_round(maturity / months, 2)}
     return {'maturity_amount': php_round(paid_in * (1 + r) ** months, 2), 'monthly_payout': None}

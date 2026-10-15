@@ -19,30 +19,16 @@ const REPORT_EXPORT_MAX = 20000;   // rows in a single download
 // Column formats: 'text', 'money', 'date', 'datetime', 'int'.
 function report_definitions(): array
 {
-    // A scheme-priced instalment plan (Masik/Daily Yojana) stores the whole
-    // contracted total as principal_amount, but only the first instalment is
-    // debited from the member's account; the rest is collected in person by a
-    // field agent and logged in agent_collections against the account and the
-    // plan. So "committed" and "collected" differ, and a register that totals
-    // principal_amount overstates the money actually received. Anything else
-    // (a fixed deposit, an MIS, a plan-less deposit) is funded in full when
-    // booked, so for those the two are the same. scheme_deposit_terms() maps
-    // every by-instalment scheme to deposit_type 'recurring'.
-    // The agent log is per account and plan, not per deposit, so a member with
-    // two deposits on one instalment plan would have the agent total counted
-    // against both.
-    $instalment = "(d.scheme_code IS NOT NULL AND d.deposit_type = 'recurring')";
+    // An instalment plan (Masik / Daily Yojana) stores the contracted total as
+    // principal_amount and what has actually come in as paid_amount (the booking
+    // plus every instalment run_instalments has taken). A lump sum is paid in full,
+    // so for it the two are equal.
+    $instalment = "(d.instalment_amount IS NOT NULL)";
     $kind = "CASE WHEN $instalment THEN 'instalment' ELSE 'lump sum' END";
     // The enquiry rows below skip a lead who has since booked that plan under the same mobile number.
     $dailyEarning = "CASE WHEN d.interest_payout = 'daily' AND d.status = 'active'
         THEN ROUND(d.principal_amount * d.interest_rate / 100 / 365, 2) ELSE 0 END";
-    $collected = "CASE WHEN $instalment THEN
-            COALESCE((SELECT SUM(b.amount) FROM transactions b
-                WHERE b.ref_number = d.deposit_number AND b.mode = 'DEPOSIT_BOOKING' AND b.type = 'debit'), 0)
-            + COALESCE((SELECT SUM(c.amount) FROM agent_collections c JOIN schemes cs ON cs.id = c.scheme_id
-                WHERE cs.code = d.scheme_code AND c.account_number = d.source_account
-                  AND c.collected_on >= DATE(d.created_at)), 0)
-        ELSE d.principal_amount END";
+    $collected = "d.paid_amount";
     return [
         // The statutory one: who the members are. The Nidhi Rules turn on this.
         'member_register' => [

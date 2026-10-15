@@ -102,6 +102,25 @@ has "and the refusal says it is closed" "$BODY" "closed to new deposits"
 ck "a refused booking admits and charges nobody" "0|0" "$(Q "SELECT CONCAT_WS('|',(SELECT COUNT(*) FROM member_register WHERE user_id='retail-001'),(SELECT COUNT(*) FROM transactions WHERE mode='SHARE_ALLOTMENT' AND user_id='retail-001'))")"
 hasnt "nor is it on the public plan list" "$(curl -s "$API/public/schemes")" "ZZ-CAP-1"
 Q "UPDATE schemes SET status='draft' WHERE code='ZZ-CAP-1'" >/dev/null
+# The director can bring it inside the cap in one action, keeping the plan.
+CAP1=$(Q "SELECT id FROM schemes WHERE code='ZZ-CAP-1'")
+call POST "/schemes/$CAP1/reprice" "$STAFF" '{}'; ck "only the director re-prices" 403 "$CODE"
+call POST "/schemes/$CAP1/reprice" "$OWNER" '{}'; ck "the director re-prices an over-cap plan" 200 "$CODE"
+ck "and it now sits at or just under the cap" "True" "$(print -r -- "$BODY" | jq_ 'print(12.4 <= d["scheme"]["effective_rate_pa"] <= 12.5)')"
+call POST "/schemes/$CAP1/reprice" "$OWNER" '{}'; has "a second re-price changes nothing" "$BODY" "already within"
+
+# An instalment plan takes one instalment now and records the rest to collect.
+call POST /schemes "$OWNER" '{"code":"ZZ-RD-1","name":"Test RD","scheme_type":"recurring","tenure_months":12,"total_deposit":12000,"maturity_amount":12600,"status":"active","slabs":[{"unit":1000,"deposit":12000,"maturity":12600}]}'
+ck "a compliant instalment plan is created" 200 "$CODE"
+reset_balances
+call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"scheme_code\":\"ZZ-RD-1\",\"amount\":1000}"
+ck "a member books it" 200 "$CODE"
+has "and is told the rest comes from savings" "$BODY" "taken from your savings"
+ck "first instalment paid, the plan knows the rest" "1000.00|1000.00|month|12000.00" "$(Q "SELECT CONCAT_WS('|',paid_amount,instalment_amount,instalment_every,principal_amount) FROM deposits WHERE scheme_code='ZZ-RD-1' AND user_id='retail-001'")"
+call GET /deposits/staff-member-lookup "$STAFF"
+call POST /deposits/staff-book "$STAFF" "{\"account_number\":\"$CORP_ACC\",\"scheme_code\":\"ZZ-RD-1\",\"amount\":1000}"
+ck "staff book the same plan for a member" 200 "$CODE"
+ck "with the same instalment record" "1000.00|month" "$(Q "SELECT CONCAT_WS('|',paid_amount,instalment_every) FROM deposits WHERE scheme_code='ZZ-RD-1' AND user_id='corp-001'")"
 
 # The cap applies to every published denomination, not just the headline one: a
 # member buys a slab, so a compliant headline must not smuggle an over-cap row in.
@@ -115,9 +134,11 @@ ck "compliant denominations accepted" 200 "$CODE"
 # maturity, so the same two totals imply a much higher rate.
 call POST /schemes "$OWNER" '{"code":"ZZ-MIS-1","name":"Monthly payout","scheme_type":"mis","tenure_months":60,"principal_amount":10000,"total_deposit":10000,"maturity_amount":15000,"payout_type":"monthly","status":"active"}'
 ck "monthly-payout scheme rated on its true return" 422 "$CODE"
-has "monthly payout rate is far above the maturity reading" "$BODY" "18.71%"
-call POST /schemes "$OWNER" '{"code":"ZZ-MIS-2","name":"Maturity payout","scheme_type":"mis","tenure_months":60,"principal_amount":10000,"total_deposit":10000,"maturity_amount":15000,"payout_type":"maturity","status":"active"}'
+has "monthly payout plus the principal back is rated on its true return" "$BODY" "34.49%"
+call POST /schemes "$OWNER" '{"code":"ZZ-MIS-2","name":"Maturity payout","scheme_type":"fixed","tenure_months":60,"principal_amount":10000,"total_deposit":10000,"maturity_amount":15000,"payout_type":"maturity","status":"active"}'
 ck "same totals paid on maturity stay within the cap" 200 "$CODE"
+call POST /schemes "$OWNER" '{"code":"ZZ-FD-X","name":"Wrong payout","scheme_type":"fixed","tenure_months":12,"total_deposit":10000,"maturity_amount":10500,"payout_type":"monthly","status":"draft"}'
+ck "a fixed deposit cannot pay monthly" 422 "$CODE"
 
 # The public rate card is open to anyone and must never advertise a draft.
 call GET /public/schemes ""
@@ -399,7 +420,7 @@ reset_balances
 call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
 ck "a non-member's first deposit is booked" 200 "$CODE"
 ck "and admits them with ten shares" "10" "$(Q "SELECT shares_held FROM member_register WHERE user_id='retail-001' AND status='active'")"
-ck "the ten shares are paid for from their account" "100.00" "$(Q "SELECT amount FROM transactions WHERE mode='SHARE_ALLOTMENT' AND user_id='retail-001'")"
+ck "the ten shares are paid for from their account" "100.00" "$(Q "SELECT amount FROM transactions WHERE mode='SHARE_ALLOTMENT' AND user_id='retail-001' ORDER BY timestamp DESC LIMIT 1")"
 ck "so the balance is less the deposit and the share money" "132700.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
 call POST /deposits/book "$RETAIL" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":5000,\"tenure_months\":12}"
 ck "an identical booking a moment later is refused" 409 "$CODE"

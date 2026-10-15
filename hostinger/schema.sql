@@ -192,6 +192,13 @@ CREATE TABLE IF NOT EXISTS deposits (
     -- maturity_date. Mutually exclusive with matured_on -- a deposit reaches
     -- 'closed' status only by this route, 'matured' only by cron.php.
     closed_on DATETIME,
+    -- Money actually received into the deposit. A lump sum is paid in full when
+    -- booked; an instalment plan (Masik / Daily Yojana) grows by instalment_amount
+    -- every instalment_every ('day' or 'month'), auto-debited from source_account
+    -- by run_instalments in cron.php, up to principal_amount (the contracted total).
+    paid_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    instalment_amount DECIMAL(15,2),
+    instalment_every VARCHAR(5),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
     INDEX idx_maturity (status, maturity_date),

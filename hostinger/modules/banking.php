@@ -31,6 +31,18 @@ function deposit_tier_rate(int $tenureMonths): float
     return param_value("deposit_rate_$tier", DEPOSIT_RATE_DEFAULTS[$tier]);
 }
 
+// What has actually been paid into a deposit, and, for an instalment plan, the
+// instalment and how often it falls due. run_instalments (cron.php) collects the rest.
+function record_funding(string $depositNumber, float $paid, ?array $terms): void
+{
+    global $pdo;
+    $byInstalment = $terms !== null && $terms['by_instalment'];
+    $pdo->prepare('UPDATE deposits SET paid_amount = ?, instalment_amount = ?, instalment_every = ?
+        WHERE deposit_number = ?')
+        ->execute([$paid, $byInstalment ? $terms['unit'] : null, $byInstalment ? $terms['instalment_every'] : null,
+            $depositNumber]);
+}
+
 // --- Counter deposits ----------------------------------------------------------------
 // The cash or cheque a member hands over at the counter after their account
 // already exists. Account opening funds itself (route_register, api.php); this
@@ -242,11 +254,12 @@ function route_staff_book_deposit(array $d): void
         'counterparty_acc' => $number, 'ref_number' => $number,
         'description' => ($planCode !== '' ? $terms['scheme_name'] : ucfirst($type) . ' deposit')
             . " #$number booked by branch staff"]);
+    record_funding($number, $dueToday, $planCode !== '' ? $terms : null);
     audit($staff, 'STAFF_DEPOSIT_BOOKED', "$number " . rupees($dueToday) . " for {$owner['name']} ({$account['account_number']})");
     $pdo->commit();
     respond(['status' => 'SUCCESS',
         'message' => strtoupper($type) . " #$number booked for {$owner['name']}! "
-            . deposit_outcome_note($interestPayout, $maturity, $principal),
+            . deposit_outcome_note($interestPayout, $maturity, $principal, $planCode !== '' ? $terms : null),
         'deposit' => out($deposit)]);
 }
 
@@ -329,18 +342,24 @@ function route_book_deposit(array $d): void
         'counterparty_name' => $planCode !== '' ? $terms['scheme_name'] : 'AJSPay Term Deposit',
         'counterparty_acc' => $number, 'ref_number' => $number,
         'description' => ($planCode !== '' ? $terms['scheme_name'] : ucfirst($type) . ' deposit') . " #$number booked"]);
+    record_funding($number, $dueToday, $planCode !== '' ? $terms : null);
     audit($user, 'DEPOSIT_BOOKED', "$number " . rupees($dueToday));
     $pdo->commit();
     respond(['status' => 'SUCCESS',
-        'message' => strtoupper($type) . " #$number booked successfully! " . deposit_outcome_note($interestPayout, $maturity, $principal),
+        'message' => strtoupper($type) . " #$number booked successfully! " . deposit_outcome_note($interestPayout, $maturity, $principal, $planCode !== '' ? $terms : null),
         'deposit' => out($deposit)]);
 }
 
 // What the member is told they will get. A plan that pays out as it goes only
 // returns its principal at maturity, so "Maturity value" -- which for a daily
 // plan is just the amount deposited -- read as if the deposit earned nothing.
-function deposit_outcome_note(?string $interestPayout, float $maturity, float $principal): string
+function deposit_outcome_note(?string $interestPayout, float $maturity, float $principal, ?array $terms = null): string
 {
+    if ($terms !== null && $terms['by_instalment']) {
+        return 'First instalment of ' . rupees($terms['unit']) . ' taken today. The rest is taken from your savings '
+            . 'account every ' . $terms['instalment_every'] . ' until ' . rupees($principal)
+            . ' is paid in; keep enough there. Maturity value when fully paid: ' . rupees($maturity) . '.';
+    }
     return match ($interestPayout) {
         'daily' => 'Interest is credited to your account every day (less TDS); your '
             . rupees($principal) . ' is returned at maturity.',
@@ -455,20 +474,6 @@ function route_premature_close(array $d): void
         $pdo->rollBack();
         fail(400, 'This deposit has no linked account to pay proceeds into. Contact the branch.');
     }
-    // A scheme-priced instalment plan (Masik/Daily Yojana) stores the full
-    // contracted total in principal_amount, but only the first instalment was
-    // ever actually debited -- everything after that is collected in person
-    // by a field agent (agent_collections) and never touches this account.
-    // Paying out principal_amount here would hand back money that was never
-    // banked. scheme_deposit_terms() maps every by-instalment scheme to
-    // deposit_type 'recurring'; a scheme-less self-service "recurring" booking
-    // debits its full amount up front like a fixed deposit, so this only
-    // catches the genuinely under-funded case.
-    if ($deposit['scheme_code'] && $deposit['deposit_type'] === 'recurring') {
-        $pdo->rollBack();
-        fail(400, 'This is an instalment plan collected in person, so only part of the committed amount has '
-            . 'actually reached your account. Early closure needs a branch visit, not a self-service action.');
-    }
     if (strtotime($deposit['maturity_date']) <= strtotime(now_utc())) {
         $pdo->rollBack();
         fail(400, 'This deposit has already reached its maturity date. It settles automatically at full '
@@ -492,10 +497,15 @@ function route_premature_close(array $d): void
                 . "so it unlocks in " . ($minHoldDays - $heldDays) . " more.");
     }
     $heldMonths = max(1, (int)round($heldDays / 30.4));
-    $principal = (float)$deposit['principal_amount'];
+    // What was actually paid in comes back, not the contracted total of an
+    // instalment plan. Instalments arrive spread across the time held, so on
+    // average they were held half as long.
+    // ponytail: assumes even instalments; per-instalment dates are the upgrade.
+    $instalments = $deposit['instalment_amount'] !== null;
+    $principal = (float)($instalments ? $deposit['paid_amount'] : $deposit['principal_amount']);
     $penaltyPct = param_value('premature_withdrawal_penalty_pct', 1.0);
     $effectiveRate = max(0.0, min(deposit_tier_rate($heldMonths), (float)$deposit['interest_rate']) - $penaltyPct);
-    $earnedForPeriod = round($principal * $effectiveRate / 100 * $heldDays / 365, 2);
+    $earnedForPeriod = round($principal * $effectiveRate / 100 * ($instalments ? $heldDays / 2 : $heldDays) / 365, 2);
     $alreadyPaid = (float)$deposit['interest_paid'];
     $tierInterest = max(0.0, $earnedForPeriod - $alreadyPaid);
     // A daily plan's unreleased accrual is still owed regardless of the
