@@ -31,6 +31,23 @@ function report_definitions(): array
     $collected = "d.paid_amount";
     return [
         // The statutory one: who the members are. The Nidhi Rules turn on this.
+        // Periodic KYC refresh (RBI KYC Master Direction, applied to Nidhis for AML):
+        // high risk every 2 years, medium every 8, low every 10; next_kyc_review is set
+        // when a member is rated (apply_risk, modules/register.php).
+        'kyc_reviews' => [
+            'name' => 'KYC reviews due',
+            'note' => 'Members whose periodic KYC refresh is due or overdue, by risk. Collect fresh documents, verify them, then re-rate the member in Screening.',
+            'roles' => ['staff', 'admin', 'branch_manager', 'bank_owner'],
+            'sql' => "SELECT m.folio_no, u.name, u.phone, m.risk_category, m.next_kyc_review, u.kyc_status,
+                    CASE WHEN m.next_kyc_review < CURDATE() THEN 'overdue' ELSE 'due within 30 days' END AS due_state
+                FROM member_register m JOIN users u ON u.id = m.user_id
+                WHERE m.status = 'active' AND m.next_kyc_review <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)",
+            'filters' => ['q' => ['u.name LIKE ? OR m.folio_no LIKE ? OR u.phone LIKE ?', 'like3'],
+                'risk_category' => ['m.risk_category = ?', 'exact']],
+            'order' => 'm.next_kyc_review',
+            'columns' => ['folio_no' => 'text', 'name' => 'text', 'phone' => 'text', 'risk_category' => 'text',
+                'next_kyc_review' => 'date', 'due_state' => 'text', 'kyc_status' => 'text'],
+        ],
         'member_register' => [
             'name' => 'Member register',
             'note' => 'Every member, when they joined and what they hold (deposits = money actually collected, not the committed total of an instalment plan). Required under the Nidhi Rules, 2014.',

@@ -263,6 +263,87 @@ function route_support_notifications(array $d): void
     ]);
 }
 
+// What the bell in the top bar shows: things this person should act on, worked out
+// from the data each time (nothing to mark read). Each item names the /app tab that
+// deals with it; the app only links it if the role can open that tab.
+function route_notifications(array $d): void
+{
+    $user = current_user();
+    $today = (new DateTimeImmutable('now', new DateTimeZone(IST)))->format('Y-m-d');
+    $items = [];
+    $add = function (string $title, string $detail, string $tab, string $tone = 'info') use (&$items): void {
+        $items[] = ['title' => $title, 'detail' => $detail, 'tab' => $tab, 'tone' => $tone];
+    };
+    $count = fn(string $sql, array $p = []) => (int)scalar($sql, $p);
+
+    if (in_array($user['role'], ['retail', 'corporate'], true)) {
+        if ($user['kyc_status'] !== 'verified') {
+            $add('Verify your KYC', 'You cannot move money or open deposits until your KYC is verified.', 'video-kyc', 'warn');
+        }
+        $review = scalar("SELECT next_kyc_review FROM member_register WHERE user_id = ? AND status = 'active'", [$user['id']]);
+        if ($review && $review <= date('Y-m-d', strtotime("$today +30 days"))) {
+            $add('KYC review due', 'Please refresh your KYC documents by ' . date('j M Y', strtotime($review)) . '.', 'kyc',
+                $review < $today ? 'warn' : 'info');
+        }
+        foreach (rows("SELECT * FROM deposits WHERE user_id = ? AND status = 'active' AND instalment_amount > 0
+                AND paid_amount < principal_amount ORDER BY created_at LIMIT 5", [$user['id']]) as $dep) {
+            $o = instalments_owed($dep, $today);
+            if ($o['owed'] >= (float)$dep['instalment_amount'] - 0.005) {
+                $add('Instalment due on ' . $dep['deposit_number'], 'Keep ' . rupees($o['owed'])
+                    . ' in your savings account; it is taken tonight.', 'deposits', 'warn');
+            } elseif ($o['next_due']) {
+                $add('Next instalment on ' . $dep['deposit_number'], rupees((float)$dep['instalment_amount']) . ' on '
+                    . date('j M Y', strtotime($o['next_due'])) . ', taken from your savings.', 'deposits');
+            }
+        }
+        foreach (rows("SELECT details, timestamp FROM audit_logs WHERE user_id = ? AND action = 'DEPOSIT_RERATED_TO_CAP'
+                AND timestamp >= ? ORDER BY timestamp DESC LIMIT 3", [$user['id'], gmdate('Y-m-d', strtotime('-90 days'))]) as $r) {
+            $add('Your deposit rate changed', $r['details'] . '. 12.5% a year is the most a Nidhi may pay; interest '
+                . 'already credited is yours to keep.', 'deposits');
+        }
+        if ($n = $count('SELECT COUNT(*) FROM support_tickets WHERE user_id = ? AND unread_for_member > 0', [$user['id']])) {
+            $add('Reply from support', "$n of your queries ha" . ($n === 1 ? 's' : 've') . ' a new reply.', 'kyc');
+        }
+    } else {
+        if (in_array($user['role'], CRM_ROLES, true)) {
+            if ($n = $count("SELECT COUNT(*) FROM users WHERE role IN ('retail','corporate') AND kyc_status = 'pending_approval'")) {
+                $add('KYC waiting', "$n member" . ($n === 1 ? '' : 's') . ' waiting for KYC verification.', 'kyc', 'warn');
+            }
+            if ($n = $count("SELECT COUNT(*) FROM member_register WHERE status = 'active' AND next_kyc_review <= ?", [$today])) {
+                $add('KYC reviews due', "$n member" . ($n === 1 ? '' : 's') . ' due a periodic KYC refresh (see the KYC reviews report).',
+                    'reports', 'warn');
+            }
+        }
+        if (in_array($user['role'], GRIEVANCE_ROLES, true)
+            && ($n = $count("SELECT COUNT(*) FROM support_tickets WHERE grievance_status = 'open'"))) {
+            $add('Open grievances', "$n complaint" . ($n === 1 ? '' : 's') . ' waiting for a decision (30-day limit).', 'grievance', 'warn');
+        }
+        if (in_array($user['role'], AML_REVIEW_ROLES, true)
+            && ($n = $count("SELECT COUNT(*) FROM fraud_alerts WHERE status = 'open'"))) {
+            $add('Fraud alerts', "$n alert" . ($n === 1 ? '' : 's') . ' to review.', 'fraud', 'warn');
+        }
+        if (in_array($user['role'], ['loan_officer', ...ADMIN_ROLES], true)
+            && ($n = $count("SELECT COUNT(*) FROM loan_applications WHERE status IN ('submitted','under_review','documentation')"))) {
+            $add('Loans waiting', "$n application" . ($n === 1 ? '' : 's') . ' waiting for a decision.', 'loan-dept');
+        }
+        if (in_array($user['role'], ['collection_agent', ...ADMIN_ROLES], true)
+            && ($n = $count('SELECT COUNT(*) FROM collection_cases WHERE dpd_days >= 90'))) {
+            $add('Cases past 90 days', "$n loan" . ($n === 1 ? ' is' : 's are') . ' 90 or more days past due.', 'collection', 'warn');
+        }
+        if ($user['role'] === 'bank_owner') {
+            $over = array_filter(array_map('scheme_public', rows("SELECT * FROM schemes WHERE status = 'active'
+                AND deleted_at IS NULL")), fn($x) => $x['exceeds_cap']);
+            if ($over) {
+                $add('Plans above 12.5%', count($over) . ' plan(s) are closed to new deposits until re-priced.', 'schemes', 'warn');
+            }
+            if (param_value('net_owned_funds', 0.0) <= 0) {
+                $add('Net owned funds not entered', 'The Nidhi Rules checks need it. Enter it in Business Parameters.', 'parameters');
+            }
+        }
+    }
+    respond(['notifications' => $items]);
+}
+
 // ---------------------------------------------------------------------------
 // Grievance escalation.
 //

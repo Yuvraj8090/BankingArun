@@ -171,15 +171,9 @@ function run_instalments(string $today, bool $dryRun, bool $verbose): array
     $due = rows("SELECT * FROM deposits WHERE status = 'active' AND instalment_amount > 0
         AND paid_amount < principal_amount AND maturity_date > ? AND source_account IS NOT NULL
         ORDER BY created_at LIMIT " . CRON_BATCH, [$today]);
-    $ist = new DateTimeZone(IST);
     foreach ($due as $deposit) {
         $unit = (float)$deposit['instalment_amount'];
-        $booked = (new DateTimeImmutable($deposit['created_at'], new DateTimeZone('UTC')))->setTimezone($ist)
-            ->setTime(0, 0);
-        $gap = $booked->diff(new DateTimeImmutable($today, $ist));
-        $elapsed = $deposit['instalment_every'] === 'day' ? (int)$gap->days : $gap->y * 12 + $gap->m;
-        $total = (int)round((float)$deposit['principal_amount'] / $unit);
-        $owed = round(min($total, $elapsed + 1) * $unit - (float)$deposit['paid_amount'], 2);
+        $owed = instalments_owed($deposit, $today)['owed'];
         if ($owed < $unit - 0.005) {
             continue;
         }
@@ -192,7 +186,7 @@ function run_instalments(string $today, bool $dryRun, bool $verbose): array
         $pdo->beginTransaction();
         $locked = row("SELECT * FROM deposits WHERE id = ? AND status = 'active' FOR UPDATE", [$deposit['id']]);
         $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$deposit['source_account']]);
-        $owed = round(min($total, $elapsed + 1) * $unit - (float)$locked['paid_amount'], 2);
+        $owed = instalments_owed($locked, $today)['owed'];
         $take = $account && $account['status'] === 'active'
             ? min($owed, floor((float)$account['balance'] / $unit) * $unit) : 0.0;
         if ($take < $unit - 0.005) {

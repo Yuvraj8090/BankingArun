@@ -43,6 +43,25 @@ function record_funding(string $depositNumber, float $paid, ?array $terms): void
             $depositNumber]);
 }
 
+// How much of an instalment plan has fallen due and not been paid by $today, and
+// when the next instalment falls due. Instalment k (k = 1..N) is due k-1 days or
+// months after booking. Shared by run_instalments (cron.php) and the member's notices.
+function instalments_owed(array $deposit, string $today): array
+{
+    $unit = (float)$deposit['instalment_amount'];
+    $ist = new DateTimeZone(IST);
+    $booked = (new DateTimeImmutable($deposit['created_at'], new DateTimeZone('UTC')))->setTimezone($ist)->setTime(0, 0);
+    $gap = $booked->diff(new DateTimeImmutable($today, $ist));
+    $daily = $deposit['instalment_every'] === 'day';
+    $elapsed = $daily ? (int)$gap->days : $gap->y * 12 + $gap->m;
+    $total = (int)round((float)$deposit['principal_amount'] / $unit);
+    $paidCount = (int)floor(((float)$deposit['paid_amount'] + 0.005) / $unit);
+    $next = $paidCount >= $total ? null
+        : $booked->modify('+' . $paidCount . ($daily ? ' days' : ' months'))->format('Y-m-d');
+    return ['owed' => max(0.0, round(min($total, $elapsed + 1) * $unit - (float)$deposit['paid_amount'], 2)),
+        'total' => $total, 'next_due' => $next];
+}
+
 // --- Counter deposits ----------------------------------------------------------------
 // The cash or cheque a member hands over at the counter after their account
 // already exists. Account opening funds itself (route_register, api.php); this
@@ -70,6 +89,7 @@ function route_counter_deposit(array $d): void
         fail(422, 'Cheque number is required for a cheque deposit.');
     }
     $accountNumber = clip($d['account_number'], 30);
+    require_nof_headroom($amount);
 
     $pdo->beginTransaction();
     $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$accountNumber]);

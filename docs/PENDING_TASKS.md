@@ -268,3 +268,49 @@ The Type dropdown explains each kind of plan and drives the form. Fixed, RD and
 daily plans pay at maturity; MIS chooses monthly payout or daily interest. Only
 the fields that type needs are shown, and "Generate table" now works for
 instalment plans. The server refuses mismatched type and payout combinations.
+
+---
+
+## Round 3 (15 Oct)
+
+### 17. Plan names  ✅
+"Savadhi Yojana 3x in 8 years" is now **Savadhi Yojana 8 Year**, and "Dwigun Yojana
+(12 instalments, doubles by year 6)" is now **Dwigun Yojana 6 Year (12 instalments)**.
+**Found while doing it:** 20 statements in migrate.sql rewrote every plan back to
+its brochure figures **on every deploy**. That silently wiped Scheme Master edits, and
+it would have undone the 12.5% re-pricing. Each now touches only a plan nobody has
+changed since 15 Oct.
+
+### 18. Real notifications; members told about rates and instalments  ✅
+The bell showed typed-in text. `GET /notifications` now works out real items per
+role:
+- **Members:** deposits re-rated to 12.5% (interest already credited is kept),
+  instalments due tonight, the next instalment date, KYC not verified, KYC review
+  due, and support replies.
+- **Staff:** KYC waiting, KYC reviews due, open grievances, fraud alerts, loans
+  waiting, and cases past 90 days.
+- **Director:** plans above the cap, and net owned funds not entered.
+
+### 19. Periodic re-KYC  ✅
+The review date already set by risk rating (2/8/10 years) is now acted on. A
+**KYC reviews due** report lists overdue and due-in-30-days members, staff get a
+notice, and each member gets their own reminder.
+
+### 20. NOF limit enforced  ✅
+New money (counter cash, account opening, funding at KYC) is refused if it would
+take deposits above 20 × net owned funds. It applies once the Director enters NOF
+in Business Parameters.
+
+## Still open
+- **Loans have no disbursement or repayment ledger.** Applications are approved,
+  but no loan account, EMI schedule, repayment posting or outstanding balance
+  exists, and collections cases are typed in. This is the biggest banking gap
+  left.
+- FIU-IND submission files (CTR/STR XML), NDH-1/NDH-3 returns, passbook printing,
+  and beneficiary (saved payee) management.
+- **Your decisions:**
+  - collect ₹100 share money from members auto-admitted earlier;
+  - reverse ₹500 referral bonuses already paid;
+  - drop the old card and investment tables.
+- **MLM / binary commission plan:** not built. It is illegal for a Nidhi (Nidhi
+  Rules Rule 6; Prize Chits & Money Circulation Schemes (Banning) Act, 1978).

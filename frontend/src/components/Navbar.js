@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Building2, ShieldCheck, LogOut, Bell, ChevronDown, FileText, Lock, Compass, HelpCircle } from 'lucide-react';
 import Brand from './Brand';
 import GlobalSearch from './GlobalSearch';
 import { GuideButton } from './HelpGuide';
-import { ROLE_HOME } from '../navigation';
+import { ROLE_HOME, canOpen } from '../navigation';
+import { api } from '../services/api';
 
 const ROLE_BADGE = {
   retail: { label: 'Customer', color: 'bg-blue-50 text-[#0b3b8c] border-blue-200' },
@@ -23,14 +24,13 @@ export default function Navbar({ onNavigate, activeTab }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const badge = ROLE_BADGE[user?.role] || ROLE_BADGE.retail;
-  const notifications = [
-    activeTab === 'collection'
-      ? ['Collection follow-up due', 'Review active recovery cases']
-      : activeTab === 'loan-dept'
-      ? ['Loan pipeline updated', 'Applications are waiting for decision']
-      : ['Security reminder', 'Review pending dashboard actions'],
-    ['Session protected', 'Encrypted member portal session is active']
-  ];
+  // Real things to act on, worked out by the server (GET /notifications) and
+  // refreshed whenever the page changes.
+  const [notifications, setNotifications] = useState([]);
+  useEffect(() => {
+    if (!user) return;
+    api.notifications().then((r) => setNotifications(r.notifications || [])).catch(() => setNotifications([]));
+  }, [user, activeTab]);
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -63,19 +63,30 @@ export default function Navbar({ onNavigate, activeTab }) {
                 className="relative p-2 rounded-md hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/25 active:scale-95 text-slate-600 transition"
               >
                 <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#c8102e] rounded-full" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#c8102e] text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+                    data-testid="notification-count">{notifications.length}</span>
+                )}
               </button>
               {showNotifications && (
                 <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-md shadow-lg p-2 z-50" data-testid="notification-dropdown">
                   <div className="px-3 py-2 border-b border-slate-100">
                     <p className="font-semibold text-slate-900 text-sm">Notifications</p>
-                    <p className="text-[11px] text-slate-500">Latest portal alerts</p>
+                    <p className="text-[11px] text-slate-500">Things waiting for you</p>
                   </div>
                   <div className="py-1">
-                    {notifications.map(([title, detail]) => (
-                      <button key={title} className="w-full text-left px-3 py-2 rounded hover:bg-slate-50 focus:outline-none focus:bg-slate-50 transition">
-                        <span className="block text-xs font-semibold text-slate-800">{title}</span>
-                        <span className="block text-[11px] text-slate-500 mt-0.5">{detail}</span>
+                    {notifications.length === 0 && (
+                      <p className="px-3 py-3 text-[11px] text-slate-500">Nothing needs you right now.</p>
+                    )}
+                    {notifications.map((n, i) => (
+                      <button key={`${n.title}-${i}`}
+                        onClick={() => { if (canOpen(user.role, n.tab, features)) onNavigate(n.tab); setShowNotifications(false); }}
+                        className="w-full text-left px-3 py-2 rounded hover:bg-slate-50 focus:outline-none focus:bg-slate-50 transition flex gap-2">
+                        <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${n.tone === 'warn' ? 'bg-amber-500' : 'bg-[#0b3b8c]'}`} />
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-800">{n.title}</span>
+                          <span className="block text-[11px] text-slate-500 mt-0.5">{n.detail}</span>
+                        </span>
                       </button>
                     ))}
                   </div>

@@ -256,6 +256,7 @@ function route_kyc_verify_and_fund(array $d): void
         }
     }
 
+    require_nof_headroom($terms !== null && !$terms['by_instalment'] ? (float)$terms['due_today'] : 0.0);
     $pdo->beginTransaction();
     $pdo->prepare('UPDATE users SET kyc_status = ?, kyc_reason = NULL WHERE id = ?')
         ->execute(['verified', $customer['id']]);
@@ -328,11 +329,34 @@ function route_kyc_verify_and_fund(array $d): void
 // director enters it in Business Parameters from the audited balance sheet.
 // ponytail: the 10% unencumbered term deposit rule needs the treasury book, which
 // this system does not keep, so it is reported as not tracked rather than guessed.
+// Everything members hold with us: savings balances plus money paid into deposits.
+function deposits_held(): float
+{
+    return (float)scalar("SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active'")
+        + (float)scalar('SELECT COALESCE(SUM(balance), 0) FROM accounts');
+}
+
+// Nidhi Rules, 2014: deposits may not exceed twenty times net owned funds. Checked
+// where new money comes in (counter cash, account opening, funding at KYC); moving
+// savings into a deposit changes nothing. Not enforced until NOF has been entered,
+// because 0 would refuse everything; the director's dashboard flags that instead.
+function require_nof_headroom(float $adding): void
+{
+    $nof = param_value('net_owned_funds', 0.0);
+    if ($nof <= 0 || $adding <= 0) {
+        return;
+    }
+    $after = deposits_held() + $adding;
+    if ($after > 20 * $nof) {
+        fail(422, 'This would take deposits to ' . rupees($after) . ', above twenty times net owned funds ('
+            . rupees(20 * $nof) . '), the Nidhi Rules limit. No new money can be accepted until net owned funds rise.');
+    }
+}
+
 function nidhi_statutory_checks(): array
 {
     $nof = param_value('net_owned_funds', 0.0);
-    $deposits = (float)scalar("SELECT COALESCE(SUM(principal_amount), 0) FROM deposits WHERE status = 'active'")
-        + (float)scalar('SELECT COALESCE(SUM(balance), 0) FROM accounts');
+    $deposits = deposits_held();
     $nonMembers = (int)scalar("SELECT COUNT(*) FROM deposits d WHERE d.status = 'active' AND NOT EXISTS
         (SELECT 1 FROM member_register m WHERE m.user_id = d.user_id AND m.status = 'active')");
     return [

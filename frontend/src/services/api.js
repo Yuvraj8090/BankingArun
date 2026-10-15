@@ -187,6 +187,7 @@ export const api = {
   parameterDelete: async (id) => (await axios.delete(`${API}/parameters/${id}`, getAuthHeaders())).data,
 
   // Scheme master (back office only)
+  notifications: async () => (await axios.get(`${API}/notifications`, getAuthHeaders())).data,
   schemesList: async () => (await axios.get(`${API}/schemes`, getAuthHeaders())).data,
   schemeCreate: async (payload) => (await axios.post(`${API}/schemes`, payload, getAuthHeaders())).data,
   schemeUpdate: async (id, payload) => (await axios.patch(`${API}/schemes/${id}`, payload, getAuthHeaders())).data,

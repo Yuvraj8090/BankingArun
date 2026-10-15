@@ -568,6 +568,7 @@ function route_register(array $d): void
         }
     }
 
+    require_nof_headroom($initial + ($terms !== null && !$terms['by_instalment'] ? (float)$terms['due_today'] : 0.0));
     $pdo->beginTransaction();
     $pdo->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, transaction_password_hash,
             branch, pan_number, aadhaar_number, kyc_status, is_joint, joint_holder_name, nominee_name, nominee_relation,
@@ -1268,6 +1269,7 @@ $routes = [
     // Support desk (modules/support.php)
     'GET /support/queue' => 'route_support_queue',
     'GET /support/notifications' => 'route_support_notifications',
+    'GET /notifications' => 'route_notifications',
     'GET /impersonate/candidates' => 'route_impersonate_candidates',
     'POST /impersonate/start' => 'route_impersonate_start',
     'POST /impersonate/stop' => 'route_impersonate_stop',

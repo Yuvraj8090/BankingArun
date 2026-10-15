@@ -527,6 +527,21 @@ has "and the refusal says what we lend against" "$BODY" "gold or property"
 call POST /loans/apply "$RETAIL" '{"loan_type":"vehicle","amount_requested":50000,"tenure_months":12,"monthly_income":40000,"employment_type":"salaried","purpose":"APITEST"}'
 ck "a vehicle loan is refused" 422 "$CODE"
 
+print "\n-- Nidhi limits enforced, and what people are told --"
+call GET /notifications "$OWNER"; ck "the director's notices load" 200 "$CODE"
+has "and say net owned funds are missing" "$BODY" "Net owned funds not entered"
+call GET /notifications "$RETAIL"; ck "a member's notices load" 200 "$CODE"
+call GET /notifications ""; ck "and need a session" 401 "$CODE"
+call GET /reports/kyc_reviews "$STAFF"; ck "tellers can list KYC reviews due" 200 "$CODE"
+Q "UPDATE system_parameters SET value = 1000 WHERE param_key = 'net_owned_funds'" >/dev/null
+call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":500,\"mode\":\"cash\"}"
+ck "new money above 20x net owned funds is refused" 422 "$CODE"
+has "and the refusal cites the rule" "$BODY" "twenty times net owned funds"
+Q "UPDATE system_parameters SET value = 0 WHERE param_key = 'net_owned_funds'" >/dev/null
+call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":500,\"mode\":\"cash\"}"
+ck "not enforced until net owned funds are entered" 200 "$CODE"
+reset_balances
+
 print "\n-- KYC verification desk --"
 call GET /admin/kyc-pending "$STAFF"; ck "a teller can open the KYC queue" 200 "$CODE"
 call GET /kyc/documents/queue "$STAFF"; ck "and the document review queue" 200 "$CODE"
