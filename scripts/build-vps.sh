@@ -19,10 +19,8 @@ trap 'rm -rf "$stage"' EXIT
 # directory on extraction, which would leave Apache unable to enter it.
 chmod 755 "$stage"
 cp -R frontend/build/. "$stage/"
-cp hostinger/api.php hostinger/db.php hostinger/cron.php hostinger/.htaccess "$stage/"
+cp hostinger/api.php hostinger/db.php hostinger/cron.php hostinger/site-switch.php hostinger/.htaccess "$stage/"
 cp -R hostinger/modules hostinger/assets "$stage/"
-# The off switch travels with the release; .htaccess acts on it.
-[[ ! -f hostinger/SITE_DOWN ]] || cp hostinger/SITE_DOWN "$stage/"
 git rev-parse HEAD > "$stage/version.txt"
 
 # One packaging check: the entry points exist and secrets/source data stay out.

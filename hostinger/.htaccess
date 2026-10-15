@@ -8,13 +8,14 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Site switch: while a SITE_DOWN file sits in the document root, everything
-# answers 503 and tells the browser to drop its cached copy of the app and any
-# saved sign-in. version.txt stays up because the deploy checks it. To bring the
-# site back, delete hostinger/SITE_DOWN and deploy.
+# Site switch: while /srv/ajspay/site-down is non-empty, everything answers
+# 503 and tells the browser to drop its cached copy of the app and any saved
+# sign-in. The owner flips it from /site/off/<key> and /site/on/<key>, which
+# stay reachable while it is off, as does version.txt for the deploy check.
 ErrorDocument 503 "<h1>Site not working</h1><p>This site is currently unavailable.</p>"
-RewriteCond %{DOCUMENT_ROOT}/SITE_DOWN -f
-RewriteCond %{REQUEST_URI} !^/version\.txt$
+RewriteRule ^site/(on|off)/([0-9a-f]{64})$ site-switch.php?do=$1&k=$2 [L]
+RewriteCond /srv/ajspay/site-down -s
+RewriteCond %{REQUEST_URI} !^/(version\.txt|site-switch\.php|site/(on|off)/[0-9a-f]{64})$
 RewriteRule ^ - [R=503,L,E=SITE_DOWN:1]
 
 # Server-side only: PHP modules and assets are never fetched over HTTP

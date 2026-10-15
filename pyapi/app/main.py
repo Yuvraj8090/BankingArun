@@ -8,9 +8,10 @@ notices which one served a request.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import routes_public, routes_rails
@@ -34,6 +35,21 @@ app.middleware("http")(block_impersonated_writes)
 # it decides anything else about it -- including before rejecting an unknown
 # path, so probing costs what using it costs.
 app.middleware("http")(guard_request)
+
+# The site switch. Proxied routes never reach the .htaccess that enforces it, so
+# they check the same file here. Registered last, so it answers before anything.
+SITE_DOWN = Path("/srv/ajspay/site-down")
+
+
+async def site_switch(request: Request, call_next):
+    if SITE_DOWN.is_file() and SITE_DOWN.stat().st_size:
+        return HTMLResponse("<h1>Site not working</h1><p>This site is currently unavailable.</p>",
+                            status_code=503, headers={"Clear-Site-Data": '"cache", "storage"',
+                                                      "Cache-Control": "no-store"})
+    return await call_next(request)
+
+
+app.middleware("http")(site_switch)
 
 app.include_router(routes_public.router, prefix="/api")
 # The owner's payment-rail screen. Settlement stays in the PHP; see rails.py.
