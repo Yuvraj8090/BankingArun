@@ -251,7 +251,8 @@ function PublicFooter() {
       heading: 'Loans',
       links: [
         ['Gold Loan', '/loans/gold-loan'],
-        ['Home Loan', '/loans/home-loan']
+        ['Loan Against Property', '/loans/home-loan'],
+        ['Loan Against Deposit', '/loans/deposit-loan']
       ]
     },
     {

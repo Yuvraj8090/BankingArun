@@ -458,6 +458,22 @@ Nidhi Rules rule 15 allows lending against the member's deposits; the brochure's
   as their address proof; it now shows what they actually uploaded.
 - "24×7 Toll-Free" label on the home page fixed.
 
+### 30. Public product pages promised what the system does not do ✅
+- Savings: "4% interest, credited every quarter" (no savings interest is paid).
+  Now says so, and points to deposit plans.
+- Salary Account (free cheque book): hidden.
+- FD: "7 days to 10 years", "+0.50% for senior citizens" (neither exists).
+  Now the real tenures, the 12.5% cap and the live rate card.
+- RD: "6 to 60 months at FD rates". Now plan-based, as the system books them.
+- Home loan: balance transfer, 30 years, NetBanking. Now "Loan Against
+  Property", up to 20 years.
+- Grievance: "toll-free, 24×7". Now Help & Support → grievance officer.
+- New page: Loan Against Deposit. Home page FD calculator reads the live rate
+  card instead of page text.
+- Only pages still holding the original text were changed; anything edited
+  under Public Pages is untouched.
+- To check: the footer email support@ajspay.in (the site is ajspay.co.in).
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

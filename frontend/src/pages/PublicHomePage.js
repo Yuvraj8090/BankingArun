@@ -13,10 +13,15 @@ export default function PublicHomePage() {
   const [features, setFeatures] = useState(null);
   const [siteProducts, setSiteProducts] = useState([]);
   const [marketRates, setMarketRates] = useState(null);
+  // The FD rate card, straight from Business Parameters (same as the Deposits page).
+  const [fdRates, setFdRates] = useState([]);
+  const fdTier = (tier) => { const r = fdRates.find((x) => x.tier === tier)?.rate; return r == null ? null : `${r}% p.a.`; };
+
   useEffect(() => {
     api.publicFeatures().then((d) => setFeatures(d.features)).catch(() => setFeatures([]));
     api.publicProducts().then((d) => setSiteProducts(d.products || [])).catch(() => setSiteProducts([]));
     api.publicMarketRates().then(setMarketRates).catch(() => setMarketRates(null));
+    api.publicSchemes().then((d) => setFdRates(d.fd_rates || [])).catch(() => setFdRates([]));
   }, []);
 
   const fact = (path, label) => siteProducts.find((p) => p.path === path)?.facts
@@ -28,8 +33,8 @@ export default function PublicHomePage() {
   };
 
   const savingsRate = clean(fact('personal/savings-account', 'Interest rate'));
-  const fdOneToTwo = clean(fact('personal/fixed-deposits', '1 year to 2 years'));
-  const fdTwoToThree = clean(fact('personal/fixed-deposits', '2 years to 3 years'));
+  const fdOneToTwo = fdTier('1y_to_2y');
+  const fdTwoToThree = fdTier('2y_to_3y');
   const seniorBonus = clean(fact('personal/fixed-deposits', 'Senior citizen bonus'));
   const homeLoanRate = clean(fact('loans/home-loan', 'Interest rate'));
   const goldLoanRate = clean(fact('loans/gold-loan', 'Interest rate'));
@@ -57,7 +62,7 @@ export default function PublicHomePage() {
     { label: 'Fixed Deposit (1-2 Yrs)', value: fdOneToTwo },
     { label: 'Fixed Deposit (2-3 Yrs)', value: fdTwoToThree },
     { label: 'Senior Citizen FD bonus', value: seniorBonus },
-    { label: 'Home Loan', value: homeLoanRate },
+    { label: 'Loan Against Property', value: homeLoanRate },
     { label: 'Gold Loan', value: goldLoanRate },
     marketRates?.usd_inr && {
       label: 'USD / INR (ECB daily)',
@@ -69,7 +74,7 @@ export default function PublicHomePage() {
   // Every product tile is its own page at its own URL.
   const products = [
     { icon: PiggyBank, label: 'Savings Account', desc: savingsRate ? `Zero balance, ${savingsRate}` : 'Zero-balance member account', to: '/personal/savings-account', color: 'text-blue-800' },
-    { icon: HomeIcon, label: 'Home Loan', desc: homeLoanRate || 'Buy, build or transfer', to: '/loans/home-loan', color: 'text-emerald-700' },
+    { icon: HomeIcon, label: 'Loan Against Property', desc: homeLoanRate || 'Secured on your house or land', to: '/loans/home-loan', color: 'text-emerald-700' },
     { icon: TrendingUp, label: 'Fixed Deposit', desc: fdOneToTwo ? `1-2 years: ${fdOneToTwo}` : 'Flexible deposit tenures', to: '/personal/fixed-deposits', color: 'text-blue-800' },
     { icon: Banknote, label: 'Recurring Deposit', desc: 'Save a fixed amount every month', to: '/personal/recurring-deposit', color: 'text-emerald-700' },
     { icon: Coins, label: 'Gold Loan', desc: goldLoanRate || 'Against your gold jewellery', to: '/loans/gold-loan', color: 'text-amber-700' }
@@ -341,7 +346,7 @@ export default function PublicHomePage() {
             savingsRate && { n: savingsRate, l: 'Savings interest', to: '/personal/savings-account' },
             seniorBonus && { n: seniorBonus, l: 'Senior citizen FD bonus', to: '/personal/fixed-deposits' },
             { n: '24×7', l: 'Transfers between members', to: '/personal/savings-account' },
-            { n: '₹0', l: 'Minimum balance', to: '/personal/salary-account' }
+            { n: '₹0', l: 'Minimum balance', to: '/personal/savings-account' }
           ].filter(Boolean).map((s) => (
             <Link key={s.l} to={s.to} className="bg-white border border-slate-200 rounded-lg p-5 text-center hover:border-[#0b3b8c] transition">
               <div className="text-2xl font-bold text-[#0b3b8c]">{s.n}</div>

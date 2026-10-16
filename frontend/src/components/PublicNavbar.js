@@ -12,7 +12,6 @@ const NAV_GROUPS = [
     label: 'Personal',
     items: [
       ['Savings Account', '/personal/savings-account'],
-      ['Salary Account', '/personal/salary-account'],
       ['Fixed Deposits', '/personal/fixed-deposits'],
       ['Recurring Deposit', '/personal/recurring-deposit']
     ]
@@ -22,7 +21,8 @@ const NAV_GROUPS = [
     label: 'Loans',
     items: [
       ['Gold Loan', '/loans/gold-loan'],
-      ['Home Loan', '/loans/home-loan']
+      ['Loan Against Property', '/loans/home-loan'],
+      ['Loan Against Deposit', '/loans/deposit-loan']
     ]
   }
 ];
