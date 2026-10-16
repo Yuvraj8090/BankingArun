@@ -666,6 +666,14 @@ print "\n-- staff help bot --"
 call POST /staff/assistant "$RETAIL" '{"message":"where do I edit a plan?"}'; ck "members cannot use the staff bot" 403 "$CODE"
 call POST /staff/assistant "$STAFF" '{"message":"where do I edit a plan?","guides":"## Scheme Master"}'
 ck "without an API key it says so, and the page answers from its guides" 503 "$CODE"
+CFGBAK=$(Q "SELECT TO_BASE64(data) FROM system_config WHERE id='global'")
+call PUT /admin/config "$OWNER" '{"anthropic_api_key":"not-a-key"}'; ck "the owner panel refuses a malformed Claude key" 422 "$CODE"
+call PUT /admin/config "$OWNER" '{"anthropic_api_key":"sk-ant-apitest-0000000000","anthropic_model":"claude-sonnet-5-5"}'
+ck "and saves a real-looking one" 200 "$CODE"
+call GET /admin/config "$OWNER"
+ck "shown masked, never in full, and marked set up" "True|False" "$(print -r -- "$BODY" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(str(d["assistant_configured"])+"|"+str("apitest-0000000000" in json.dumps(d)))')"
+ck "stored encrypted" "0" "$(Q "SELECT INSTR(data,'sk-ant-apitest') FROM system_config WHERE id='global'")"
+Q "UPDATE system_config SET data=FROM_BASE64('$CFGBAK') WHERE id='global'" >/dev/null
 
 print "\n-- regulatory returns and share money --"
 call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":600000,\"mode\":\"cash\"}"

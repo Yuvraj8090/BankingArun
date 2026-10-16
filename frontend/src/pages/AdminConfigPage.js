@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, AlertCircle, CheckCircle2, UserCheck, Send, Clock } from 'lucide-react';
+import { Settings2, Phone, Mail, ShieldCheck, RefreshCw, Save, AlertCircle, CheckCircle2, UserCheck, Send, Clock, Bot } from 'lucide-react';
 import { api } from '../services/api';
 import { PlainInput, SecretInput } from '../components/FormField';
 import { toast } from 'sonner';
@@ -103,7 +103,7 @@ export default function AdminConfigPage() {
   const [showSecrets, setShowSecrets] = useState({});
 
   const load = async () => {
-    try { const r = await api.adminConfigGet(); setCfg(r); setForm({ live_otp: r.live_otp, twilio_from_number: r.twilio_from_number, sendgrid_from_email: r.sendgrid_from_email, smtp_host: r.smtp_host, smtp_port: r.smtp_port, smtp_user: r.smtp_user, support_email: r.support_email }); }
+    try { const r = await api.adminConfigGet(); setCfg(r); setForm({ live_otp: r.live_otp, twilio_from_number: r.twilio_from_number, sendgrid_from_email: r.sendgrid_from_email, smtp_host: r.smtp_host, smtp_port: r.smtp_port, smtp_user: r.smtp_user, support_email: r.support_email, anthropic_model: r.anthropic_model }); }
     catch { toast.error('Director access required'); }
   };
   useEffect(() => { load(); }, []);
@@ -117,6 +117,7 @@ export default function AdminConfigPage() {
       if (form.twilio_auth_token) payload.twilio_auth_token = form.twilio_auth_token;
       if (form.sendgrid_api_key) payload.sendgrid_api_key = form.sendgrid_api_key;
       if (form.smtp_password) payload.smtp_password = form.smtp_password;
+      if (form.anthropic_api_key) payload.anthropic_api_key = form.anthropic_api_key;
       const r = await api.adminConfigSet(payload);
       toast.success(r.message);
       load();
@@ -230,6 +231,30 @@ export default function AdminConfigPage() {
             value={form.sendgrid_from_email || ''}
             onChange={v => setForm(f => ({ ...f, sendgrid_from_email: v }))}
             testId="cfg-sg-from" />
+        </div>
+      </Section>
+
+      {/* Staff help bot */}
+      <Section title="Staff help bot (Claude)" icon={Bot}>
+        <p className="text-[11px] text-slate-600 mb-3">
+          "Ask AJS Assistant" answers staff questions such as "where do I edit a plan?" from the page guides.
+          It sees no member data and takes no actions. {cfg.assistant_configured
+            ? <span className="text-emerald-700 font-semibold">Set up: staff get full answers.</span>
+            : <span className="text-amber-700 font-semibold">Not set up: staff get the matching page guide instead.</span>}
+          {' '}Create a key at console.anthropic.com.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <SecretInput label="Anthropic API key"
+            placeholder={cfg.anthropic_api_key_masked || 'sk-ant-…'}
+            value={form.anthropic_api_key || ''}
+            onChange={v => setForm(f => ({ ...f, anthropic_api_key: v }))}
+            show={showSecrets.ak} onToggle={() => setShowSecrets(s => ({ ...s, ak: !s.ak }))}
+            testId="cfg-anthropic-key" />
+          <PlainInput label="Model"
+            placeholder="claude-sonnet-5-5"
+            value={form.anthropic_model || ''}
+            onChange={v => setForm(f => ({ ...f, anthropic_model: v }))}
+            testId="cfg-anthropic-model" />
         </div>
       </Section>
 

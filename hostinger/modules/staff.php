@@ -600,6 +600,10 @@ function route_admin_config_get(array $d): void
         'smtp_user' => $cfg['smtp_user'],
         'smtp_password_masked' => mask_secret($cfg['smtp_password']),
         'support_email' => $cfg['support_email'],
+        // The staff help bot (modules/ai.php). Set here, or in config.local.php.
+        'anthropic_api_key_masked' => mask_secret(assistant_config()['key']),
+        'anthropic_model' => assistant_config()['model'],
+        'assistant_configured' => assistant_config()['key'] !== '',
         // Referral reward, face-match threshold, loan/deposit rates, the DD fee
         // and the card limit ceiling all moved to the Business Parameters screen
         // (modules/parameters.php, system_parameters table) -- a listable,
@@ -651,7 +655,8 @@ function route_admin_config_set(array $d): void
     }
     foreach (['twilio_account_sid' => 64, 'twilio_auth_token' => 128, 'twilio_from_number' => 20,
         'sendgrid_api_key' => 128, 'sendgrid_from_email' => 150, 'smtp_host' => 150, 'smtp_port' => 5,
-        'smtp_user' => 150, 'smtp_password' => 128, 'support_email' => 150] as $key => $max) {
+        'smtp_user' => 150, 'smtp_password' => 128, 'support_email' => 150,
+        'anthropic_api_key' => 200, 'anthropic_model' => 60] as $key => $max) {
         $value = clip($d[$key] ?? '', $max);
         if ($value === '') {
             continue;  // blank means "keep the current value"
@@ -659,6 +664,12 @@ function route_admin_config_set(array $d): void
         if (in_array($key, ['sendgrid_from_email', 'smtp_user', 'support_email'], true)
             && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
             fail(422, "$key must be a valid email address.");
+        }
+        if ($key === 'anthropic_model' && !preg_match('/^claude-[a-z0-9.-]+$/', $value)) {
+            fail(422, 'The model must be a Claude model id, such as claude-sonnet-5-5.');
+        }
+        if ($key === 'anthropic_api_key' && !str_starts_with($value, 'sk-ant-')) {
+            fail(422, 'That does not look like an Anthropic API key (they start with sk-ant-).');
         }
         if ($key === 'smtp_port' && !in_array($value, ['465', '587'], true)) {
             fail(422, 'smtp_port must be 465 (TLS) or 587 (STARTTLS).');

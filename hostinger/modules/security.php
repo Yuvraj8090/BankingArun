@@ -10,7 +10,7 @@ const OTP_PURPOSES = ['login', 'txn', 'pin_reset', 'high_value'];
 // Issued to someone who is not signed in, so it is deliberately not in
 // OTP_PURPOSES: route_otp_send must never mint one of these.
 const OTP_PURPOSE_RESET = 'password_reset';
-const SECRET_CONFIG_KEYS = ['twilio_account_sid', 'twilio_auth_token', 'sendgrid_api_key', 'smtp_password'];
+const SECRET_CONFIG_KEYS = ['twilio_account_sid', 'twilio_auth_token', 'sendgrid_api_key', 'smtp_password', 'anthropic_api_key'];
 
 // --- Runtime config (bank owner's System Config screen) ------------------------------
 function system_config(): array
@@ -105,6 +105,20 @@ function http_post(string $url, array $headers, string $body, ?string $basicAuth
     }
     error_log("AJSPay OTP delivery failed for $url: HTTP $status " . curl_error($ch));
     return 'failed';
+}
+
+// What each OTP is for, in the words the member sees.
+const OTP_PURPOSE_LABELS = ['login' => 'sign in', 'txn' => 'confirm a payment', 'pin_reset' => 'reset your transaction password',
+    'high_value' => 'confirm a large payment', OTP_PURPOSE_RESET => 'reset your password'];
+
+// Every email we send: who it is from, and the warning a member needs most.
+function email_html(string $body): string
+{
+    $c = COMPANY_IDENTITY;
+    return "<div style='font-family:Arial,sans-serif;font-size:14px;color:#0f172a'>$body"
+        . "<p style='color:#b91c1c'><b>Never share this code.</b> Our staff will never ask for it, by phone, SMS or in person.</p>"
+        . "<hr style='border:none;border-top:1px solid #e2e8f0'><p style='font-size:12px;color:#64748b'>{$c['legal_name']} (AJSPay), a Nidhi company"
+        . " · CIN {$c['cin']}<br>{$c['corporate_office']}<br>Helpline {$c['phone']} · Cyber fraud 1930</p></div>";
 }
 
 function send_sms(array $cfg, string $to, string $text): string
@@ -257,7 +271,7 @@ function route_otp_send(array $d): void
         // call can tell "nothing was configured" from "we tried and it failed".
         if ($channel !== 'email') {
             $delivery['sms'] = sms_configured($cfg)
-                ? send_sms($cfg, $user['phone'], "AJSPay OTP: $otp. Valid 5 min. Never share.")
+                ? send_sms($cfg, $user['phone'], "$otp is your AJS Nidhi OTP to " . (OTP_PURPOSE_LABELS[$purpose] ?? 'continue') . ". Valid 5 min. Our staff never ask for it. Do not share.")
                 : 'SKIPPED_NOT_CONFIGURED';
         }
         if ($channel !== 'sms') {
@@ -266,8 +280,9 @@ function route_otp_send(array $d): void
             $delivery['email'] = empty($user['email'])
                 ? 'SKIPPED_NO_ADDRESS'
                 : (email_configured($cfg)
-                    ? send_email($cfg, $user['email'], "AJSPay OTP — $purpose",
-                        "<p>Your OTP is <b style='font-size:22px'>$otp</b>. Valid 5 min.</p><p>Never share this with anyone.</p>")
+                    ? send_email($cfg, $user['email'], 'Your AJSPay code to ' . (OTP_PURPOSE_LABELS[$purpose] ?? 'continue'),
+                        email_html("<p>Your one-time code to " . (OTP_PURPOSE_LABELS[$purpose] ?? 'continue') . " is</p>"
+                            . "<p style='font-size:26px;font-weight:bold;letter-spacing:4px'>$otp</p><p>It expires in 5 minutes.</p>"))
                     : 'SKIPPED_NOT_CONFIGURED');
         }
     }
@@ -625,8 +640,8 @@ function route_forgot_password(array $d): void
     $cfg = delivery_config();
     if ($cfg['live_otp']) {
         send_email($cfg, $user['email'], 'Your AJSPay password reset code',
-            '<p>Your password reset code is <b>' . $otp . '</b>. It expires in 5 minutes.</p>'
-            . '<p>If you did not ask for this, ignore this email and your password stays as it is.</p>');
+            email_html('<p>Your password reset code is</p><p style="font-size:26px;font-weight:bold;letter-spacing:4px">' . $otp . '</p>'
+            . '<p>It expires in 5 minutes. If you did not ask for this, ignore this email: your password stays as it is.</p>'));
     }
     security_event('PASSWORD_RESET_REQUESTED', 'warning', "Reset code issued for {$user['email']}", $user);
     respond($reply);

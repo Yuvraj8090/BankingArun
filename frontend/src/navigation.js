@@ -88,7 +88,7 @@ export const NAV_BY_ROLE = {
     { id: 'public-pages', label: 'Public Pages', icon: FileText, testId: 'tab-public-pages', group: 'Settings' },
     { id: 'parameters', label: 'Business Parameters', icon: SlidersHorizontal, testId: 'tab-parameters', group: 'Settings' },
     { id: 'rails', label: 'Payment Rails', icon: Radio, testId: 'tab-rails', group: 'Settings' },
-    { id: 'admin-config', label: 'System Config (Twilio/SendGrid)', icon: Settings2, testId: 'tab-admin-config', group: 'Settings' }
+    { id: 'admin-config', label: 'System Config (SMS, email, Claude)', icon: Settings2, testId: 'tab-admin-config', group: 'Settings' }
   ],
   staff: [
     { id: 'staff', label: 'Customer Console', icon: Users, testId: 'tab-staff' },

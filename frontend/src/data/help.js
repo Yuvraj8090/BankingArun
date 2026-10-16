@@ -510,10 +510,12 @@ const DIRECTOR = {
   },
   'admin-config': {
     title: 'System Config',
-    what: 'OTP delivery (SMS and email) and the named compliance officers.',
-    steps: ['Enter the SMS (Twilio) or email (SMTP or SendGrid) details.', 'Send a test.', 'Name the grievance officer, the PMLA principal officer and the designated director.'],
+    what: 'OTP delivery (SMS and email), the staff help bot (Claude), and the named compliance officers.',
+    steps: ['Enter the SMS (Twilio) or email (SMTP or SendGrid) details.', 'Send a test.', 'For the staff help bot, paste an Anthropic API key (from console.anthropic.com) and save.', 'Name the grievance officer, the PMLA principal officer and the designated director.'],
     fields: [
       ['Account SID / Auth token / From number', 'From your Twilio account.'],
+      ['Anthropic API key', 'Starts with sk-ant-. Stored encrypted; only the last characters are ever shown again.'],
+      ['Model', 'Leave as claude-sonnet-5-5 unless told otherwise.'],
       ['SMTP host / Port / Mailbox', 'For sending email from your own mailbox.'],
       ['Officer name / email / phone', 'Shown to members on the privacy notice and support pages.']
     ],

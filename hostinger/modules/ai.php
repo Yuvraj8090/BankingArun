@@ -516,14 +516,23 @@ Rules:
 - Be short. Reply in the language the question was asked in (Hindi or English).
 TXT;
 
-function route_staff_assistant(array $d): void
+// The key and model the bot uses: System Config first (encrypted, set by the owner),
+// then config.local.php.
+function assistant_config(): array
 {
     global $config;
+    $saved = system_config();
+    $key = !empty($saved['anthropic_api_key']) ? decrypt_secret($saved['anthropic_api_key']) : (string)($config['anthropic_api_key'] ?? '');
+    return ['key' => $key, 'model' => ($saved['anthropic_model'] ?? '') ?: (string)($config['anthropic_model'] ?? 'claude-sonnet-5-5')];
+}
+
+function route_staff_assistant(array $d): void
+{
     $staff = staff_user(CRM_ROLES);
     need($d, 'message');
     $message = clip($d['message'], 1000);
     $guides = clip($d['guides'] ?? '', 60000);
-    $key = $config['anthropic_api_key'] ?? '';
+    ['key' => $key, 'model' => $model] = assistant_config();
     if ($key === '') {
         fail(503, 'The assistant is not set up yet.');
     }
@@ -550,7 +559,7 @@ function route_staff_assistant(array $d): void
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['content-type: application/json', 'anthropic-version: 2023-06-01', "x-api-key: $key"],
         CURLOPT_POSTFIELDS => json_encode([
-            'model' => $config['anthropic_model'] ?? 'claude-sonnet-5-5',
+            'model' => $model,
             'max_tokens' => 800,
             // The guides repeat on every question, so cache them.
             'system' => [['type' => 'text', 'text' => STAFF_ASSISTANT_PROMPT
