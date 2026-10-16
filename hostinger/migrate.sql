@@ -1606,3 +1606,26 @@ UPDATE site_products SET deleted_at = NOW(), deleted_by = 'migration'
       'corporate/trade-finance', 'corporate/payroll-services', 'corporate/cash-management', 'loans/personal-loan',
       'loans/vehicle-loan', 'loans/education-loan', 'investments/mutual-funds', 'investments/sovereign-gold-bonds',
       'investments/insurance');
+
+-- 16 Oct 2026: the jewellery behind each gold loan (modules/banking.php, gold pledges).
+CREATE TABLE IF NOT EXISTS gold_pledges (
+    id VARCHAR(36) PRIMARY KEY,
+    application_id VARCHAR(36) NOT NULL UNIQUE,
+    user_id VARCHAR(36) NOT NULL,
+    receipt_no VARCHAR(30) NOT NULL UNIQUE,
+    items TEXT NOT NULL,                       -- JSON: description, pieces, gross_g, net_g, karat
+    net_weight_g DECIMAL(10,3) NOT NULL,
+    rate_per_g_24k DECIMAL(10,2) NOT NULL,     -- entered by the valuer on the day
+    value DECIMAL(15,2) NOT NULL,
+    ltv DECIMAL(5,2) NOT NULL,
+    max_loan DECIMAL(15,2) NOT NULL,
+    valued_by VARCHAR(150) NOT NULL,
+    valued_at DATETIME NOT NULL,
+    status VARCHAR(10) NOT NULL DEFAULT 'held', -- held | returned
+    returned_at DATETIME,
+    returned_by VARCHAR(150),
+    INDEX idx_gold_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO system_parameters (id, param_key, label, category, value, unit, min_value, max_value, description) VALUES
+('param-gold-ltv', 'gold_loan_ltv', 'Gold loan, most lent', 'limits', 75.00, '%', 10, 90,
+    'The most that can be lent, as a share of the value of the gold pledged.');

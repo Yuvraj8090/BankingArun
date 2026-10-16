@@ -1307,3 +1307,26 @@ UPDATE site_products SET title = 'Gold Loan', tagline = 'Borrow against your gol
 INSERT IGNORE INTO site_products (id, group_key, slug, title, tagline, summary, highlights, facts, documents, note, requires, sort_order, status) VALUES ('prod-loans-deposit-loan', 'loans', 'deposit-loan', 'Loan Against Deposit', 'Borrow against your own FD or RD, without breaking it.', 'Borrow up to 90% of what you have paid into an active deposit, from your member account. The deposit keeps earning; it cannot be closed early while the loan is open, and anything still owed at maturity is taken from the maturity amount first.', '["Up to 90% of what you have paid in","The deposit keeps earning","Apply online, no income proof needed","Repaid before the deposit matures"]', '[["Interest rate","From 9.50% a year"],["Most you can borrow","90% of what you have paid in"],["Tenure","Up to the deposit’s maturity"]]', '["An active deposit in your name"]', NULL, NULL, 140, 'active');
 UPDATE site_products SET title = 'Grievance Redressal', tagline = 'How to raise a complaint and what happens next.', summary = 'Raise a query from Help & Support in the member portal and you get a ticket number straight away. If you are not satisfied with the answer, escalate it from the same ticket to the grievance officer, who must reply within 30 days.', highlights = '["Ticket number as soon as you file","Fraud reports prioritised","Follow every reply in your account","Escalate to the grievance officer from the ticket"]', facts = '[["Level 1","Help & Support, in the member portal"],["Level 2","Grievance officer, reply within 30 days"],["Helpline","9105015464"],["Cyber fraud helpline","1930"]]', documents = '["Your account details","Transaction reference for the disputed entry"]' WHERE group_key = 'support' AND slug = 'grievance-redressal' AND tagline = 'How to raise a complaint and what happens next.' AND facts LIKE '%Toll-free%';
 UPDATE site_products SET status = 'draft' WHERE group_key = 'personal' AND slug = 'salary-account' AND tagline = 'For monthly salary credits, with no balance requirement.';
+
+-- 16 Oct 2026: the jewellery behind each gold loan (modules/banking.php, gold pledges).
+CREATE TABLE IF NOT EXISTS gold_pledges (
+    id VARCHAR(36) PRIMARY KEY,
+    application_id VARCHAR(36) NOT NULL UNIQUE,
+    user_id VARCHAR(36) NOT NULL,
+    receipt_no VARCHAR(30) NOT NULL UNIQUE,
+    items TEXT NOT NULL,                       -- JSON: description, pieces, gross_g, net_g, karat
+    net_weight_g DECIMAL(10,3) NOT NULL,
+    rate_per_g_24k DECIMAL(10,2) NOT NULL,     -- entered by the valuer on the day
+    value DECIMAL(15,2) NOT NULL,
+    ltv DECIMAL(5,2) NOT NULL,
+    max_loan DECIMAL(15,2) NOT NULL,
+    valued_by VARCHAR(150) NOT NULL,
+    valued_at DATETIME NOT NULL,
+    status VARCHAR(10) NOT NULL DEFAULT 'held', -- held | returned
+    returned_at DATETIME,
+    returned_by VARCHAR(150),
+    INDEX idx_gold_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO system_parameters (id, param_key, label, category, value, unit, min_value, max_value, description) VALUES
+('param-gold-ltv', 'gold_loan_ltv', 'Gold loan, most lent', 'limits', 75.00, '%', 10, 90,
+    'The most that can be lent, as a share of the value of the gold pledged.');

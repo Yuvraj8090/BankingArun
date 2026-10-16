@@ -174,6 +174,20 @@ function route_loan_decision(array $d): void
         $pdo->rollBack();
         fail(400, 'A ' . $app['loan_type'] . ' loan cannot be approved: a Nidhi lends only against gold, property or deposits.');
     }
+    // A gold loan is approved only against gold the desk has valued, and only up to
+    // the share of its value the rules allow (route_gold_pledge_save).
+    if ($status === 'approved' && strtolower($app['loan_type']) === 'gold') {
+        $pledge = row("SELECT * FROM gold_pledges WHERE application_id = ? AND status = 'held'", [$app['id']]);
+        if (!$pledge) {
+            $pdo->rollBack();
+            fail(400, 'Value the gold first (Record gold), then approve.');
+        }
+        if ((float)$app['amount'] > (float)$pledge['max_loan']) {
+            $pdo->rollBack();
+            fail(400, 'The loan of ' . rupees((float)$app['amount']) . ' is more than the ' . rupees((float)$pledge['max_loan'])
+                . " that can be lent against this gold ({$pledge['ltv']}% of " . rupees((float)$pledge['value']) . ').');
+        }
+    }
     $loan = $status === 'disbursed' ? disburse_loan($app, $user) : null;
     $pdo->prepare('UPDATE loan_applications SET status = ?, decision_note = ? WHERE id = ?')
         ->execute([$status, clip($d['remark'] ?? '', 255), $app['id']]);

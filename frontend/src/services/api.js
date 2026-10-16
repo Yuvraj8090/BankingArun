@@ -89,6 +89,9 @@ export const api = {
   staffBookDeposit: async (payload) => (await axios.post(`${API}/deposits/staff-book`, payload, getAuthHeaders())).data,
 
   // Loans
+  goldPledgeGet: async (applicationId) => (await axios.get(`${API}/loans/gold-pledge`, { ...getAuthHeaders(), params: { application_id: applicationId } })).data,
+  goldPledgeSave: async (payload) => (await axios.post(`${API}/loans/gold-pledge`, payload, getAuthHeaders())).data,
+  goldPledgeRelease: async (applicationId) => (await axios.post(`${API}/loans/gold-pledge/release`, { application_id: applicationId }, getAuthHeaders())).data,
   applyLoan: async (payload) => (await axios.post(`${API}/loans/apply`, payload, getAuthHeaders())).data,
   getMyLoans: async () => (await axios.get(`${API}/loans/my-applications`, getAuthHeaders())).data,
   payLoanEmi: async (loanNumber) => (await axios.post(`${API}/loans/pay-emi`, { loan_number: loanNumber }, getAuthHeaders())).data,

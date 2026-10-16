@@ -842,6 +842,14 @@ function disburse_loan(array $app, array $staff): array
             fail(400, "Deposit {$app['security_deposit']} already secures another loan.");
         }
     }
+    // Applications approved before the pledge register existed reach here unvalued.
+    if (strtolower($app['loan_type']) === 'gold') {
+        $pledge = row("SELECT * FROM gold_pledges WHERE application_id = ? AND status = 'held'", [$app['id']]);
+        if (!$pledge || (float)$app['amount'] > (float)$pledge['max_loan']) {
+            fail(400, $pledge ? 'The loan is more than ' . rupees((float)$pledge['max_loan']) . ' that can be lent against the gold.'
+                : 'Value the gold first (Record gold), then disburse.');
+        }
+    }
     $principal = (float)$app['amount'];
     $rate = (float)$app['roi'];
     $months = (int)$app['tenure_months'];
@@ -870,6 +878,132 @@ function disburse_loan(array $app, array $staff): array
 
 // Takes one EMI from the borrower's account if it holds enough. Called inside a
 // transaction with the loan row locked. Returns false, changing nothing, when short.
+// --- Gold pledges ----------------------------------------------------------------------
+// The jewellery behind a gold loan: what was handed over, what it is worth, and when
+// it went back. Valued by the loan desk at today's 24-carat rate, which they enter;
+// the loan may not exceed GOLD_LTV of that value.
+const GOLD_KARATS = [14, 18, 20, 22, 24];
+const GOLD_LTV_DEFAULT = 75.0;
+const GOLD_DESK_ROLES = ['loan_officer', 'admin', 'branch_manager', 'bank_owner'];
+
+function gold_pledge_public(array $p): array
+{
+    $p = out($p);
+    $p['items'] = json_decode((string)$p['items'], true) ?: [];
+    return $p;
+}
+
+// The receipt the member keeps. Same shape as a deposit slip (deposit_slip), so the
+// same printable component draws it.
+function gold_pledge_receipt(array $pledge, array $app, array $staff): array
+{
+    $lines = array_map(fn($i) => [$i['description'] . " ({$i['pieces']} pc)",
+        "{$i['net_g']} g net, {$i['karat']}K"], $pledge['items']);
+    $lines[] = ['Total net weight', $pledge['net_weight_g'] . ' g'];
+    $lines[] = ['Valued at', rupees((float)$pledge['value']) . ' (24K ₹' . $pledge['rate_per_g_24k'] . '/g)'];
+    $lines[] = ['Most that can be lent', rupees((float)$pledge['max_loan'])];
+    $lines[] = ['Loan applied for', rupees((float)$app['amount']) . " ({$app['loan_application_no']})"];
+    $owner = row('SELECT * FROM users WHERE id = ?', [$app['user_id']]) ?: ['name' => $app['applicant']];
+    $account = scalar("SELECT account_number FROM accounts WHERE user_id = ? ORDER BY created_at LIMIT 1", [$app['user_id']]) ?: '';
+    return ['title' => 'Gold pledge receipt'] + deposit_slip($staff, $owner, (string)$account, (float)$pledge['value'], $pledge['receipt_no'], $lines);
+}
+
+function route_gold_pledge_save(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(GOLD_DESK_ROLES);
+    need($d, 'application_id', 'rate_per_g_24k', 'items');
+    $app = row('SELECT * FROM loan_applications WHERE id = ?', [clip($d['application_id'], 36)]);
+    if (!$app || strtolower($app['loan_type']) !== 'gold') {
+        fail(404, 'No gold loan application with that id.');
+    }
+    if (!in_array($app['status'], ['submitted', 'under_review', 'documentation', 'approved'], true)) {
+        fail(400, "The application is {$app['status']}; the gold can only be valued before the loan is paid out.");
+    }
+    $rate = money($d['rate_per_g_24k']);
+    if ($rate < 1000 || $rate > 50000) {
+        fail(422, 'Enter today\'s 24-carat rate per gram (between ₹1,000 and ₹50,000).');
+    }
+    if (!is_array($d['items']) || !$d['items'] || count($d['items']) > 30) {
+        fail(422, 'List each item handed over (1 to 30 items).');
+    }
+    $items = [];
+    $net = $value = 0.0;
+    foreach ($d['items'] as $i => $item) {
+        $n = $i + 1;
+        $desc = clip($item['description'] ?? '', 80);
+        $pieces = (int)($item['pieces'] ?? 1);
+        $gross = round((float)($item['gross_g'] ?? 0), 3);
+        $netG = round((float)($item['net_g'] ?? 0), 3);
+        $karat = (int)($item['karat'] ?? 0);
+        if ($desc === '' || $pieces < 1 || $pieces > 100) {
+            fail(422, "Item $n: describe it and give the number of pieces.");
+        }
+        if ($gross <= 0 || $gross > 5000 || $netG <= 0 || $netG > $gross) {
+            fail(422, "Item $n: net weight must be above 0 and no more than the gross weight.");
+        }
+        if (!in_array($karat, GOLD_KARATS, true)) {
+            fail(422, "Item $n: purity must be 14, 18, 20, 22 or 24 carat.");
+        }
+        $items[] = ['description' => $desc, 'pieces' => $pieces, 'gross_g' => $gross, 'net_g' => $netG, 'karat' => $karat];
+        $net += $netG;
+        $value += $netG * $karat / 24 * $rate;
+    }
+    $value = floor($value);
+    $ltv = param_value('gold_loan_ltv', GOLD_LTV_DEFAULT);
+    $maxLoan = floor($value * $ltv / 100);
+    $existing = row('SELECT * FROM gold_pledges WHERE application_id = ?', [$app['id']]);
+    $receipt = $existing['receipt_no'] ?? 'GP-' . gmdate('Ymd') . '-' . random_int(10000, 99999);
+    $pdo->prepare('INSERT INTO gold_pledges (id, application_id, user_id, receipt_no, items, net_weight_g, rate_per_g_24k,
+            value, ltv, max_loan, valued_by, valued_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?)
+        ON DUPLICATE KEY UPDATE items = VALUES(items), net_weight_g = VALUES(net_weight_g), rate_per_g_24k = VALUES(rate_per_g_24k),
+            value = VALUES(value), ltv = VALUES(ltv), max_loan = VALUES(max_loan), valued_by = VALUES(valued_by),
+            valued_at = VALUES(valued_at)')
+        ->execute([$existing['id'] ?? uuid4(), $app['id'], $app['user_id'], $receipt, json_encode($items),
+            round($net, 3), $rate, $value, $ltv, $maxLoan, $staff['name'] ?? $staff['email'], 'held']);
+    audit($staff, 'GOLD_PLEDGE_VALUED', "$receipt for {$app['loan_application_no']}: " . round($net, 3) . ' g, ' . rupees($value));
+    $pledge = gold_pledge_public(row('SELECT * FROM gold_pledges WHERE application_id = ?', [$app['id']]));
+    respond(['status' => 'SUCCESS', 'pledge' => $pledge, 'receipt' => gold_pledge_receipt($pledge, $app, $staff),
+        'message' => 'Gold valued at ' . rupees($value) . '. Up to ' . rupees($maxLoan) . ' can be lent against it'
+            . ((float)$app['amount'] > $maxLoan ? '; the ' . rupees((float)$app['amount']) . ' applied for is more, so reduce the loan or reject it.' : '.')]);
+}
+
+function route_gold_pledge_get(array $d): void
+{
+    $staff = staff_user(GOLD_DESK_ROLES);
+    $app = row('SELECT * FROM loan_applications WHERE id = ?', [clip($_GET['application_id'] ?? '', 36)]);
+    $pledge = $app ? row('SELECT * FROM gold_pledges WHERE application_id = ?', [$app['id']]) : null;
+    if (!$pledge) {
+        respond(['pledge' => null, 'ltv' => param_value('gold_loan_ltv', GOLD_LTV_DEFAULT)]);
+    }
+    $pledge = gold_pledge_public($pledge);
+    respond(['pledge' => $pledge, 'receipt' => gold_pledge_receipt($pledge, $app, $staff),
+        'ltv' => param_value('gold_loan_ltv', GOLD_LTV_DEFAULT)]);
+}
+
+// The jewellery goes back once nothing is owed: the loan is closed, or it never started.
+function route_gold_pledge_release(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(GOLD_DESK_ROLES);
+    need($d, 'application_id');
+    $pledge = row("SELECT * FROM gold_pledges WHERE application_id = ? AND status = 'held'", [clip($d['application_id'], 36)]);
+    if (!$pledge) {
+        fail(404, 'No gold is held against that application.');
+    }
+    $app = row('SELECT * FROM loan_applications WHERE id = ?', [$pledge['application_id']]);
+    $loan = row('SELECT * FROM loans WHERE application_id = ?', [$pledge['application_id']]);
+    if ($loan ? $loan['status'] !== 'closed' : $app['status'] !== 'rejected') {
+        fail(400, $loan ? "Loan {$loan['loan_number']} still owes " . rupees((float)$loan['outstanding']) . '. Return the gold once it is repaid.'
+            : 'The application is still open. Reject it first, or return the gold after the loan is repaid.');
+    }
+    $pdo->prepare("UPDATE gold_pledges SET status = 'returned', returned_at = UTC_TIMESTAMP(), returned_by = ? WHERE id = ?")
+        ->execute([$staff['name'] ?? $staff['email'], $pledge['id']]);
+    audit($staff, 'GOLD_PLEDGE_RETURNED', "{$pledge['receipt_no']} returned to the member");
+    respond(['status' => 'SUCCESS', 'message' => "Gold under {$pledge['receipt_no']} marked as returned to the member."]);
+}
+
 // At maturity, a loan the deposit secures is repaid from the proceeds just credited
 // to the member's account, before they can spend them. The interest for the part
 // month since the last EMI is not charged.

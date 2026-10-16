@@ -474,6 +474,18 @@ Nidhi Rules rule 15 allows lending against the member's deposits; the brochure's
   under Public Pages is untouched.
 - To check: the footer email support@ajspay.in (the site is ajspay.co.in).
 
+### 31. Messages, Claude key, leftover pages, gold pledge register ✅
+- OTP SMS/emails name the company, say what the code is for, and warn that
+  staff never ask for it; emails carry the company footer.
+- System Config → "Staff help bot (Claude)": the owner pastes the Anthropic key
+  (stored encrypted, shown masked) and the model.
+- 13 hidden draft pages for products a Nidhi cannot offer removed.
+- Gold pledge register: Loan Pipeline → coins button on a gold application.
+  Items, net weight, purity and today's 24K rate → value and the most that can
+  be lent (75%, Business Parameters "Gold loan, most lent"). A gold loan cannot
+  be approved or paid out without it, or above it. Printed receipt; jewellery
+  marked returned only after the loan is repaid (or the application rejected).
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

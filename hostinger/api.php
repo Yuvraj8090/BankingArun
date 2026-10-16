@@ -1144,6 +1144,9 @@ $routes = [
     'GET /support/my-tickets' => 'route_my_tickets',
     'POST /support/chat' => 'route_chat',
     'POST /staff/assistant' => 'route_staff_assistant',
+    'GET /loans/gold-pledge' => 'route_gold_pledge_get',
+    'POST /loans/gold-pledge' => 'route_gold_pledge_save',
+    'POST /loans/gold-pledge/release' => 'route_gold_pledge_release',
     'GET /branches/locator' => 'route_branches',
     // A member's own standing, and what the next rung would take.
     'GET /my-standing' => 'route_my_standing',

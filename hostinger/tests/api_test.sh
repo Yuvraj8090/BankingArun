@@ -469,6 +469,20 @@ LAPP=$(Q "SELECT id FROM loan_applications WHERE purpose='APITEST loan' ORDER BY
 call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"disburse\"}"
 ck "an application cannot be disbursed before approval" 400 "$CODE"
 call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"approve\"}"
+ck "a gold loan cannot be approved before the gold is valued" 400 "$CODE"
+GOLD='"rate_per_g_24k":7000,"items":[{"description":"Chain","pieces":1,"gross_g":3,"net_g":2,"karat":22}]'
+call POST /loans/gold-pledge "$OWNER" "{\"application_id\":\"$LAPP\",$GOLD}"
+ck "the desk values it" 200 "$CODE"
+ck "2 g of 22K at 7,000 is 12,833, so 9,624 can be lent" "12833.00|9624.00" "$(Q "SELECT CONCAT_WS('|',value,max_loan) FROM gold_pledges WHERE application_id='$LAPP'")"
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"approve\"}"
+ck "and the 12,000 asked for is more than that" 400 "$CODE"
+call POST /loans/gold-pledge "$RETAIL" "{\"application_id\":\"$LAPP\",$GOLD}"
+ck "members cannot value gold" 403 "$CODE"
+call POST /loans/gold-pledge "$OWNER" "{\"application_id\":\"$LAPP\",\"rate_per_g_24k\":7000,\"items\":[{\"description\":\"Chain\",\"pieces\":1,\"gross_g\":3,\"net_g\":4,\"karat\":22}]}"
+ck "net weight cannot exceed gross" 422 "$CODE"
+call POST /loans/gold-pledge "$OWNER" "{\"application_id\":\"$LAPP\",\"rate_per_g_24k\":7000,\"items\":[{\"description\":\"Bangles\",\"pieces\":2,\"gross_g\":3,\"net_g\":2.6,\"karat\":22}]}"
+has "revaluing gives a receipt to hand over" "$BODY" "Gold pledge receipt"
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"approve\"}"
 ck "the loan desk approves it" 200 "$CODE"
 call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"decision\":\"disburse\"}"
 ck "and disburses it" 200 "$CODE"
@@ -492,8 +506,14 @@ call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$LAPP\",\"de
 ck "a disbursed loan cannot be rejected" 400 "$CODE"
 call GET /loans/my-applications "$RETAIL"
 has "the member sees the loan and its schedule" "$BODY" '"schedule"'
+call POST /loans/gold-pledge/release "$OWNER" "{\"application_id\":\"$LAPP\"}"
+ck "the gold stays held while the loan is open" 400 "$CODE"
+Q "UPDATE loans SET status='closed', outstanding=0 WHERE application_id='$LAPP'" >/dev/null
+call POST /loans/gold-pledge/release "$OWNER" "{\"application_id\":\"$LAPP\"}"
+ck "and goes back once it is repaid" "returned" "$(Q "SELECT status FROM gold_pledges WHERE application_id='$LAPP'")"
 Q "DELETE e FROM loan_emis e JOIN loans l ON l.id=e.loan_id WHERE l.application_id='$LAPP';
-   DELETE FROM loans WHERE application_id='$LAPP'; DELETE FROM loan_applications WHERE id='$LAPP';" >/dev/null
+   DELETE FROM loans WHERE application_id='$LAPP'; DELETE FROM loan_applications WHERE id='$LAPP';
+   DELETE FROM gold_pledges WHERE application_id='$LAPP';" >/dev/null
 reset_balances
 
 print "\n-- loan against the member's own deposit --"

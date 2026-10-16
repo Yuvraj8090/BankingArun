@@ -11,7 +11,7 @@ export default function DepositSlip({ slip, onClose }) {
   const rows = [['Member', slip.member], ['Account number', slip.account_number], ...slip.lines,
     ['Date and time', `${slip.at} IST`], ['Received by', slip.received_by]];
   return (
-    <Modal testId="deposit-slip-modal" title="Deposit slip" subtitle="Print it, sign it and give it to the member."
+    <Modal testId="deposit-slip-modal" title={slip.title || 'Deposit slip'} subtitle="Print it, sign it and give it to the member."
       onClose={onClose}
       footer={<>
         <button onClick={() => window.print()} data-testid="deposit-slip-print"
@@ -21,7 +21,7 @@ export default function DepositSlip({ slip, onClose }) {
       <div className="print-slip p-4 border border-slate-200 rounded-md text-xs text-slate-800 space-y-3">
         <div className="text-center border-b border-slate-200 pb-2">
           <p className="font-bold text-sm text-slate-900">{COMPANY.legalName}</p>
-          <p className="text-[11px] text-slate-500">Deposit receipt · Slip no. <span className="font-mono">{slip.slip_no}</span></p>
+          <p className="text-[11px] text-slate-500">{slip.title || 'Deposit receipt'} · No. <span className="font-mono">{slip.slip_no}</span></p>
         </div>
         <p className="text-center text-2xl font-extrabold text-emerald-700" data-testid="deposit-slip-amount">{inr(slip.amount, { decimals: 2 })}</p>
         <dl className="space-y-1">
@@ -35,7 +35,7 @@ export default function DepositSlip({ slip, onClose }) {
           <p className="border-t border-slate-300 pt-1">Member's signature</p>
           <p className="border-t border-slate-300 pt-1 text-right">Cashier's signature and stamp</p>
         </div>
-        <p className="text-[10px] text-slate-400">Keep this slip. Quote the slip number for any question about this deposit.</p>
+        <p className="text-[10px] text-slate-400">Keep this receipt. Quote its number for any question about it.</p>
       </div>
     </Modal>
   );

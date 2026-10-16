@@ -388,10 +388,13 @@ const MANAGER = {
   'loan-dept': {
     title: 'Loan Pipeline',
     what: 'Every loan application with its EMI, the applicant\'s income and a risk grade, plus the outstanding book and its NPA share.',
-    steps: ['Check the security (gold, property, or the deposit number shown) and the documents.', 'Approve, ask for documents, or reject.',
+    steps: ['Check the security (gold, property, or the deposit number shown) and the documents.',
+      'Gold loan: click the coins button, list each item with its net weight and purity, enter today\'s 24-carat rate, and click "Value the gold". Print the receipt for the member. The loan cannot exceed 75% of the value.',
+      'Approve, ask for documents, or reject.',
       'Disburse an approved loan: the amount is credited to the member\'s savings and its EMI schedule starts. Only approved applications can be disbursed, and disbursal is final.'],
     fields: [],
-    tips: ['Only gold and home loans can be applied for.']
+    tips: ['Members can apply for gold, property and deposit loans.',
+      'After a gold loan is repaid, open the coins button and click "Gold returned to member".']
   },
   collection: {
     title: 'Loan Recovery',
