@@ -114,7 +114,8 @@ def public_features() -> dict:
 @router.get("/branches/locator")
 def branches_locator() -> dict:
     """The branch and ATM network behind the public locator."""
-    return {"branches": [out(r) for r in rows("SELECT * FROM branches ORDER BY id")]}
+    # Same rule as route_branches in modules/banking.php: a removed branch is not listed.
+    return {"branches": [out(r) for r in rows("SELECT * FROM branches WHERE deleted_at IS NULL ORDER BY id")]}
 
 
 @router.get("/auth/me")

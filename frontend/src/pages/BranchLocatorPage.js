@@ -59,7 +59,7 @@ export default function BranchLocatorPage() {
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-[#0b3b8c] border border-blue-500/30">
-                  {b.bank} Branch
+                  {b.bank}
                 </span>
                 <h3 className="font-bold text-slate-900 text-sm mt-1">{b.name}</h3>
               </div>
@@ -72,9 +72,11 @@ export default function BranchLocatorPage() {
               <p className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-[#0b3b8c]" /> {b.phone}
               </p>
-              <p className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-[#0b3b8c]" /> Timing: {b.timing}
-              </p>
+              {b.timing && (
+                <p className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-[#0b3b8c]" /> Timing: {b.timing}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-1.5 pt-1 text-[10px]">
@@ -82,7 +84,7 @@ export default function BranchLocatorPage() {
             </div>
 
             <a
-              href={`https://maps.google.com/?q=${b.lat},${b.lng}`}
+              href={`https://maps.google.com/?q=${b.lat != null ? `${b.lat},${b.lng}` : encodeURIComponent(b.address || b.name)}`}
               target="_blank"
               rel="noreferrer"
               className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-100 text-[#0b3b8c] text-xs font-semibold flex items-center justify-center gap-1.5 transition"

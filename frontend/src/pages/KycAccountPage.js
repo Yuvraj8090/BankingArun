@@ -125,7 +125,7 @@ export default function KycAccountPage() {
                 <input
                   type="text"
                   readOnly
-                  value="Electricity Bill - Arya Nagar, Chhutmalpur"
+                  value={docs.address ? `${docs.address.file_name || 'Document'} uploaded` : 'Not uploaded yet'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-600"
                 />
                 <div className="w-56 shrink-0"><DocumentUpload kind="address" label="Proof of address" hint="A utility bill or passport, up to 3 MB" existing={docs.address} onUploaded={(r) => setDocs((v) => ({ ...v, address: r.document }))} /></div>

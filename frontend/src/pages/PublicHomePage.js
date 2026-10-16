@@ -170,7 +170,7 @@ export default function PublicHomePage() {
 
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2 text-slate-600">
-                  <Phone className="w-3.5 h-3.5" /> 24×7 Toll-Free
+                  <Phone className="w-3.5 h-3.5" /> Helpline
                 </div>
                 <a href={`tel:${COMPANY.phone}`} className="font-semibold text-[#0b3b8c]">{COMPANY.phone}</a>
               </div>

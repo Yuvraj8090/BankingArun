@@ -444,6 +444,20 @@ Nidhi Rules rule 15 allows lending against the member's deposits; the brochure's
 - The loan desk sees which deposit secures each application; NDH figures count
   deposit loans separately.
 
+### 29. Sample branches on the public locator; other leftovers ✅
+- **The live branch locator listed five sample branches** (Nariman Point,
+  Bandra Kurla Complex, Connaught Place, Koramangala, Hitech City) with ATMs.
+  The two whose codes members' accounts carry are now the real Corporate Office
+  (Chhutmalpur) and Registered Office (Fatehpur Bhado); the other three are
+  removed (and pyapi, which serves the live locator, now skips removed ones).
+  Opening hours and map position are blank: fill them in under Branch Network.
+- ATM / cash-machine options removed (a Nidhi has neither); lockers kept.
+- Standing instructions to a non-member account are refused at setup instead
+  of failing every night; the IFSC field is hidden.
+- Every member's KYC page showed "Electricity Bill - Arya Nagar, Chhutmalpur"
+  as their address proof; it now shows what they actually uploaded.
+- "24×7 Toll-Free" label on the home page fixed.
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

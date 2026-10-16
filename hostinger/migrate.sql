@@ -1553,3 +1553,29 @@ INSERT IGNORE INTO system_parameters (id, param_key, label, category, value, uni
 ('param-loan-deposit-ltv', 'loan_against_deposit_ltv', 'Loan against deposit, most lent', 'limits', 90.00, '%', 10, 95,
     'The most a member can borrow, as a share of what they have paid into the deposit.');
 ALTER TABLE ndh_snapshots ADD COLUMN IF NOT EXISTS deposit_loans DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER property_loans;
+
+-- 16 Oct 2026: the branch list was five sample branches (Mumbai, Delhi, Bengaluru,
+-- Hyderabad) with ATMs, published on the public locator. Members' accounts carry
+-- two of their codes, so those two rows become the company's real offices (from
+-- the certificate of incorporation) and keep their codes; the other three go.
+-- Hours and map position are left for the owner to fill in, not guessed.
+-- Each statement only touches a row still holding its sample values.
+UPDATE branches SET name = 'Corporate Office, Chhutmalpur', bank = 'AJS Nidhi',
+    address = 'Arya Nagar, Kamalpur Road, Chhutmalpur, Saharanpur, Uttar Pradesh 247662',
+    lat = NULL, lng = NULL, phone = '9105015464', has_atm = 0, has_cdm = 0, has_locker = 0, timing = NULL
+    WHERE id = 'b1' AND name = 'Nariman Point Main Branch';
+UPDATE branches SET name = 'Registered Office, Fatehpur Bhado', bank = 'AJS Nidhi',
+    address = 'V Fatehpur Bhado, PO Chutmalpur, Saharanpur, Uttar Pradesh 247662',
+    lat = NULL, lng = NULL, phone = '9105015464', has_atm = 0, has_cdm = 0, has_locker = 0, timing = NULL
+    WHERE id = 'b2' AND name = 'Bandra Kurla Complex Branch';
+UPDATE branches SET deleted_at = NOW()
+    WHERE deleted_at IS NULL AND ((id = 'b3' AND name = 'Connaught Place Flagship')
+      OR (id = 'b4' AND name = 'Koramangala 80 Feet Road') OR (id = 'b5' AND name = 'Hitech City Madhapur'));
+-- No Nidhi branch has an ATM or a cash deposit machine.
+UPDATE branches SET has_atm = 0, has_cdm = 0 WHERE has_atm = 1 OR has_cdm = 1;
+ALTER TABLE branches ALTER COLUMN has_atm SET DEFAULT 0;
+ALTER TABLE branches ALTER COLUMN has_cdm SET DEFAULT 0;
+-- Staff records named the sample branches too.
+UPDATE users SET branch = 'Corporate Office, Chhutmalpur'
+    WHERE branch IN ('AJSP-MUM-042 (Nariman Point Main)', 'Head Office - Nariman Point', 'AJSP-BKC-001 (Bandra Kurla Complex)');
+UPDATE users SET branch = 'Recovery Cell' WHERE branch = 'Recovery Cell - Mumbai Zone';

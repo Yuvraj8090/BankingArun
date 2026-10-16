@@ -501,8 +501,8 @@ CREATE TABLE IF NOT EXISTS branches (
     lat DECIMAL(9,6),
     lng DECIMAL(9,6),
     phone VARCHAR(30),
-    has_atm TINYINT(1) NOT NULL DEFAULT 1,
-    has_cdm TINYINT(1) NOT NULL DEFAULT 1,
+    has_atm TINYINT(1) NOT NULL DEFAULT 0,
+    has_cdm TINYINT(1) NOT NULL DEFAULT 0,
     has_locker TINYINT(1) NOT NULL DEFAULT 0,
     timing VARCHAR(50)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -643,16 +643,10 @@ INSERT IGNORE INTO transactions (id, user_id, account_number, type, mode, amount
     'AJSP000492109', 'IMPS-9921849102', 'Family Maintenance', UTC_TIMESTAMP() - INTERVAL 7 DAY);
 
 INSERT IGNORE INTO branches (id, name, bank, code, address, lat, lng, phone, has_atm, has_cdm, has_locker, timing) VALUES
-('b1', 'Nariman Point Main Branch', 'AJSPay', 'AJSP0000042', 'Air India Building, Nariman Point, Mumbai 400021',
-    18.928100, 72.822800, '022-22024100', 1, 1, 1, '10:00 AM - 4:00 PM'),
-('b2', 'Bandra Kurla Complex Branch', 'AJSPay', 'AJSP0000001', 'G Block, BKC, Bandra East, Mumbai 400051',
-    19.066200, 72.868800, '022-66521000', 1, 1, 1, '9:30 AM - 4:30 PM'),
-('b3', 'Connaught Place Flagship', 'AJSPay', 'AJSP0000007', '9A, Inner Circle, Connaught Place, New Delhi 110001',
-    28.631500, 77.216700, '011-41512000', 1, 1, 1, '9:30 AM - 5:00 PM'),
-('b4', 'Koramangala 80 Feet Road', 'AJSPay', 'AJSP0004081', '80 Feet Road, 4th Block, Koramangala, Bengaluru 560034',
-    12.935200, 77.624500, '080-25539800', 1, 0, 1, '10:00 AM - 4:00 PM'),
-('b5', 'Hitech City Madhapur', 'AJSPay', 'AJSP0001928', 'Cyber Towers, Hitech City, Hyderabad 500081',
-    17.450400, 78.380800, '040-67891200', 1, 1, 0, '9:30 AM - 4:30 PM');
+('b1', 'Corporate Office, Chhutmalpur', 'AJS Nidhi', 'AJSP0000042',
+    'Arya Nagar, Kamalpur Road, Chhutmalpur, Saharanpur, Uttar Pradesh 247662', NULL, NULL, '9105015464', 0, 0, 0, NULL),
+('b2', 'Registered Office, Fatehpur Bhado', 'AJS Nidhi', 'AJSP0000001',
+    'V Fatehpur Bhado, PO Chutmalpur, Saharanpur, Uttar Pradesh 247662', NULL, NULL, '9105015464', 0, 0, 0, NULL);
 
 INSERT IGNORE INTO loan_applications (id, user_id, applicant, loan_type, amount, tenure_months, roi, credit_score, status) VALUES
 ('app-001', 'retail-001', 'Rahul Sharma', 'Personal', 500000.00, 36, 10.50, 782, 'under_review'),

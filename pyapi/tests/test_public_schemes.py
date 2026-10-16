@@ -30,3 +30,10 @@ def test_over_cap_and_deleted_plans_are_not_listed(monkeypatch) -> None:
     assert [s['code'] for s in listed['schemes']] == ['AJS-RD-1Y']
     assert listed['fd_rates'][0] == {'tier': 'under_1y', 'rate': 6.75}
     assert 'deleted_at IS NULL' in seen['sql']
+
+
+def test_removed_branches_are_not_listed(monkeypatch) -> None:
+    seen = {}
+    monkeypatch.setattr(routes_public, 'rows', lambda sql, params=None: seen.setdefault('sql', sql) and [])
+    routes_public.branches_locator()
+    assert 'deleted_at IS NULL' in seen['sql']

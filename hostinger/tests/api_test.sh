@@ -655,6 +655,13 @@ call POST "/tickets/$TKT/escalate" "$RETAIL" '{"ground":"delay","detail":"It too
 ck "and can escalate it to the grievance officer" 200 "$CODE"
 call GET /grievance/queue "$OWNER"; has "who sees it in the Grievance Queue" "$BODY" "Interest not credited"
 
+print "\n-- standing instructions pay members only --"
+call POST /standing-instructions "$RETAIL" '{"from_account_number":"'$RETAIL_ACC'","beneficiary_name":"Outside","beneficiary_account":"999999999999","amount":500,"start_date":"2026-12-01"}'
+ck "an instruction to a non-member account is refused at setup" 422 "$CODE"
+call POST /standing-instructions "$RETAIL" '{"from_account_number":"'$RETAIL_ACC'","beneficiary_name":"Member","beneficiary_account":"'$CORP_ACC'","amount":500,"start_date":"2026-12-01","remarks":"APITEST SI"}'
+ck "one to a member account is set up" 200 "$CODE"
+Q "DELETE FROM standing_instructions WHERE remarks='APITEST SI'" >/dev/null
+
 print "\n-- staff help bot --"
 call POST /staff/assistant "$RETAIL" '{"message":"where do I edit a plan?"}'; ck "members cannot use the staff bot" 403 "$CODE"
 call POST /staff/assistant "$STAFF" '{"message":"where do I edit a plan?","guides":"## Scheme Master"}'

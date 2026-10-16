@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Repeat, Home, TrendingUp, FileText, Shield, Plus, Play, Pause, Trash2, RefreshCw, Calendar, Save, X } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
 const CATEGORY = {
@@ -14,6 +15,8 @@ const CATEGORY = {
 const FREQ = ['daily', 'weekly', 'monthly', 'quarterly'];
 
 export default function StandingInstructionsPage() {
+  const { features } = useAuth();
+  const outside = Array.isArray(features) && features.includes('payment_systems');
   const [items, setItems] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -177,8 +180,11 @@ export default function StandingInstructionsPage() {
                 onChange={v => setForm(f => ({ ...f, beneficiary_name: v }))} testId="si-bene-name" />
               <Input label="Beneficiary account" value={form.beneficiary_account} disabled={!!editId}
                 onChange={v => setForm(f => ({ ...f, beneficiary_account: v }))} testId="si-bene-acc" />
-              <Input label="IFSC" value={form.beneficiary_ifsc} disabled={!!editId}
-                onChange={v => setForm(f => ({ ...f, beneficiary_ifsc: v }))} testId="si-ifsc" />
+              {/* Only another member's account can be paid unless a payment partner is enabled. */}
+              {outside && (
+                <Input label="IFSC" value={form.beneficiary_ifsc} disabled={!!editId}
+                  onChange={v => setForm(f => ({ ...f, beneficiary_ifsc: v }))} testId="si-ifsc" />
+              )}
               <Input type="number" label="Amount (₹)" value={form.amount}
                 onChange={v => setForm(f => ({ ...f, amount: v }))} testId="si-amount" />
               <Select label="Frequency" value={form.frequency} disabled={!!editId}

@@ -1224,6 +1224,12 @@ function route_si_create(array $d): void
         fail(422, 'frequency must be daily, weekly, monthly or quarterly.');
     }
     $category = in_array($d['category'] ?? '', SI_CATEGORIES, true) ? $d['category'] : 'generic';
+    // Paying outside the Nidhi needs a payment partner (compliance.php). Without one
+    // the nightly run could only fail and pause it, so refuse it here instead.
+    if (!capability_enabled('payment_systems')
+        && !row("SELECT 1 FROM accounts WHERE account_number = ? AND status = 'active'", [clip($d['beneficiary_account'], 50)])) {
+        fail(422, 'Standing instructions can only pay another member\'s account. Check the account number.');
+    }
     $start = valid_date($d['start_date'], 'start_date');
     $end = empty($d['end_date']) ? null : valid_date($d['end_date'], 'end_date');
     if ($end !== null && $end < $start) {

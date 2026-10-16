@@ -7,10 +7,10 @@ import { toast } from 'sonner';
 
 const BLANK = {
   name: '', code: '', bank: 'AJSPay', address: '', lat: '', lng: '',
-  phone: '', timing: '9:30 AM - 4:30 PM', has_atm: 1, has_cdm: 1, has_locker: 0
+  phone: '', timing: '9:30 AM - 4:30 PM', has_atm: 0, has_cdm: 0, has_locker: 0
 };
 
-// The branch and ATM network behind the public locator. Editing a row here changes
+// The branch network behind the public locator. Editing a row here changes
 // what visitors see at /branches, so it is the director's to change.
 export default function BranchAdminPage() {
   const { user } = useAuth();
@@ -58,7 +58,7 @@ export default function BranchAdminPage() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-md bg-[#0b3b8c] text-white flex items-center justify-center"><MapPin className="w-5 h-5" /></div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">Branch &amp; ATM Network</h1>
+            <h1 className="text-xl font-bold text-slate-900">Branch Network</h1>
             <p className="text-xs text-slate-500">{branches.length} location{branches.length === 1 ? '' : 's'} on the public locator</p>
           </div>
         </div>
@@ -73,7 +73,7 @@ export default function BranchAdminPage() {
       <div className="flex items-start gap-2 p-3 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-700">
         <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#0b3b8c]" />
         <p>
-          These rows are what the public Branch &amp; ATM locator shows. A branch with no latitude and longitude is
+          These rows are what the public branch locator shows. A branch with no latitude and longitude is
           still listed, but cannot be placed on the map. A branch that members or staff are attached to cannot be
           deleted until they are moved.
         </p>
@@ -116,7 +116,7 @@ export default function BranchAdminPage() {
                   </td>
                   <td className="px-4 py-3 align-top">
                     <div className="flex flex-wrap gap-1">
-                      {[['ATM', b.has_atm], ['CDM', b.has_cdm], ['Locker', b.has_locker]]
+                      {[['Locker', b.has_locker]]
                         .filter(([, on]) => Number(on) === 1)
                         .map(([tag]) => (
                           <span key={tag} className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">{tag}</span>
@@ -156,7 +156,7 @@ export default function BranchAdminPage() {
         <Modal
           testId="branch-modal"
           title={form.id ? `Edit ${form.code}` : 'New branch'}
-          subtitle="Saved changes appear on the public Branch & ATM locator straight away."
+          subtitle="Saved changes appear on the public branch locator straight away."
           onClose={() => setForm(null)}
           footer={<>
             <button onClick={() => setForm(null)}
@@ -198,7 +198,7 @@ export default function BranchAdminPage() {
                 onChange={(e) => setForm({ ...form, lng: e.target.value })} />
             </Field>
             <div className="sm:col-span-2 flex flex-wrap gap-4 pt-1">
-              {[['has_atm', 'ATM on site'], ['has_cdm', 'Cash deposit machine'], ['has_locker', 'Lockers']].map(([key, label]) => (
+              {[['has_locker', 'Lockers']].map(([key, label]) => (
                 <label key={key} className="flex items-center gap-2 text-slate-700">
                   <input type="checkbox" checked={Number(form[key]) === 1} data-testid={`branch-${key}`}
                     onChange={(e) => setForm({ ...form, [key]: e.target.checked ? 1 : 0 })} />

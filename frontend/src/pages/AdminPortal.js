@@ -86,7 +86,7 @@ export default function AdminPortal() {
                   Branch Manager &amp; Compliance Portal
                 </h1>
                 <p className="text-[11px] text-slate-500">
-                  Chhutmalpur Branch, Saharanpur (AJS-SRE-001) · PAN/Aadhaar KYC · PMLA Section 12
+                  {user?.branch || 'Your branch'} · PAN/Aadhaar KYC · PMLA Section 12
                 </p>
               </div>
             </div>
