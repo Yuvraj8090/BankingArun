@@ -1180,8 +1180,8 @@ function route_automation_status(array $d): void
             : 'The nightly run has been attempted but has never completed. See its error below.';
     } elseif ($hours !== null && $hours > CRON_STALE_HOURS) {
         $state = 'stale';
-        $message = sprintf('The last completed run was %d hours ago. It should run every night at '
-            . '01:30 IST. Check the timer on the server: systemctl list-timers ajspay-cron.timer',
+        $message = sprintf('The last completed run was %d hours ago. It should run five times a day, '
+            . '09:30 to 21:30 IST. Check the timer on the server: systemctl list-timers ajspay-cron.timer',
             (int)$hours);
     } elseif ($last !== null && $last['status'] === 'attention') {
         $state = 'attention';

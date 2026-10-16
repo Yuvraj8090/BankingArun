@@ -497,6 +497,16 @@ Every menu page for Director (26), member (12) and teller (11) opened at 375 px:
 no load errors, no error messages, no sideways overflow. Fixed: KYC / Profile
 upload boxes and the Security passkey row ran off the screen; they now stack.
 
+### 34. One failing nightly job no longer stops the rest ✅
+Production showed daily-MIS deposits still at ~30% (₹8.33 a day on ₹10,000) and
+Shubh Lakshmi 21 never re-priced: signs the scheduled run was dying before those
+jobs. One error anywhere used to end the whole run, so interest, maturities and
+the 12.5% re-rate after it never happened. Now each job runs on its own; a
+failure is rolled back, logged and named in the run record (System Config →
+automation status), and the others still run. fail() throws inside cron instead
+of exiting. The 12.5% re-rate now runs straight after plan re-pricing.
+MIS checked: monthly payouts match each plan's printed amount exactly.
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

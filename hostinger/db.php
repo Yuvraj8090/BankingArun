@@ -102,6 +102,11 @@ function fail(int $code, string $detail): never
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
+    // In the nightly job there is no HTTP response to send, and exiting would stop
+    // every job after this one; cron.php catches this per job instead.
+    if (defined('AJSPAY_CRON')) {
+        throw new RuntimeException($detail, $code);
+    }
     respond(['detail' => $detail], $code);
 }
 

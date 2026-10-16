@@ -37,6 +37,7 @@ register_shutdown_function(function () use (&$finished) {
 
 // api.php pulls in db.php and the modules, then returns early under the CLI,
 // leaving every helper and constant defined but no request dispatched.
+const AJSPAY_CRON = true;  // fail() throws instead of exiting (db.php)
 require __DIR__ . '/api.php';
 
 const CRON_LOCK = 'ajspay_cron';
@@ -770,35 +771,37 @@ $runId = uuid4();
 $pdo->prepare('INSERT INTO cron_runs (id, dry_run, status) VALUES (?, ?, ?)')
     ->execute([$runId, (int)$dryRun, 'running']);
 
-try {
-    // Plans first, so nothing priced above the cap is sold tomorrow -- and so a
-    // failure in any later job cannot leave a plan over the cap and off the site.
-    $repriced = run_plan_repricing($dryRun);
-    [$siDone, $siFailed] = run_standing_instructions($today, $dryRun, $verbose);
-    [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
-    $capped = run_cap_rerate($today, $dryRun, $verbose);
-    [$instTaken, $instShort] = run_instalments($today, $dryRun, $verbose);
-    [$emiPaid, $emiShort] = run_loan_emis($today, $dryRun, $verbose);
-    [$intDone, $intFailed] = run_deposit_interest($today, $dryRun, $verbose);
-    [$dailyAccrued, $dailyReleased, $dailyFailed] = run_daily_interest_accrual($today, $dryRun, $verbose);
-    [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
-    [$railSent, $railFailed, $railDone, $railStuck] = run_rail_reconciliation($dryRun, $verbose);
-    // Last, so the day's figures include everything the run above posted.
-    if (!$dryRun) {
-        record_ndh_snapshot($today);
+// Each job on its own: one that throws is rolled back, logged and recorded, and the
+// rest still run. A single bad row used to stop every job after it -- interest,
+// maturities and the 12.5% re-rate included -- night after night.
+$jobErrors = [];
+$job = function (string $name, callable $fn, mixed $none) use (&$jobErrors, $pdo) {
+    try {
+        return $fn();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log("AJSPay cron job $name failed: " . $e);
+        say("ERROR in $name: " . $e->getMessage());
+        $jobErrors[] = "$name: " . $e->getMessage();
+        return $none;
     }
-} catch (Throwable $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-    error_log('AJSPay cron error: ' . $e);
-    say('ERROR: ' . $e->getMessage());
-    // Recorded before the lock goes, and deliberately not inside a transaction
-    // that may have just been rolled back.
-    $pdo->prepare("UPDATE cron_runs SET finished_at = NOW(), status = 'failed', error = ? WHERE id = ?")
-        ->execute([mb_substr($e->getMessage(), 0, 500), $runId]);
-    scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
-    exit(1);  // $finished stays false; the shutdown handler would do this anyway
+};
+// Compliance first, so nothing above the cap is sold or paid tomorrow.
+$repriced = $job('plan_repricing', fn() => run_plan_repricing($dryRun), 0);
+$capped = $job('cap_rerate', fn() => run_cap_rerate($today, $dryRun, $verbose), 0);
+[$siDone, $siFailed] = $job('standing_instructions', fn() => run_standing_instructions($today, $dryRun, $verbose), [0, 1]);
+[$payDone, $payFailed] = $job('scheduled_payments', fn() => run_scheduled_payments($today, $dryRun, $verbose), [0, 1]);
+[$instTaken, $instShort] = $job('instalments', fn() => run_instalments($today, $dryRun, $verbose), [0, 0]);
+[$emiPaid, $emiShort] = $job('loan_emis', fn() => run_loan_emis($today, $dryRun, $verbose), [0, 0]);
+[$intDone, $intFailed] = $job('deposit_interest', fn() => run_deposit_interest($today, $dryRun, $verbose), [0, 1]);
+[$dailyAccrued, $dailyReleased, $dailyFailed] = $job('daily_interest', fn() => run_daily_interest_accrual($today, $dryRun, $verbose), [0, 0, 1]);
+[$matDone, $matFailed] = $job('deposit_maturities', fn() => run_deposit_maturities($today, $dryRun, $verbose), [0, 1]);
+[$railSent, $railFailed, $railDone, $railStuck] = $job('payment_rail', fn() => run_rail_reconciliation($dryRun, $verbose), [0, 1, 0, 0]);
+// Last, so the day's figures include everything the run above posted.
+if (!$dryRun) {
+    $job('ndh_snapshot', function () use ($today) { record_ndh_snapshot($today); return null; }, null);
 }
 
 scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
@@ -814,9 +817,9 @@ say("Standing instructions: $siDone run, $siFailed failed. "
 $finished = true;
 // A rail transaction that is still pending is not a failure — the partner has
 // simply not answered yet — so it does not make the run report a problem.
-$problems = $siFailed + $payFailed + $intFailed + $dailyFailed + $matFailed + $railFailed;
-$pdo->prepare('UPDATE cron_runs SET finished_at = NOW(), status = ?, jobs = ? WHERE id = ?')
-    ->execute([$problems > 0 ? 'attention' : 'ok', json_encode([
+$problems = $siFailed + $payFailed + $intFailed + $dailyFailed + $matFailed + $railFailed + count($jobErrors);
+$pdo->prepare('UPDATE cron_runs SET finished_at = NOW(), status = ?, error = ?, jobs = ? WHERE id = ?')
+    ->execute([$problems > 0 ? 'attention' : 'ok', $jobErrors ? mb_substr(implode(' | ', $jobErrors), 0, 500) : null, json_encode([
         'standing_instructions' => ['done' => $siDone, 'failed' => $siFailed],
         'scheduled_payments' => ['done' => $payDone, 'failed' => $payFailed],
         'cap_rerate' => ['done' => $capped + $repriced, 'failed' => 0],

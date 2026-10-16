@@ -211,6 +211,18 @@ CRON --reprice-only >/dev/null 2>&1
 ck "--reprice-only brings it back inside the cap" "1" "$(Q "SELECT maturity_amount < 450000 FROM schemes WHERE code='AJS-FD-8Y'")"
 Q "UPDATE schemes SET maturity_amount=SUBSTRING_INDEX('$OLD8Y','|',1) WHERE code='AJS-FD-8Y'" >/dev/null
 
+print "\n-- one failing job does not stop the others --"
+Q "INSERT INTO deposits (id,user_id,deposit_number,deposit_type,source_account,principal_amount,interest_rate,tenure_months,interest_payout,maturity_amount,maturity_date,status,created_at) VALUES
+('crontest-dep-mat2','retail-001','CRONTEST-MAT2','fixed','$RETAIL_ACC',1000.00,7.25,12,'on_maturity',1072.50,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'active',DATE_SUB(NOW(),INTERVAL 13 MONTH))" >/dev/null
+Q "RENAME TABLE scheduled_payments TO scheduled_payments_away" >/dev/null
+CRON >/dev/null 2>&1
+Q "RENAME TABLE scheduled_payments_away TO scheduled_payments" >/dev/null
+ck "a later job (maturity) still pays" "matured" "$(Q "SELECT status FROM deposits WHERE deposit_number='CRONTEST-MAT2'")"
+# started_at has one-second resolution, so find the run by what it recorded, not by order.
+ck "and the run records which job failed" "attention" \
+  "$(Q "SELECT status FROM cron_runs WHERE error LIKE 'scheduled_payments:%' AND started_at >= UTC_TIMESTAMP() - INTERVAL 5 MINUTE LIMIT 1")"
+Q "DELETE FROM deposits WHERE id='crontest-dep-mat2'; DELETE FROM transactions WHERE ref_number='MAT-CRONTEST-MAT2'" >/dev/null
+
 print "\n-- cron refuses to run over HTTP --"
 ck "CLI guard present" "1" "$(grep -c "PHP_SAPI" "$ROOT/cron.php" >/dev/null && grep -cF "PHP_SAPI !== " "$ROOT/cron.php")"
 
