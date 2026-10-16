@@ -39,6 +39,7 @@ typeset -A PAGE_API=(
   support-view /impersonate/candidates  fraud /ai/fraud-queue  branch-admin /branches
   public-pages /products  member-ranks /member-ranks  rails /rails/config  admin-config /admin/config
   parameters /parameters  book-deposit /public/schemes  video-kyc /kyc/documents
+  support /support/my-tickets
 )
 NAV=$(node -e '
   const src = require("fs").readFileSync(process.argv[1], "utf8");

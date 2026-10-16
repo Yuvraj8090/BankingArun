@@ -599,6 +599,21 @@ ck "a counter deposit gives a slip with its reference" "True|Cash" \
   "$(print -r -- "$BODY" | jq_ 's=d["slip"];print(str(s["slip_no"]==d["ref_number"])+"|"+s["lines"][0][1])')"
 reset_balances
 
+print "\n-- support tickets, member to staff to grievance officer --"
+call POST /support/complaint "$RETAIL" '{"category":"Deposit","subject":"Interest not credited","description":"My FD interest for September is missing."}'
+ck "a member raises a query" 200 "$CODE"
+TKT=$(Q "SELECT id FROM support_tickets WHERE user_id='retail-001' ORDER BY created_at DESC LIMIT 1")
+call GET /support/queue "$RETAIL"; ck "members cannot read the staff queue" 403 "$CODE"
+call GET /support/queue "$STAFF"; has "staff see it in the queue" "$BODY" "Interest not credited"
+call POST "/support/ticket/$TKT/reply" "$STAFF" '{"body":"Checking with accounts.","internal":true}'
+call POST "/support/ticket/$TKT/reply" "$STAFF" '{"body":"Credited today, sorry for the delay."}'
+call GET "/support/ticket/$TKT" "$RETAIL"
+has "the member reads the staff reply" "$BODY" "Credited today"
+hasnt "but never the internal note" "$BODY" "Checking with accounts"
+call POST "/tickets/$TKT/escalate" "$RETAIL" '{"ground":"delay","detail":"It took three weeks to sort out."}'
+ck "and can escalate it to the grievance officer" 200 "$CODE"
+call GET /grievance/queue "$OWNER"; has "who sees it in the Grievance Queue" "$BODY" "Interest not credited"
+
 print "\n-- staff help bot --"
 call POST /staff/assistant "$RETAIL" '{"message":"where do I edit a plan?"}'; ck "members cannot use the staff bot" 403 "$CODE"
 call POST /staff/assistant "$STAFF" '{"message":"where do I edit a plan?","guides":"## Scheme Master"}'

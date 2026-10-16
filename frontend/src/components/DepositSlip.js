@@ -1,6 +1,7 @@
 import React from 'react';
 import Modal from './Modal';
 import { inr } from '../utils/format';
+import { COMPANY } from '../data/company';
 
 // The receipt a teller prints and hands over after taking a deposit at the counter.
 // The server builds the slip (modules/banking.php: deposit_slip), so it shows what
@@ -19,7 +20,7 @@ export default function DepositSlip({ slip, onClose }) {
       </>}>
       <div className="print-slip p-4 border border-slate-200 rounded-md text-xs text-slate-800 space-y-3">
         <div className="text-center border-b border-slate-200 pb-2">
-          <p className="font-bold text-sm text-slate-900">Aadhunik Jeewan Sanchay Nidhi Limited</p>
+          <p className="font-bold text-sm text-slate-900">{COMPANY.legalName}</p>
           <p className="text-[11px] text-slate-500">Deposit receipt · Slip no. <span className="font-mono">{slip.slip_no}</span></p>
         </div>
         <p className="text-center text-2xl font-extrabold text-emerald-700" data-testid="deposit-slip-amount">{inr(slip.amount, { decimals: 2 })}</p>

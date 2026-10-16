@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, KeyRound, ArrowRight, ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { COMPANY } from '../data/company';
 
 // Two steps on one page: ask for the address, then take the code and the new
 // password. The reply to step one is identical whether or not the address is
@@ -85,7 +86,7 @@ export default function ForgotPasswordPage() {
               {busy ? <><RefreshCw className="w-4 h-4 animate-spin" /> Sending…</> : <>Send code <ArrowRight className="w-4 h-4" /></>}
             </button>
             <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-              Didn't register an email? Call 9105015464 and your branch will verify you in person.
+              Didn't register an email? Call {COMPANY.phone} and your branch will verify you in person.
             </p>
           </form>
         ) : (

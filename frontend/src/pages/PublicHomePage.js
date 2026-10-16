@@ -7,6 +7,7 @@ import {
   TrendingUp, ChevronRight,
   Phone, HelpCircle, MapPin, Video
 } from 'lucide-react';
+import { COMPANY } from '../data/company';
 
 export default function PublicHomePage() {
   const [features, setFeatures] = useState(null);
@@ -171,7 +172,7 @@ export default function PublicHomePage() {
                 <div className="flex items-center gap-2 text-slate-600">
                   <Phone className="w-3.5 h-3.5" /> 24×7 Toll-Free
                 </div>
-                <a href="tel:18001234567" className="font-semibold text-[#0b3b8c]">9105015464</a>
+                <a href={`tel:${COMPANY.phone}`} className="font-semibold text-[#0b3b8c]">{COMPANY.phone}</a>
               </div>
             </div>
           </div>
@@ -182,7 +183,7 @@ export default function PublicHomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-900">Explore what we offer members</h2>
-          <p className="text-sm text-slate-600 mt-1">Savings, deposits and secured loans for members of Aadhunik Jeewan Sanchay Nidhi Limited.</p>
+          <p className="text-sm text-slate-600 mt-1">Savings, deposits and secured loans for members of {COMPANY.legalName}.</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -362,13 +363,13 @@ export default function PublicHomePage() {
               <div className="text-xs text-slate-600">Grievance redressal · Complaint tracking · Chatbot</div>
             </div>
           </Link>
-          <a href="tel:18001234567" className="flex items-start gap-3 group">
+          <a href={`tel:${COMPANY.phone}`} className="flex items-start gap-3 group">
             <div className="w-10 h-10 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0b3b8c]">
               <Phone className="w-5 h-5" />
             </div>
             <div>
               <div className="font-semibold text-slate-900 group-hover:text-[#0b3b8c]">Talk to us</div>
-              <div className="text-xs text-slate-600">Toll-free 9105015464 · 24×7</div>
+              <div className="text-xs text-slate-600">Helpline {COMPANY.phone}</div>
             </div>
           </a>
           <Link to="/branches" className="flex items-start gap-3 group">

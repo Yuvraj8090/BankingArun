@@ -181,6 +181,18 @@ const MEMBER = {
     ],
     tips: ['If a document is rejected, the reason is shown, so you can upload a better copy.']
   },
+  support: {
+    title: 'Help & Support',
+    what: 'Raise a query with the branch and follow the replies.',
+    steps: [
+      'Click "Raise a query", choose what it is about, and describe the problem.',
+      'Replies appear in the ticket. Reply there if they ask for anything.',
+      'Not satisfied? Open the ticket and click "Escalate to the grievance officer". They must answer within 30 days.'
+    ],
+    fields: [['Subject', 'One line, e.g. Interest not credited on my FD.'],
+      ['Describe the problem', 'Dates, amounts and reference numbers help. Never write your password or OTP.']],
+    tips: ['Beyond the grievance officer, you can approach the Registrar of Companies or a consumer forum.']
+  },
   branches: {
     title: 'Branches',
     what: 'Find a branch, its address, timings and whether it offers lockers.',
@@ -191,6 +203,20 @@ const MEMBER = {
 };
 
 const COUNTER = {
+  'support-desk': {
+    title: 'Support Tickets',
+    what: 'Every query members raise, overdue first, with the full thread.',
+    steps: [
+      'Open a ticket from the list. Filter by status at the top.',
+      'Click "Take this ticket" so others know you are handling it.',
+      'Reply in "Your reply". Tick "Internal note" for a note only staff can see.',
+      'When it is fixed, click "Mark resolved" and write how. The member sees that note.'
+    ],
+    fields: [['Your reply', 'What the member reads. Never ask for a password or OTP.'],
+      ['Internal note', 'Ticked: only staff see it.']],
+    tips: ['Each priority has a deadline: urgent 4 hours, high 24, medium 72, low 120. Overdue tickets are listed first.',
+      'If the member escalates, the ticket also appears in the Grievance Queue for the grievance officer.']
+  },
   'kyc-desk': {
     title: 'KYC Verification',
     what: 'Members waiting for their KYC to be checked. Verify them here once you have seen their original documents.',
@@ -569,7 +595,8 @@ const COUNTER_ROLES = ['staff', 'admin', 'branch_manager', 'bank_owner'];
 // The KYC tab is a member's own profile for members, and the verification desk
 // for the counter roles (see App.js), so it has two guides.
 export const guideFor = (tab, role) =>
-  tab === 'kyc' && COUNTER_ROLES.includes(role) ? GUIDES['kyc-desk'] : GUIDES[tab] || null;
+  tab === 'kyc' && COUNTER_ROLES.includes(role) ? GUIDES['kyc-desk']
+    : tab === 'support' && COUNTER_ROLES.includes(role) ? GUIDES['support-desk'] : GUIDES[tab] || null;
 
 const FAQ_MEMBER = [
   ['Is AJSPay a bank?', 'No. Aadhunik Jeewan Sanchay Nidhi Limited is a Nidhi company under the Companies Act, 2013. It takes deposits from and lends to its members only. It is not licensed by the RBI, and deposits are not insured by DICGC.'],
@@ -580,7 +607,7 @@ const FAQ_MEMBER = [
   ['What can I borrow against?', 'Gold jewellery or property.'],
   ['Do I earn money for inviting people?', 'No. The Nidhi Rules forbid paying for introductions. Your network and standing are recognition only.'],
   ['I forgot my password.', 'Use "Forgot password" on the sign-in page. Five wrong attempts lock sign-in for 15 minutes.'],
-  ['How do I complain?', 'Raise a query with support. If it is not resolved, it goes to the grievance officer, who must answer within 30 days. Beyond that, you can approach the Registrar of Companies or a consumer forum.']
+  ['How do I complain?', 'Open Help & Support and raise a query. If you are not satisfied with the answer, escalate it there to the grievance officer, who must answer within 30 days. Beyond that, you can approach the Registrar of Companies or a consumer forum.']
 ];
 
 const FAQ_STAFF = [

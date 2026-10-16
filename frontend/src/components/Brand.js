@@ -1,4 +1,5 @@
 import React from 'react';
+import { COMPANY } from '../data/company';
 
 // The one approved logo, in its three official lockups.
 const SOURCES = {
@@ -12,7 +13,7 @@ export default function Brand({ variant = 'compact', className = '', height = 40
   const logo = (
     <img
       src={SOURCES[variant] || SOURCES.compact}
-      alt="Aadhunik Jeewan Sanchay Nidhi Limited"
+      alt={COMPANY.legalName}
       style={{ height }}
       className={`w-auto ${onDark ? '' : className}`}
       draggable="false"

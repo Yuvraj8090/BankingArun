@@ -283,19 +283,6 @@ function digits(int $count): string
     return $s;
 }
 
-// Avoids 0/O/1/l/I so a password read aloud or handed over on paper is not
-// ambiguous about which character it was. Mirrors generatePassword() in
-// frontend/src/components/Modal.js, used when an operator generates one by hand.
-function generate_password(int $length = 14): string
-{
-    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-    $s = '';
-    for ($i = 0; $i < $length; $i++) {
-        $s .= $chars[random_int(0, strlen($chars) - 1)];
-    }
-    return $s;
-}
-
 function now_utc(): string
 {
     return gmdate('Y-m-d H:i:s');

@@ -9,6 +9,7 @@ import Brand from '../components/Brand';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { b64uToBuf, bufToB64u } from '../utils/webauthn';
+import { COMPANY } from '../data/company';
 
 export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'member', referralCode = '' }) {
   const { login } = useAuth();
@@ -86,7 +87,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
       });
       setRegistered(r);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Could not create your account. Please call 9105015464.');
+      toast.error(err.response?.data?.detail || 'Could not create your account. Please call ' + COMPANY.phone + '.');
       // The image is spent whether the answer was right or wrong, so the one on
       // screen is already invalid — replace it rather than let them retype it.
       newCaptcha();
@@ -169,7 +170,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
 
           <div className="pt-6 border-t border-white/15 space-y-1.5">
             <p className="text-[11px] text-blue-100/70">
-              © {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited · 1800&#8209;123&#8209;4567
+              © {new Date().getFullYear()} {COMPANY.legalName} · {COMPANY.phone}
             </p>
           </div>
         </div>
@@ -329,7 +330,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
                 <CaptchaField testId="register-captcha" captcha={captcha} captchaAnswer={captchaAnswer}
                   setCaptchaAnswer={setCaptchaAnswer} onRefresh={newCaptcha} />
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Can't read it? Use the refresh button for a new number, or call 9105015464.
+                  Can't read it? Use the refresh button for a new number, or call {COMPANY.phone}.
                 </p>
               </div>
 

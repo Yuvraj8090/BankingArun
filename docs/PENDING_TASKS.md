@@ -400,6 +400,20 @@ tests and build pass.
   the server; without it the bot answers by searching the guides in the browser.
 - Live referral commissions on deposits stay off (Nidhi Rule 6).
 
+### 26. Duplicates and dead code removed; support tickets given a screen ✅
+- **Support tickets:** the server had a full ticket system but no screen, so
+  members could not raise a query and the Grievance Queue could never fill.
+  Now: members → Help & Support (raise, follow replies, escalate to the
+  grievance officer); staff → Support Tickets (queue, reply, internal notes,
+  take, resolve with a note).
+- **Wrong phone numbers:** the home page dialled a placeholder 1800 number and
+  called the helpline "toll-free"; the sign-in footer showed the placeholder.
+  All company details now come from `frontend/src/data/company.js`.
+- **Owner menu** grouped into sections; Collections → Loan Recovery, Agents &
+  Collections → Field Agents (cash collected).
+- **Removed:** 46 unused UI-kit files, the unused toast hook, 44 unused npm
+  packages, 5 unused API client calls, an unused PHP password helper.
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

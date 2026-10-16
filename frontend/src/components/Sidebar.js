@@ -2,6 +2,7 @@ import React from 'react';
 import { HeadphonesIcon, HelpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { navFor, ROLE_LABEL } from '../navigation';
+import { COMPANY } from '../data/company';
 
 export default function Sidebar({ activeTab, onSelectTab }) {
   const { user, features } = useAuth();
@@ -57,7 +58,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
         <div className="flex items-center gap-2 text-[#0b3b8c] font-semibold">
           <HeadphonesIcon className="w-3.5 h-3.5" /> 24×7 Member Help
         </div>
-        <p className="text-slate-600">Helpline: <strong className="text-slate-900">9105015464</strong></p>
+        <p className="text-slate-600">Helpline: <strong className="text-slate-900">{COMPANY.phone}</strong></p>
         <p className="text-slate-600">Cyber Fraud: <strong className="text-[#c8102e]">1930</strong></p>
         <button type="button" data-testid="sidebar-help-btn" onClick={() => onSelectTab('help')}
           className="flex items-center gap-1.5 text-[#0b3b8c] font-semibold hover:underline">

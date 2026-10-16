@@ -49,6 +49,7 @@ import MemberRegisterPage from './pages/MemberRegisterPage';
 import ScreeningPage from './pages/ScreeningPage';
 import DataRequestsPage from './pages/DataRequestsPage';
 import GrievancePage from './pages/GrievancePage';
+import SupportPage from './pages/SupportPage';
 import ReportsPage from './pages/ReportsPage';
 import TutorialOverlay from './components/TutorialOverlay';
 import SecurityCenterPage from './pages/SecurityCenterPage';
@@ -57,6 +58,7 @@ import SupportBanner from './components/SupportBanner';
 import AuthPage from './pages/AuthPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { Toaster } from 'sonner';
+import { COMPANY } from './data/company';
 
 function Loading() {
   return (
@@ -196,6 +198,7 @@ function AppShell() {
     screening: <ScreeningPage />,
     'data-requests': <DataRequestsPage />,
     grievance: <GrievancePage />,
+    support: <SupportPage />,
     reports: <ReportsPage />,
     'security-center': <SecurityCenterPage />,
     'support-view': <SupportViewPage />,
@@ -286,16 +289,16 @@ function PublicFooter() {
         ))}
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-slate-500">
-        <a href="tel:9105015464" className="hover:text-slate-900">Helpline 9105015464</a>
+        <a href={`tel:${COMPANY.phone}`} className="hover:text-slate-900">Helpline {COMPANY.phone}</a>
         <a href="mailto:support@ajspay.in" className="hover:text-slate-900">support@ajspay.in</a>
         <span>Cyber fraud helpline 1930</span>
       </div>
       <div className="border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-[11px] text-slate-500 space-y-1">
         <p className="max-w-4xl mx-auto leading-relaxed">
-          Aadhunik Jeewan Sanchay Nidhi Limited · CIN U65990UP2019PLN121746
+          {COMPANY.legalName} · CIN {COMPANY.cin}
         </p>
-        <p>© {new Date().getFullYear()} Aadhunik Jeewan Sanchay Nidhi Limited. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} {COMPANY.legalName}. All rights reserved.</p>
         </div>
       </div>
     </footer>

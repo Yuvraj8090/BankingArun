@@ -95,6 +95,11 @@ export const api = {
 
   // Support & Branches
   registerComplaint: async (payload) => (await axios.post(`${API}/support/complaint`, payload, getAuthHeaders())).data,
+  supportQueue: async (params) => (await axios.get(`${API}/support/queue`, { ...getAuthHeaders(), params })).data,
+  ticketDetail: async (id) => (await axios.get(`${API}/support/ticket/${id}`, getAuthHeaders())).data,
+  ticketReply: async (id, payload) => (await axios.post(`${API}/support/ticket/${id}/reply`, payload, getAuthHeaders())).data,
+  ticketAssign: async (id, payload) => (await axios.post(`${API}/support/ticket/${id}/assign`, payload, getAuthHeaders())).data,
+  ticketStatus: async (id, payload) => (await axios.post(`${API}/support/ticket/${id}/status`, payload, getAuthHeaders())).data,
   getMyTickets: async () => (await axios.get(`${API}/support/my-tickets`, getAuthHeaders())).data,
   getBranches: async () => (await axios.get(`${API}/branches/locator`, getAuthHeaders())).data,
   staffAssistant: async (message, guides, history) => (await axios.post(`${API}/staff/assistant`, { message, guides, history }, getAuthHeaders())).data,
@@ -138,7 +143,6 @@ export const api = {
   kycQueue: async () => (await axios.get(`${API}/kyc/video/queue`, getAuthHeaders())).data,
   kycDetail: async (id) => (await axios.get(`${API}/kyc/video/${id}`, getAuthHeaders())).data,
   kycDecision: async (payload) => (await axios.post(`${API}/kyc/video/decision`, payload, getAuthHeaders())).data,
-  faceMatch: async (subId) => (await axios.get(`${API}/kyc/video/${subId}/face-match`, getAuthHeaders())).data,
 
   // Statements
   downloadStatement: async (kind, accountNumber, start, end) => {
@@ -181,7 +185,6 @@ export const api = {
   railsConfigSet: async (payload) => (await axios.put(`${API}/rails/config`, payload, getAuthHeaders())).data,
   railsTest: async () => (await axios.post(`${API}/rails/test`, {}, getAuthHeaders())).data,
   railsTransactions: async (params) => (await axios.get(`${API}/rails/transactions`, { ...getAuthHeaders(), params })).data,
-  railsReconcile: async (payload) => (await axios.post(`${API}/rails/reconcile`, payload, getAuthHeaders())).data,
 
   adminConfigGet: async () => (await axios.get(`${API}/admin/config`, getAuthHeaders())).data,
   adminConfigSet: async (payload) => (await axios.put(`${API}/admin/config`, payload, getAuthHeaders())).data,
@@ -221,7 +224,6 @@ export const api = {
   // Identity documents a member uploads for verification.
   kycDocuments: async () => (await axios.get(`${API}/kyc/documents`, getAuthHeaders())).data,
   kycDocumentUpload: async (payload) => (await axios.post(`${API}/kyc/documents`, payload, getAuthHeaders())).data,
-  kycDocumentsQueue: async () => (await axios.get(`${API}/kyc/documents/queue`, getAuthHeaders())).data,
   kycDocumentReview: async (id, payload) =>
     (await axios.post(`${API}/kyc/documents/${id}/review`, payload, getAuthHeaders())).data,
   // The applicant's file, built against the enquiry before any account exists.
@@ -254,7 +256,6 @@ export const api = {
   memberRanks: async (params = {}) => (await axios.get(`${API}/member-ranks`, { ...getAuthHeaders(), params })).data,
   testSms: async (to) => (await axios.post(`${API}/admin/config/test-sms`, { to }, getAuthHeaders())).data,
   revokeSession: async (id) => (await axios.delete(`${API}/auth/sessions/${id}`, getAuthHeaders())).data,
-  publicEnquiry: async (payload) => (await axios.post(`${API}/public/enquiry`, payload)).data,
   selfRegister: async (payload) => (await axios.post(`${API}/register/self`, payload)).data,
   productsList: async () => (await axios.get(`${API}/products`, getAuthHeaders())).data,
   productCreate: async (payload) => (await axios.post(`${API}/products`, payload, getAuthHeaders())).data,
@@ -266,7 +267,6 @@ export const api = {
   fraudQueue: async (status = 'open', params = {}) =>
     (await axios.get(`${API}/ai/fraud-queue`, { ...getAuthHeaders(), params: { status, ...params } })).data,
   fraudAction: async (payload) => (await axios.post(`${API}/ai/fraud-action`, payload, getAuthHeaders())).data,
-  loanRescore: async () => (await axios.post(`${API}/ai/loan-rescore`, {}, getAuthHeaders())).data,
   collectionAnomalies: async () => (await axios.get(`${API}/ai/collection-anomalies`, getAuthHeaders())).data,
 
   // Security centre
