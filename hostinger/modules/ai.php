@@ -500,6 +500,75 @@ function route_chat(array $d): void
         'suggestions' => $answer['suggestions'], 'timestamp' => iso(now_utc())]);
 }
 
+// The staff help bot: answers "where do I edit a plan?" and the like for new staff,
+// from the guides of the pages their role can open (frontend/src/data/help.js,
+// sent by the browser as `guides`). Read-only: it has no tools and sees no member
+// data, so the worst a bad answer can do is point at the wrong page.
+const STAFF_ASSISTANT_PROMPT = <<<'TXT'
+You are the in-app help assistant for staff of Aadhunik Jeewan Sanchay Nidhi Limited (AJSPay), a Nidhi company under the Companies Act 2013 and the Nidhi Rules 2014. It is not a bank.
+Answer questions about how to use this staff panel: which menu page does what, where to edit or create something, which button to press and what to type.
+Rules:
+- Use only the PAGE GUIDES below. Name the menu item exactly as written there and give numbered steps.
+- If the guides do not cover it, say so plainly and suggest asking the Director. Never invent pages, buttons or features.
+- If the page needed is not in the guides, this role cannot open it: say a Director or Branch Manager must do it.
+- The Nidhi Rules apply: deposits at most 12.5% a year, members only, loans only against gold or property, and no commission or brokerage for bringing members or deposits. Explain this when a question touches it.
+- You cannot see accounts, members or balances, and you take no actions.
+- Be short. Reply in the language the question was asked in (Hindi or English).
+TXT;
+
+function route_staff_assistant(array $d): void
+{
+    global $config;
+    $staff = staff_user(CRM_ROLES);
+    need($d, 'message');
+    $message = clip($d['message'], 1000);
+    $guides = clip($d['guides'] ?? '', 60000);
+    $key = $config['anthropic_api_key'] ?? '';
+    if ($key === '') {
+        fail(503, 'The assistant is not set up yet.');
+    }
+    rate_limit("rl:assistant:{$staff['id']}", 30, 3600, 'You have asked a lot in the last hour. Try again later, or open the Guide on the page.');
+    // Earlier turns, so "and where is that?" makes sense. Text only, last few.
+    $history = [];
+    foreach (array_slice(is_array($d['history'] ?? null) ? $d['history'] : [], -8) as $turn) {
+        $role = ($turn['role'] ?? '') === 'assistant' ? 'assistant' : 'user';
+        $text = clip($turn['text'] ?? '', 2000);
+        if ($text !== '' && (end($history)['role'] ?? 'assistant') !== $role) {
+            $history[] = ['role' => $role, 'content' => $text];
+        }
+    }
+    if (($history[0]['role'] ?? 'user') !== 'user') {
+        array_shift($history);
+    }
+    if ((end($history)['role'] ?? '') === 'user') {
+        array_pop($history);
+    }
+    $history[] = ['role' => 'user', 'content' => $message];
+
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['content-type: application/json', 'anthropic-version: 2023-06-01', "x-api-key: $key"],
+        CURLOPT_POSTFIELDS => json_encode([
+            'model' => $config['anthropic_model'] ?? 'claude-sonnet-5-5',
+            'max_tokens' => 800,
+            // The guides repeat on every question, so cache them.
+            'system' => [['type' => 'text', 'text' => STAFF_ASSISTANT_PROMPT
+                . "\n\nThe person asking is signed in as: {$staff['role']}.\n\nPAGE GUIDES:\n$guides",
+                'cache_control' => ['type' => 'ephemeral']]],
+            'messages' => $history,
+        ]),
+    ]);
+    $body = curl_exec($ch);
+    $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $reply = $status === 200 ? (json_decode((string)$body, true)['content'][0]['text'] ?? '') : '';
+    if ($reply === '') {
+        error_log("AJSPay assistant: HTTP $status " . mb_substr((string)$body, 0, 300));
+        fail(502, 'The assistant could not answer just now.');
+    }
+    respond(['response' => $reply]);
+}
+
 // --- 3. Loan credit scoring ----------------------------------------------------------
 // Grades affordability and account behaviour into a 0-100 score with reasons.
 // It is a decision aid for the loan desk, not an automatic approval: nothing

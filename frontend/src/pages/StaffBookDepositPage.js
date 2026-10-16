@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import PlanPicker from '../components/PlanPicker';
 import { useBankTheme } from '../context/BankThemeContext';
 import { toast } from 'sonner';
+import DepositSlip from '../components/DepositSlip';
 
 // Staff-assisted counter booking: a teller types a member's account number,
 // the member's identity, KYC status and existing FD/RD/MIS holdings are
@@ -20,6 +21,7 @@ export default function StaffBookDepositPage() {
 
   const [nominee, setNominee] = useState('Registered Nominee');
   const [booking, setBooking] = useState(false);
+  const [slip, setSlip] = useState(null);
 
 
   // Debounced auto-fetch: look the member up a moment after the teller stops typing,
@@ -70,6 +72,7 @@ export default function StaffBookDepositPage() {
     try {
       const res = await api.staffBookDeposit({ ...choice.payload, account_number: accountNumber.trim(), nominee_name: nominee });
       toast.success(res.message);
+      setSlip(res.slip);
       await refreshLookup();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Booking failed');
@@ -82,6 +85,7 @@ export default function StaffBookDepositPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      <DepositSlip slip={slip} onClose={() => setSlip(null)} />
       <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Book Member Deposit</h1>
         <p className="text-xs text-slate-500 mt-1">

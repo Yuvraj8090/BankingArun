@@ -1532,3 +1532,13 @@ CREATE TABLE IF NOT EXISTS ndh_snapshots (
     branches INT NOT NULL,
     taken_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- AJS-FD-135M (16 Oct 2026): every ₹8,000 becomes ₹30,000 (3.75x). Asked for over
+-- 10 years, but that is 14.1% a year, above the 12.5% Nidhi cap; at 135 months
+-- (11 years 3 months) it is 12.47%. Inserted once only, so later edits in Plans stick.
+INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
+    contribution_amount, principal_amount, total_deposit, maturity_amount, payout_type, status, slabs, notes)
+VALUES (UUID(), 'AJS-FD-135M', 'Paune Chaar Guna Yojana (3.75x in 135 months)', 'fixed', 135,
+    NULL, NULL, 200000.0, 200000.0, 750000.0, 'maturity', 'active',
+    '[{"unit":8000,"deposit":8000,"maturity":30000},{"unit":16000,"deposit":16000,"maturity":60000},{"unit":24000,"deposit":24000,"maturity":90000},{"unit":32000,"deposit":32000,"maturity":120000},{"unit":40000,"deposit":40000,"maturity":150000},{"unit":48000,"deposit":48000,"maturity":180000},{"unit":56000,"deposit":56000,"maturity":210000},{"unit":64000,"deposit":64000,"maturity":240000},{"unit":72000,"deposit":72000,"maturity":270000},{"unit":80000,"deposit":80000,"maturity":300000},{"unit":88000,"deposit":88000,"maturity":330000},{"unit":96000,"deposit":96000,"maturity":360000},{"unit":104000,"deposit":104000,"maturity":390000},{"unit":112000,"deposit":112000,"maturity":420000},{"unit":120000,"deposit":120000,"maturity":450000},{"unit":128000,"deposit":128000,"maturity":480000},{"unit":136000,"deposit":136000,"maturity":510000},{"unit":144000,"deposit":144000,"maturity":540000},{"unit":152000,"deposit":152000,"maturity":570000},{"unit":160000,"deposit":160000,"maturity":600000},{"unit":168000,"deposit":168000,"maturity":630000},{"unit":176000,"deposit":176000,"maturity":660000},{"unit":184000,"deposit":184000,"maturity":690000},{"unit":192000,"deposit":192000,"maturity":720000},{"unit":200000,"deposit":200000,"maturity":750000}]',
+    'Multiples of ₹8,000: ₹8,000 → ₹30,000, ₹16,000 → ₹60,000. 12.47% a year, inside the 12.5% cap.');

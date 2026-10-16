@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import { ValueField as Field, PairSelect as Select } from '../components/FormField';
 import { toast } from 'sonner';
+import { planFigures, parseUnits } from '../utils/planMath';
 
 const BLANK = {
   code: '', name: '', scheme_type: 'recurring', tenure_months: 12, contribution_months: '',
@@ -31,42 +32,6 @@ const PAYOUTS = {
 };
 const BY_INSTALMENT = (type) => type === 'recurring' || type === 'daily';
 
-// Slabs are edited as plain lines rather than JSON so a manager can paste a
-// column straight out of the brochure.
-// A monthly-income plan carries a fourth number per row: what the member is
-// handed each month. It was being dropped on the way out and again on the way
-// back, so editing such a plan silently removed the thing that gets paid.
-const slabText = (slabs, monthly) =>
-  (slabs || []).map(s => monthly
-    ? `${s.unit}, ${s.deposit}, ${s.maturity}, ${s.monthly_payout ?? ''}`
-    : `${s.unit}, ${s.deposit}, ${s.maturity}`).join('\n');
-
-const parseSlabs = (text, monthly) => text.split('\n')
-  .map(line => line.split(',').map(n => Number(n.trim())))
-  .filter(p => p.length >= (monthly ? 4 : 3) && p.every(n => Number.isFinite(n) && n > 0))
-  .map(([unit, deposit, maturity, monthlyPayout]) => (monthly
-    ? { unit, deposit, maturity, monthly_payout: monthlyPayout }
-    : { unit, deposit, maturity }));
-
-// Typing deposit and maturity by hand for every denomination is the exact
-// complaint this exists to fix: one rate applied to a pasted list of amounts
-// (just the first column -- what the brochure actually varies row to row) is
-// enough to work out the other two/three numbers for every row at once.
-// For an instalment plan the amount is one instalment, so the total paid in is that
-// times the number of instalments (pay-in months, or days for a daily plan).
-const generateSlabs = (unitsText, rate, monthly, tenureMonths, instalments = 1) => {
-  const units = unitsText.split(/[\n,]+/).map(s => Number(s.trim())).filter(n => Number.isFinite(n) && n > 0);
-  if (!units.length || !Number.isFinite(rate) || rate <= 0) return null;
-  return units.map(unit => {
-    if (monthly) {
-      const monthly_payout = Math.round(unit * rate) / 100;
-      return { unit, deposit: unit, maturity: Math.round(monthly_payout * tenureMonths * 100) / 100, monthly_payout };
-    }
-    const deposit = unit * instalments;
-    return { unit, deposit, maturity: Math.round(deposit * (1 + rate / 100) * 100) / 100 };
-  }).sort((a, b) => a.unit - b.unit);
-};
-
 // Back-office scheme master. Nothing here is shown on the public site.
 export default function SchemesPage() {
   const { user } = useAuth();
@@ -76,8 +41,24 @@ export default function SchemesPage() {
   const [saving, setSaving] = useState(false);
   const [autoMonthly, setAutoMonthly] = useState('');
   const [autoMultiple, setAutoMultiple] = useState('');
-  const [autoUnits, setAutoUnits] = useState('');
-  const [autoRate, setAutoRate] = useState('');
+  // The plan is set by its rate a year and the amounts it is sold in; deposit and
+  // maturity for each amount are worked out (utils/planMath.js), never typed.
+  // Until either is touched, an existing plan keeps its own published figures.
+  const [ratePa, setRatePa] = useState('');
+  const [units, setUnits] = useState('');
+  const [touched, setTouched] = useState(false);
+  const open = (scheme) => {
+    setForm({ ...scheme });
+    setRatePa(scheme.effective_rate_pa != null ? String(scheme.effective_rate_pa) : '');
+    setUnits((scheme.slabs || []).map((x) => x.unit).join(', '));
+    setTouched(false); setAutoMonthly(''); setAutoMultiple('');
+  };
+  const monthly = form?.payout_type === 'monthly';
+  const slabs = !form || form.payout_type === 'daily' ? [] : !touched ? form.slabs || []
+    : Number(ratePa) > 0 ? parseUnits(units).map((unit) => planFigures({ type: form.scheme_type, payout: form.payout_type,
+      unit, ratePa: Number(ratePa), tenureMonths: form.tenure_months, payInMonths: form.contribution_months })) : [];
+  const lockMode = !form ? 'default' : form.lock_in_months == null || form.lock_in_months === '' ? 'default'
+    : Number(form.lock_in_months) >= Number(form.tenure_months) ? 'term' : 'months';
   const overCap = (data?.schemes || []).filter((x) => x.exceeds_cap);
 
   const load = async () => {
@@ -103,6 +84,15 @@ export default function SchemesPage() {
       } else {
         payload.daily_rate_percent = null;
         payload.withdrawal_threshold = null;
+        if (touched) {
+          if (!slabs.length) throw { response: { data: { detail: 'Enter the interest % a year and at least one amount.' } } };
+          const top = slabs[slabs.length - 1];
+          payload.slabs = slabs;
+          payload.total_deposit = top.deposit;
+          payload.maturity_amount = top.maturity;
+          if (BY_INSTALMENT(payload.scheme_type)) payload.contribution_amount = top.unit;
+          else payload.principal_amount = top.unit;
+        }
       }
       const r = form.id ? await api.schemeUpdate(form.id, payload) : await api.schemeCreate(payload);
       toast.success(r.message);
@@ -138,7 +128,7 @@ export default function SchemesPage() {
           </div>
         </div>
         {canEdit && (
-          <button data-testid="scheme-new-btn" onClick={() => { setForm({ ...BLANK }); setAutoUnits(''); setAutoRate(''); setAutoMonthly(''); setAutoMultiple(''); }}
+          <button data-testid="scheme-new-btn" onClick={() => open(BLANK)}
             className="px-4 py-2 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> New scheme
           </button>
@@ -252,7 +242,7 @@ export default function SchemesPage() {
                 </td>
                 {canEdit && (
                   <td className="p-3 text-right whitespace-nowrap">
-                    <button onClick={() => { setForm({ ...s }); setAutoUnits(''); setAutoRate(''); setAutoMonthly(''); setAutoMultiple(''); }} data-testid={`scheme-edit-${s.code}`}
+                    <button onClick={() => open(s)} data-testid={`scheme-edit-${s.code}`}
                       className="text-[#0b3b8c] font-semibold hover:underline py-1.5 px-1 -mx-1">Edit</button>
                     {(s.exceeds_cap || s.slabs?.some(x => x.exceeds_cap)) && (
                       <button data-testid={`scheme-reprice-${s.code}`} onClick={() => reprice(s)}
@@ -293,22 +283,19 @@ export default function SchemesPage() {
               onChange={v => setForm(f => ({ ...f, scheme_type: v,
                 payout_type: PAYOUTS[v].some(([p]) => p === f.payout_type) ? f.payout_type : PAYOUTS[v][0][0] }))}
               testId="scheme-type" />
-            <Field label="Tenure (months)" type="number" value={form.tenure_months} onChange={v => setForm(f => ({ ...f, tenure_months: v }))} testId="scheme-tenure" />
-            {BY_INSTALMENT(form.scheme_type) ? (<>
+            <Field label={`Tenure (months)${Number(form.tenure_months) ? ` = ${(Number(form.tenure_months) / 12).toFixed(Number(form.tenure_months) % 12 ? 2 : 0)} years` : ''}`}
+              type="number" value={form.tenure_months} onChange={v => { setTouched(true); setForm(f => ({ ...f, tenure_months: v, lock_in_months: lockMode === 'term' ? v : f.lock_in_months })); }} testId="scheme-tenure" />
+            {BY_INSTALMENT(form.scheme_type) && (
               <Field label="Pay-in months (blank = the whole tenure)" type="number" value={form.contribution_months ?? ''}
-                onChange={v => setForm(f => ({ ...f, contribution_months: v }))} testId="scheme-payin" />
-              <Field label={`Example instalment (₹ per ${form.scheme_type === 'daily' ? 'day' : 'month'})`} type="number"
-                value={form.contribution_amount ?? ''} onChange={v => setForm(f => ({ ...f, contribution_amount: v }))} />
-            </>) : (
-              <Field label={form.payout_type === 'daily' ? 'Minimum deposit (₹)' : 'Example deposit (₹, one lump sum)'}
-                type="number" value={form.principal_amount ?? ''} onChange={v => setForm(f => ({ ...f, principal_amount: v }))} />
+                onChange={v => { setTouched(true); setForm(f => ({ ...f, contribution_months: v })); }} testId="scheme-payin" />
             )}
-            {form.payout_type !== 'daily' && (<>
-              <Field label={BY_INSTALMENT(form.scheme_type) ? 'Total paid in over the plan (₹, example)' : 'Total deposit (₹, example)'}
-                type="number" value={form.total_deposit} onChange={v => setForm(f => ({ ...f, total_deposit: v }))} testId="scheme-deposit" />
-              <Field label={form.payout_type === 'monthly' ? 'Total monthly payouts over the term (₹, example)' : 'Maturity amount (₹, example)'}
-                type="number" value={form.maturity_amount} onChange={v => setForm(f => ({ ...f, maturity_amount: v }))} testId="scheme-maturity" />
-            </>)}
+            {form.payout_type === 'daily' ? (
+              <Field label="Minimum deposit (₹)" type="number" value={form.principal_amount ?? ''}
+                onChange={v => setForm(f => ({ ...f, principal_amount: v }))} />
+            ) : (
+              <Field label={`Interest (% a year, at most ${data.max_rate_pa})`} type="number" value={ratePa}
+                onChange={v => { setTouched(true); setRatePa(v); }} testId="scheme-rate-pa" />
+            )}
             {PAYOUTS[form.scheme_type].length > 1 ? (
               <Select label="How interest is paid" value={form.payout_type} options={PAYOUTS[form.scheme_type]}
                 onChange={v => setForm(f => ({ ...f, payout_type: v }))} testId="scheme-payout" />
@@ -352,9 +339,15 @@ export default function SchemesPage() {
                 value={form.withdrawal_threshold ?? ''}
                 onChange={v => setForm(f => ({ ...f, withdrawal_threshold: v }))} testId="scheme-threshold" />
             </>)}
-            <Field label="Lock-in months (blank = 30 days) — early closing is refused before this" type="number"
-              value={form.lock_in_months ?? ''} onChange={v => setForm(f => ({ ...f, lock_in_months: v }))}
-              testId="scheme-lock-in" />
+            <Select label="Early withdrawal" value={lockMode} testId="scheme-lock-mode"
+              options={[['default', 'Allowed any time after 30 days'], ['months', 'Locked for a number of months'],
+                ['term', 'Locked until maturity']]}
+              onChange={v => setForm(f => ({ ...f, lock_in_months: v === 'default' ? null : v === 'term' ? f.tenure_months : 12 }))} />
+            {lockMode === 'months' && (
+              <Field label="Locked for (months) — early closing is refused before this" type="number"
+                value={form.lock_in_months ?? ''} onChange={v => setForm(f => ({ ...f, lock_in_months: v }))}
+                testId="scheme-lock-in" />
+            )}
             <Select label="Status" value={form.status} options={data.statuses.map(s => [s, s])}
               onChange={v => setForm(f => ({ ...f, status: v }))} testId="scheme-status" />
             {form.payout_type === 'daily' ? (
@@ -365,90 +358,39 @@ export default function SchemesPage() {
                 again — leave the threshold blank to pay it out daily instead. No amount list needed.
               </div>
             ) : (
-            <div className="md:col-span-2">
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                The amounts this plan is sold in
+            <div className="md:col-span-2 space-y-2">
+              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="scheme-units">
+                Amounts it is sold in (₹ {BY_INSTALMENT(form.scheme_type) ? `instalment a ${form.scheme_type === 'daily' ? 'day' : 'month'}` : 'deposit'}, comma-separated, e.g. 8000, 16000, 24000)
               </label>
-              <p className="text-[11px] text-slate-500 mb-1.5">
-                One line per amount:{' '}
-                <span className="font-mono">
-                  unit, total deposit, maturity{form.payout_type === 'monthly' ? ', monthly payout' : ''}
-                </span>.
-                {form.payout_type === 'monthly' && (
-                  <> This plan pays out every month, so each line needs the fourth number — it is
-                  what the member is handed each month, and what their payout is calculated from.
-                  A line without it is rejected rather than saved with the payout missing.</>
-                )}{' '}
-                Every line has to stay within the {data.max_rate_pa}% cap before a new plan can go
-                active.
+              <textarea id="scheme-units" data-testid="scheme-units" rows={2} value={units}
+                onChange={e => { setTouched(true); setUnits(e.target.value); }}
+                className="w-full px-3 py-2 rounded-md border border-slate-200 text-xs font-mono text-slate-900 bg-white" />
+              {Number(ratePa) > data.max_rate_pa && (
+                <p className="text-[11px] text-rose-700">Above the {data.max_rate_pa}% cap: it can be saved as a draft but not made active.</p>
+              )}
+              <p className="text-[11px] text-slate-500">
+                {touched ? 'Worked out from the rate and tenure:' : 'As published now. Change the rate, tenure or amounts to recalculate.'}
               </p>
-              <div className="p-3 rounded-md bg-slate-50 border border-slate-200 mb-2 space-y-1.5">
-                <label className="block text-[11px] font-semibold text-slate-700">
-                  Don't want to type deposit{form.payout_type === 'monthly' ? ', maturity and payout' : ' and maturity'} for
-                  every line by hand? Paste just the amounts and one rate, and generate the table instead.
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto,auto] gap-2 items-start">
-                  <textarea
-                    data-testid="scheme-auto-units"
-                    rows={2}
-                    value={autoUnits}
-                    onChange={e => setAutoUnits(e.target.value)}
-                    placeholder={'Amounts, one per line or comma-separated:\n2500, 3000, 3500, ...'}
-                    className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs font-mono text-slate-900 bg-white"
-                  />
-                  <input
-                    data-testid="scheme-auto-rate"
-                    type="number"
-                    value={autoRate}
-                    onChange={e => setAutoRate(e.target.value)}
-                    placeholder={form.payout_type === 'monthly' ? 'Monthly rate %' : 'Return over term %'}
-                    title={form.payout_type === 'monthly'
-                      ? 'What the plan pays per month, as a % of the amount deposited — e.g. 5 means ₹5,000/mo on a ₹1,00,000 deposit.'
-                      : 'Total growth over the whole term, as a % — e.g. 200 means the amount triples (3x).'}
-                    className="w-28 px-2 py-1.5 rounded border border-slate-300 text-xs text-slate-900 bg-white"
-                  />
-                  <button
-                    type="button"
-                    data-testid="scheme-auto-generate-btn"
-                    onClick={() => {
-                      const payIn = Number(form.contribution_months) || Number(form.tenure_months);
-                      const instalments = BY_INSTALMENT(form.scheme_type)
-                        ? payIn * (form.scheme_type === 'daily' ? 30 : 1) : 1;
-                      const generated = generateSlabs(autoUnits, Number(autoRate), form.payout_type === 'monthly',
-                        form.tenure_months, instalments);
-                      if (!generated) {
-                        toast.error('Paste at least one amount and a rate greater than 0');
-                        return;
-                      }
-                      setForm(f => ({ ...f, slabs: generated }));
-                      toast.success(`Generated ${generated.length} amount${generated.length === 1 ? '' : 's'} — check the table below before saving`);
-                    }}
-                    className="px-3 py-1.5 rounded-md bg-[#0b3b8c] text-white text-xs font-semibold whitespace-nowrap"
-                  >
-                    Generate table
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-500">
-                  {form.payout_type === 'monthly'
-                    ? 'Deposit = the amount itself. Monthly payout = amount × rate ÷ 100. Maturity = monthly payout × tenure.'
-                    : BY_INSTALMENT(form.scheme_type)
-                      ? `Each amount is one ${form.scheme_type === 'daily' ? 'day' : 'month'}'s instalment. Total deposit = instalment × ${form.scheme_type === 'daily' ? 'days (pay-in months × 30)' : 'pay-in months'}. Maturity = total × (1 + rate ÷ 100).`
-                      : 'Deposit = the amount itself. Maturity = amount × (1 + rate ÷ 100) — e.g. rate 200 triples it.'}
-                  {' '}This fills in the table below, which you can still hand-edit afterwards.
-                </p>
+              <div className="overflow-x-auto border border-slate-200 rounded-md">
+                <table className="w-full text-[11px]" data-testid="scheme-slab-table">
+                  <thead className="bg-slate-50 text-slate-500"><tr>
+                    <th className="p-2 text-left">Amount</th><th className="p-2 text-right">Paid in</th>
+                    {monthly && <th className="p-2 text-right">Paid out a month</th>}
+                    <th className="p-2 text-right">{monthly ? 'Payouts in total' : 'At maturity'}</th>
+                  </tr></thead>
+                  <tbody>
+                    {slabs.map((x) => (
+                      <tr key={x.unit} className="border-t border-slate-100">
+                        <td className="p-2">₹{Number(x.unit).toLocaleString('en-IN')}</td>
+                        <td className="p-2 text-right">₹{Number(x.deposit).toLocaleString('en-IN')}</td>
+                        {monthly && <td className="p-2 text-right">₹{Number(x.monthly_payout).toLocaleString('en-IN')}</td>}
+                        <td className="p-2 text-right font-semibold">₹{Number(x.maturity).toLocaleString('en-IN')}</td>
+                      </tr>
+                    ))}
+                    {!slabs.length && <tr><td colSpan={4} className="p-2 text-slate-500">Enter the interest % a year and the amounts.</td></tr>}
+                  </tbody>
+                </table>
               </div>
-              <textarea
-                data-testid="scheme-slabs"
-                rows={6}
-                value={slabText(form.slabs, form.payout_type === 'monthly')}
-                onChange={e => setForm(f => ({
-                  ...f, slabs: parseSlabs(e.target.value, f.payout_type === 'monthly'),
-                }))}
-                className="w-full px-3 py-2 rounded-md border border-slate-200 text-xs font-mono text-slate-900 bg-white"
-                placeholder={form.payout_type === 'monthly'
-                  ? '10000, 10000, 15000, 250\n20000, 20000, 30000, 500'
-                  : '500, 36000, 52500\n1000, 72000, 105000'}
-              />
             </div>
             )}
             <div className="md:col-span-2">

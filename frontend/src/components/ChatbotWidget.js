@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Bot, X, Send, Sparkles, ChevronRight } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { guidesText, searchGuides } from '../data/help';
+
+const STAFF_ROLES = ['staff', 'admin', 'branch_manager', 'bank_owner'];
 
 export default function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -8,7 +12,15 @@ export default function ChatbotWidget() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const quickPrompts = [
+  const { user, features } = useAuth();
+  // Staff get the panel help bot (answers from the page guides), members the account assistant.
+  const staffMode = STAFF_ROLES.includes(user?.role);
+  const quickPrompts = staffMode ? [
+    'Where do I create or edit a deposit plan?',
+    'How do I book an FD or RD for a member?',
+    'How do I print a deposit slip?',
+    'Where do I see the NDH return figures?'
+  ] : [
     "What are current FD interest rates?",
     "Where is the Chhutmalpur branch?",
     "How do I pay another member?",
@@ -25,8 +37,18 @@ export default function ChatbotWidget() {
     setLoading(true);
 
     try {
-      const res = await api.chatWithBot(query);
-      setMessages((prev) => [...prev, { sender: 'bot', text: res.response }]);
+      let text;
+      if (staffMode) {
+        try {
+          const history = messages.map((m) => ({ role: m.sender === 'user' ? 'user' : 'assistant', text: m.text }));
+          text = (await api.staffAssistant(query, guidesText(user.role, features), history)).response;
+        } catch (err) {
+          text = searchGuides(query, user.role, features);
+        }
+      } else {
+        text = (await api.chatWithBot(query)).response;
+      }
+      setMessages((prev) => [...prev, { sender: 'bot', text }]);
     } catch (err) {
       setMessages((prev) => [...prev, { sender: 'bot', text: "Sorry, I am having trouble connecting to the banking assistant. Please try again." }]);
     } finally {
@@ -81,7 +103,7 @@ export default function ChatbotWidget() {
             {messages.length === 0 && !loading && (
               <div className="py-2">
                 <p className="text-[11px] text-slate-500 px-1 pb-2.5 leading-relaxed">
-                  Ask me anything about your account, or start with one of these.
+                  {staffMode ? 'Ask how to do anything in this panel: where a page is, what to type, which button to press.' : 'Ask me anything about your account, or start with one of these.'}
                 </p>
                 <div className="space-y-2">
                   {quickPrompts.map((p, idx) => (
@@ -138,7 +160,7 @@ export default function ChatbotWidget() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your banking query (e.g., FD rates)..."
+              placeholder={staffMode ? 'Ask where to do something (e.g., edit a plan)...' : 'Type your banking query (e.g., FD rates)...'}
               className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-[#0b3b8c]"
             />
             <button

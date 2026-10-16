@@ -97,6 +97,7 @@ export const api = {
   registerComplaint: async (payload) => (await axios.post(`${API}/support/complaint`, payload, getAuthHeaders())).data,
   getMyTickets: async () => (await axios.get(`${API}/support/my-tickets`, getAuthHeaders())).data,
   getBranches: async () => (await axios.get(`${API}/branches/locator`, getAuthHeaders())).data,
+  staffAssistant: async (message, guides, history) => (await axios.post(`${API}/staff/assistant`, { message, guides, history }, getAuthHeaders())).data,
   chatWithBot: async (message) => (await axios.post(`${API}/support/chat`, { message }, getAuthHeaders())).data,
 
   // Admin / Compliance

@@ -120,6 +120,8 @@ ck "first instalment paid, the plan knows the rest" "1000.00|1000.00|month|12000
 call GET /deposits/staff-member-lookup "$STAFF"
 call POST /deposits/staff-book "$STAFF" "{\"account_number\":\"$CORP_ACC\",\"scheme_code\":\"ZZ-RD-1\",\"amount\":1000}"
 ck "staff book the same plan for a member" 200 "$CODE"
+ck "and get a slip to hand over: amount, account, plan" "1000.0|$CORP_ACC|True" \
+  "$(print -r -- "$BODY" | jq_ 's=d["slip"];print(str(float(s["amount"]))+"|"+s["account_number"]+"|"+str(any(l[0]=="Deposit number" for l in s["lines"])))')"
 ck "with the same instalment record" "1000.00|month" "$(Q "SELECT CONCAT_WS('|',paid_amount,instalment_every) FROM deposits WHERE scheme_code='ZZ-RD-1' AND user_id='corp-001'")"
 
 # The cap applies to every published denomination, not just the headline one: a
@@ -593,7 +595,14 @@ has "and the refusal cites the rule" "$BODY" "twenty times net owned funds"
 Q "UPDATE system_parameters SET value = 0 WHERE param_key = 'net_owned_funds'" >/dev/null
 call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":500,\"mode\":\"cash\"}"
 ck "not enforced until net owned funds are entered" 200 "$CODE"
+ck "a counter deposit gives a slip with its reference" "True|Cash" \
+  "$(print -r -- "$BODY" | jq_ 's=d["slip"];print(str(s["slip_no"]==d["ref_number"])+"|"+s["lines"][0][1])')"
 reset_balances
+
+print "\n-- staff help bot --"
+call POST /staff/assistant "$RETAIL" '{"message":"where do I edit a plan?"}'; ck "members cannot use the staff bot" 403 "$CODE"
+call POST /staff/assistant "$STAFF" '{"message":"where do I edit a plan?","guides":"## Scheme Master"}'
+ck "without an API key it says so, and the page answers from its guides" 503 "$CODE"
 
 print "\n-- regulatory returns and share money --"
 call POST /accounts/counter-deposit "$STAFF" "{\"account_number\":\"$RETAIL_ACC\",\"amount\":600000,\"mode\":\"cash\"}"

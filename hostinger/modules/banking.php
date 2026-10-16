@@ -71,6 +71,16 @@ const COUNTER_DEPOSIT_ROLES = ['staff', ...ADMIN_ROLES];
 const COUNTER_DEPOSIT_MODES = ['cash', 'cheque'];
 const COUNTER_DEPOSIT_MAX = 1000000.0;
 
+// What the teller prints and hands over after taking money at the counter: who paid,
+// into which account, how much, when, and the reference to quote if anything is
+// disputed. $lines are extra label/value rows (plan, maturity, cheque number).
+function deposit_slip(array $staff, array $owner, string $accountNumber, float $amount, string $ref, array $lines): array
+{
+    return ['slip_no' => $ref, 'at' => (new DateTimeImmutable('now', new DateTimeZone(IST)))->format('Y-m-d H:i'),
+        'member' => $owner['name'], 'account_number' => $accountNumber, 'amount' => $amount,
+        'received_by' => $staff['name'] ?? $staff['email'], 'lines' => $lines];
+}
+
 function route_counter_deposit(array $d): void
 {
     global $pdo;
@@ -122,7 +132,11 @@ function route_counter_deposit(array $d): void
     audit($staff, 'COUNTER_DEPOSIT', "$accountNumber " . rupees($amount) . " ($mode) for {$owner['name']}");
     $pdo->commit();
     respond(['status' => 'SUCCESS', 'ref_number' => $ref, 'new_balance' => $newBalance,
-        'message' => rupees($amount) . " credited to $accountNumber ({$owner['name']}). New balance: " . rupees($newBalance)]);
+        'message' => rupees($amount) . " credited to $accountNumber ({$owner['name']}). New balance: " . rupees($newBalance),
+        'slip' => deposit_slip($staff, $owner, $accountNumber, $amount, $ref, array_values(array_filter([
+            ['Paid in', $mode === 'cash' ? 'Cash' : "Cheque #$chequeNumber (subject to clearing)"],
+            ['Into', 'Savings account'], ['Balance after', rupees($newBalance)],
+            $remarks !== '' ? ['Remarks', $remarks] : null])))]);
 }
 
 // --- Staff-assisted deposit booking ---------------------------------------------------
@@ -280,7 +294,13 @@ function route_staff_book_deposit(array $d): void
     respond(['status' => 'SUCCESS',
         'message' => strtoupper($type) . " #$number booked for {$owner['name']}! "
             . deposit_outcome_note($interestPayout, $maturity, $principal, $planCode !== '' ? $terms : null),
-        'deposit' => out($deposit)]);
+        'deposit' => out($deposit),
+        'slip' => deposit_slip($staff, $owner, $account['account_number'], $dueToday, $number, [
+            ['Plan', $planCode !== '' ? $terms['scheme_name'] : ucfirst($type) . ' deposit'],
+            ['Deposit number', $number], ['Taken from', 'Savings account'],
+            ['Rate', $rate . '% a year'], ['Tenure', "$tenure months"],
+            ['Maturity date', $deposit['maturity_date']], ['Maturity value', rupees((float)$maturity)],
+            ['Nominee', $deposit['nominee_name']]])]);
 }
 
 // --- Deposits ----------------------------------------------------------------------------

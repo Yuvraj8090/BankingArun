@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, UserCheck, FileText, RefreshCw, Phone, Mail, MessageSquare, Banknote } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import DepositSlip from '../components/DepositSlip';
 
 export default function StaffPanel() {
   const [data, setData] = useState(null);
@@ -93,6 +94,7 @@ function CounterDepositCard() {
   const [chequeNumber, setChequeNumber] = useState('');
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [slip, setSlip] = useState(null);
 
   const reset = () => {
     setAccountNumber(''); setAmount(''); setMode('cash'); setChequeNumber(''); setRemarks('');
@@ -118,6 +120,7 @@ function CounterDepositCard() {
         remarks: remarks.trim() || undefined,
       });
       toast.success(res.message);
+      setSlip(res.slip);
       reset();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Counter deposit failed');
@@ -128,6 +131,7 @@ function CounterDepositCard() {
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
+      <DepositSlip slip={slip} onClose={() => setSlip(null)} />
       <div className="p-5 border-b border-slate-100 flex items-center gap-2">
         <Banknote className="w-4 h-4 text-emerald-700" />
         <h2 className="text-sm font-semibold text-slate-900">Accept a counter deposit</h2>

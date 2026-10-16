@@ -23,6 +23,10 @@ $config = [
     // Signs session tokens and encrypts stored API keys. Generate with:
     //   php -r "echo bin2hex(random_bytes(32));"
     'token_secret'        => '',
+    // The staff help bot (modules/ai.php: route_staff_assistant). Blank key = the
+    // bot answers from the page guides in the browser instead of asking Claude.
+    'anthropic_api_key'   => '',
+    'anthropic_model'     => 'claude-sonnet-5-5',
     'token_ttl'           => 1800,  // session lifetime in seconds (30 minutes)
     'cookie_secure'       => true,  // false only for local http:// development
     // Enable only behind a proxy/CDN you control (e.g. Cloudflare). Otherwise

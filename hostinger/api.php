@@ -1143,6 +1143,7 @@ $routes = [
     'POST /support/complaint' => 'route_complaint',
     'GET /support/my-tickets' => 'route_my_tickets',
     'POST /support/chat' => 'route_chat',
+    'POST /staff/assistant' => 'route_staff_assistant',
     'GET /branches/locator' => 'route_branches',
     // A member's own standing, and what the next rung would take.
     'GET /my-standing' => 'route_my_standing',

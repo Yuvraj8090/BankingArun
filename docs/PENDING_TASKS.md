@@ -384,6 +384,22 @@ first night this is deployed; earlier dates cannot be rebuilt.
 Tests: api 281/281, cron 44/44, role smoke 534/534, pyapi 43/43, frontend
 tests and build pass.
 
+### 25. Deposit slip, 3.75x plan, rate-driven plan form, staff help bot ✅
+- **Deposit slip:** after a counter deposit or a staff booking, a printable slip
+  (member, account, amount, plan, deposit number, maturity, date/time, cashier)
+  with signature lines. Built by the server from what was recorded.
+- **AJS-FD-135M:** every ₹8,000 → ₹30,000 (₹16,000 → ₹60,000 …, up to ₹2 lakh).
+  Asked for over 10 years, but that is 14.1% a year, above the cap; at 135
+  months (11 years 3 months) it is 12.47%. A 10-year version could pay at most
+  ₹25,978 per ₹8,000.
+- **Plan form:** type the interest % a year, tenure and amounts; deposit and
+  maturity per amount are worked out (same model as the server's cap check).
+  Early withdrawal: after 30 days, locked N months, or locked until maturity.
+- **Staff help bot:** "Ask AJS Assistant" for staff and directors answers from
+  the page guides with Claude. Needs `anthropic_api_key` in config.local.php on
+  the server; without it the bot answers by searching the guides in the browser.
+- Live referral commissions on deposits stay off (Nidhi Rule 6).
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

@@ -1,3 +1,4 @@
+import { navFor } from '../navigation';
 // Every page's guide, keyed by its /app/<tab> id. Read by the Guide button in the
 // top bar (the page you are on) and by the Help Centre (every page your role can
 // open). Kept as data in one file so a page and its guide are fixed together.
@@ -212,7 +213,8 @@ const COUNTER = {
     steps: [
       'Type the member\'s account number.',
       'Enter the amount and choose cash or cheque.',
-      'Click "Credit Account". The member\'s balance updates at once.'
+      'Click "Credit Account". The member\'s balance updates at once.',
+      'A deposit slip opens. Click "Print slip", sign it and give it to the member.'
     ],
     fields: [
       ['Member account number', 'The account to credit.'],
@@ -250,7 +252,8 @@ const COUNTER = {
     steps: [
       'Type the member\'s account number. Their details load by themselves.',
       'Pick any plan (the same list members see), the amount or instalment, and a nominee.',
-      'Book it. Today\'s amount is taken from their savings account; an instalment plan collects the rest automatically.'
+      'Book it. Today\'s amount is taken from their savings account; an instalment plan collects the rest automatically.',
+      'A deposit slip opens with the plan, deposit number, maturity date and value. Click "Print slip" and hand it over.'
     ],
     fields: [
       ['Member account number', 'The savings account to debit.'],
@@ -258,7 +261,8 @@ const COUNTER = {
       ['Amount / Instalment', 'Plans are sold in fixed amounts. For an instalment plan, the amount per month or per day.'],
       ['Nominee details', 'Who receives it if needed.']
     ],
-    tips: ['An identical booking within a minute is refused, so pressing twice cannot book twice.']
+    tips: ['An identical booking within a minute is refused, so pressing twice cannot book twice.',
+      'The slip carries today\'s date and time and your name. Deposits cannot be back-dated.']
   },
   'member-register': {
     title: 'Member Register',
@@ -312,10 +316,12 @@ const COUNTER = {
     steps: [
       'Choose a report.',
       'Set the filters and click Apply. Click a column heading to sort.',
-      'Export to CSV or Excel.'
+      'Export to CSV or Excel.',
+      'For the MCA Nidhi returns, open "Nidhi return figures (NDH-1 / NDH-3)" and set Period to "half-year ends" to see 31 March and 30 September.'
     ],
     fields: [],
-    tips: ['Every export is written to the audit log with your name and the row count.']
+    tips: ['FIU-IND CTR and STR reports give the figures to key into FIU-IND\'s FINnet utility; they are not upload files.',
+      'Every export is written to the audit log with your name and the row count.']
   },
   agents: {
     title: 'Agents & Collections',
@@ -374,14 +380,19 @@ const MANAGER = {
     what: 'The deposit plans staff can sell. Each one shows its true annual return.',
     steps: [
       'Choose the type first: the form then asks only for what that kind of plan needs.',
-      'Fill in the tenure and the amounts it is sold in, or paste the amounts and one rate and click Generate table.',
-      'Save it as a draft, check the effective rate, then set it active. A plan above 12.5% shows "Re-price to 12.5%", which fixes it in one click.'
+      'Type the tenure in months, the interest % a year, and the amounts it is sold in (e.g. 8000, 16000). The deposit and maturity for each amount are worked out for you.',
+      'Choose Early withdrawal: any time after 30 days, locked for some months, or locked until maturity.',
+      'Save it as a draft, check the effective rate, then set it active. A plan above 12.5% shows "Re-price to 12.5%", which fixes it in one click.',
+      'To change an existing plan, click Edit on its row. Changes apply to new bookings; deposits already booked keep their terms.',
+      'To stop selling a plan, set its status to inactive. Members and staff then no longer see it.'
     ],
     fields: [
       ['Code / Name / Type', 'Type is daily, recurring, fixed or MIS.'],
       ['Tenure / Pay-in months', 'Total months, and how many of them take instalments.'],
-      ['Per instalment / Total deposit / Maturity amount', 'The figures the plan promises.'],
-      ['Daily rate / Withdrawal threshold', 'For daily-interest plans only.'],
+      ['Interest (% a year', 'The yearly rate, at most 12.5%. Maturity is worked out from it, compounded monthly.'],
+      ['Amounts it is sold in', 'The instalment (RD / daily) or deposit (FD / MIS) amounts, comma-separated.'],
+      ['Early withdrawal', 'When a member may close it early. Before then, early closing is refused.'],
+      ['Daily rate / Withdrawal threshold', 'For daily-interest plans only: any amount above the minimum earns this % a day.'],
       ['Status', 'Draft, active or inactive.']
     ],
     tips: ['A plan above 12.5% a year cannot be activated or booked, and it is not shown to the public.']
@@ -596,3 +607,39 @@ export const PUBLIC_FAQ = [
   ['How do I open an account?', 'Click "Open Account", sign up with your phone number, then complete Video KYC or visit a branch with your documents.'],
   ...FAQ_MEMBER
 ];
+
+// Every guide this role can open, as plain text: what the staff help bot answers from.
+const guideText = (label, g) => [`## ${label} (menu: ${label})`, g.what,
+  ...g.steps.map((x, i) => `${i + 1}. ${x}`), ...g.fields.map(([f, h]) => `Field "${f}": ${h}`),
+  ...(g.actions || []).map(([b, h]) => `Button "${b}": ${h}`), ...g.tips.map((t) => `Note: ${t}`)].join('\n');
+const roleGuides = (role, features) =>
+  navFor(role, features).map((item) => [item.label, guideFor(item.id, role)]).filter(([, g]) => g);
+export const guidesText = (role, features) =>
+  [...roleGuides(role, features).map(([label, g]) => guideText(label, g)),
+    '## Common questions', ...faqFor(role).map(([q, a]) => `Q: ${q}\nA: ${a}`)].join('\n\n');
+
+// Without the Claude bot (no API key set, or it is down): the page whose guide
+// shares the most words with the question.
+// ponytail: plain word overlap, no stemming or Hindi; the Claude bot is the real answer.
+// Words staff use for what the menu calls something else.
+const ALIASES = { plan: 'scheme', fd: 'fixed', rd: 'recurring', slip: 'slip', ndh: 'nidhi' };
+const STOP = new Set(['where', 'how', 'the', 'and', 'for', 'can', 'what', 'see', 'this', 'that', 'with', 'from', 'into']);
+export function searchGuides(question, role, features) {
+  const words = (t) => new Set((t.toLowerCase().match(/[a-z0-9]{2,}/g) || [])
+    .map((w) => w.replace(/s$/, '')).flatMap((w) => (ALIASES[w] ? [w, ALIASES[w]] : [w])).filter((w) => !STOP.has(w)));
+  const pages = roleGuides(role, features).map(([label, g]) => [label, g, words(guideText(label, g)), words(`${label} ${g.title}`)]);
+  // A word in every guide ("deposit", "member") says little; one in a single guide says a lot.
+  // A word in the page's own name counts three times.
+  const weight = (w) => 1 / Math.max(1, pages.filter(([, , t]) => t.has(w)).length);
+  const asked = [...words(question)];
+  const scored = pages.map(([label, g, text, name]) =>
+    [asked.reduce((n, w) => n + (text.has(w) ? weight(w) : 0) + (name.has(w) ? 3 * weight(w) : 0), 0), label, g])
+    .sort((x, y) => y[0] - x[0]);
+  if (!scored.length || scored[0][0] === 0) {
+    return 'I could not find that in the page guides. Open Help Centre in your profile menu, or ask the Director.';
+  }
+  const [, label, g] = scored[0];
+  return [`Open "${label}" in the menu.`, g.what, ...g.steps.map((x, i) => `${i + 1}. ${x}`),
+    'Press Guide in the top bar on that page for a field-by-field walk-through.'].join('\n');
+}
+

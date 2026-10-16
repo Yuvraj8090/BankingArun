@@ -65,8 +65,8 @@ body {
    everything else on the page (including the rest of the modal) is hidden. */
 @media print {
   body * { visibility: hidden; }
-  .print-account-preview, .print-account-preview * { visibility: visible; }
-  .print-account-preview {
+  .print-account-preview, .print-account-preview *, .print-slip, .print-slip * { visibility: visible; }
+  .print-account-preview, .print-slip {
     position: absolute;
     top: 0;
     left: 0;
