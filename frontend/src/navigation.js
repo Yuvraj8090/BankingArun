@@ -3,7 +3,7 @@ import {
   FileBadge2, MapPin, ShieldAlert, Globe, Crown, Users, Wallet,
   GanttChartSquare, Building2, Video, ShieldCheck, FileText, Repeat, Settings2,
   Layers, ClipboardList, Contact2, BarChart3, BookUser, FileLock2, Gavel, Award, Radio,
-  SlidersHorizontal, Eye, LifeBuoy
+  SlidersHorizontal, Eye, LifeBuoy, KeyRound
 } from 'lucide-react';
 
 // Role → sidebar menu. A role not listed here (the legacy 'corporate' login) gets the
@@ -38,6 +38,7 @@ export const NAV_BY_ROLE = {
     { id: 'collection', label: 'Loan Recovery', icon: Wallet, testId: 'tab-collection', group: 'Loans' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm', group: 'Members' },
     { id: 'support', label: 'Support Tickets', icon: LifeBuoy, testId: 'tab-support', group: 'Members' },
+    { id: 'lockers', label: 'Lockers', icon: KeyRound, testId: 'tab-lockers', group: 'Members' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register', group: 'Members' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue', group: 'Members' },
     { id: 'grievance', label: 'Grievance Queue', icon: Gavel, testId: 'tab-grievance', group: 'Members' },
@@ -56,6 +57,7 @@ export const NAV_BY_ROLE = {
     { id: 'collection', label: 'Loan Recovery', icon: Wallet, testId: 'tab-collection', group: 'Loans' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm', group: 'Members' },
     { id: 'support', label: 'Support Tickets', icon: LifeBuoy, testId: 'tab-support', group: 'Members' },
+    { id: 'lockers', label: 'Lockers', icon: KeyRound, testId: 'tab-lockers', group: 'Members' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register', group: 'Members' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue', group: 'Members' },
     { id: 'grievance', label: 'Grievance Queue', icon: Gavel, testId: 'tab-grievance', group: 'Members' },
@@ -75,6 +77,7 @@ export const NAV_BY_ROLE = {
     { id: 'collection', label: 'Loan Recovery', icon: Wallet, testId: 'tab-collection', group: 'Loans' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm', group: 'Members' },
     { id: 'support', label: 'Support Tickets', icon: LifeBuoy, testId: 'tab-support', group: 'Members' },
+    { id: 'lockers', label: 'Lockers', icon: KeyRound, testId: 'tab-lockers', group: 'Members' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register', group: 'Members' },
     { id: 'video-kyc-queue', label: 'Video KYC Queue', icon: Video, testId: 'tab-vkyc-queue', group: 'Members' },
     { id: 'support-view', label: 'View as Member (read-only)', icon: Eye, testId: 'tab-support-view', group: 'Members' },
@@ -94,6 +97,7 @@ export const NAV_BY_ROLE = {
     { id: 'staff', label: 'Customer Console', icon: Users, testId: 'tab-staff' },
     { id: 'crm', label: 'Relationship Desk', icon: Contact2, testId: 'tab-crm' },
     { id: 'support', label: 'Support Tickets', icon: LifeBuoy, testId: 'tab-support' },
+    { id: 'lockers', label: 'Lockers', icon: KeyRound, testId: 'tab-lockers' },
     { id: 'book-deposit', label: 'Book Member Deposit', icon: PiggyBank, testId: 'tab-book-deposit' },
     { id: 'member-register', label: 'Member Register', icon: BookUser, testId: 'tab-member-register' },
     { id: 'reports', label: 'Reports', icon: BarChart3, testId: 'tab-reports' },

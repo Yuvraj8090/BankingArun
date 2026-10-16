@@ -203,6 +203,19 @@ const MEMBER = {
 };
 
 const COUNTER = {
+  lockers: {
+    title: 'Lockers',
+    what: 'The branch\'s safe-deposit lockers: who holds each one and whether the rent is paid. Members only.',
+    steps: [
+      'A manager adds each locker once: branch, number, size and yearly rent ("Add a locker").',
+      'To give one to a member, click Allot, type their savings account number and a nominee. A year\'s rent is taken from their savings and a receipt opens to print.',
+      'Each year, click "Collect a year\'s rent". Overdue lockers show in red.',
+      'When the member empties it and returns the key, click Surrender.'
+    ],
+    fields: [['Member\'s savings account number', 'The member must be KYC-verified and on the member register.'],
+      ['Nominee', 'Who may open the locker if the member dies.']],
+    tips: ['Rent already paid is not refunded on surrender.']
+  },
   'support-desk': {
     title: 'Support Tickets',
     what: 'Every query members raise, overdue first, with the full thread.',

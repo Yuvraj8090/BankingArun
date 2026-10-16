@@ -50,6 +50,7 @@ import ScreeningPage from './pages/ScreeningPage';
 import DataRequestsPage from './pages/DataRequestsPage';
 import GrievancePage from './pages/GrievancePage';
 import SupportPage from './pages/SupportPage';
+import LockersPage from './pages/LockersPage';
 import ReportsPage from './pages/ReportsPage';
 import TutorialOverlay from './components/TutorialOverlay';
 import SecurityCenterPage from './pages/SecurityCenterPage';
@@ -199,6 +200,7 @@ function AppShell() {
     'data-requests': <DataRequestsPage />,
     grievance: <GrievancePage />,
     support: <SupportPage />,
+    lockers: <LockersPage />,
     reports: <ReportsPage />,
     'security-center': <SecurityCenterPage />,
     'support-view': <SupportViewPage />,

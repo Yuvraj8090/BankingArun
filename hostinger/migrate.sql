@@ -1629,3 +1629,19 @@ CREATE TABLE IF NOT EXISTS gold_pledges (
 INSERT IGNORE INTO system_parameters (id, param_key, label, category, value, unit, min_value, max_value, description) VALUES
 ('param-gold-ltv', 'gold_loan_ltv', 'Gold loan, most lent', 'limits', 75.00, '%', 10, 90,
     'The most that can be lent, as a share of the value of the gold pledged.');
+
+-- 16 Oct 2026: safe-deposit lockers (modules/staff.php, Lockers).
+CREATE TABLE IF NOT EXISTS lockers (
+    id VARCHAR(36) PRIMARY KEY,
+    branch_id VARCHAR(36) NOT NULL,
+    locker_no VARCHAR(20) NOT NULL,
+    size VARCHAR(10) NOT NULL,
+    annual_rent DECIMAL(10,2) NOT NULL,
+    status VARCHAR(10) NOT NULL DEFAULT 'available',  -- available | allotted | closed
+    holder_user_id VARCHAR(36),
+    account_number VARCHAR(30),
+    nominee_name VARCHAR(150),
+    allotted_on DATE,
+    rent_paid_until DATE,
+    UNIQUE KEY uq_locker (branch_id, locker_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

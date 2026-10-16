@@ -682,6 +682,34 @@ call POST /standing-instructions "$RETAIL" '{"from_account_number":"'$RETAIL_ACC
 ck "one to a member account is set up" 200 "$CODE"
 Q "DELETE FROM standing_instructions WHERE remarks='APITEST SI'" >/dev/null
 
+print "\n-- lockers --"
+reset_balances
+call POST /lockers "$STAFF" '{"branch_id":"b1","locker_no":"T-901","size":"small","annual_rent":1500}'
+ck "a teller cannot add lockers" 403 "$CODE"
+call POST /lockers "$OWNER" '{"branch_id":"b1","locker_no":"T-901","size":"small","annual_rent":1500}'
+ck "the owner adds one" 200 "$CODE"
+LKR=$(Q "SELECT id FROM lockers WHERE locker_no='T-901'")
+call POST /lockers/allot "$STAFF" "{\"locker_id\":\"$LKR\",\"account_number\":\"$RETAIL_ACC\",\"nominee_name\":\"Nominee\"}"
+WASMEMBER=$(Q "SELECT COUNT(*) FROM member_register WHERE user_id='retail-001' AND status='active'")
+[[ $WASMEMBER == 0 ]] && ck "lockers are for members only" 400 "$CODE"
+[[ $WASMEMBER == 0 ]] && call POST /register/admit "$OWNER" '{"user_id":"retail-001","shares":10}'
+reset_balances
+call POST /lockers/allot "$STAFF" "{\"locker_id\":\"$LKR\",\"account_number\":\"$RETAIL_ACC\",\"nominee_name\":\"Nominee\"}"
+ck "a teller allots it to a member" 200 "$CODE"
+has "with a rent receipt" "$BODY" "Locker rent receipt"
+ck "the first year's rent is taken from savings" "136300.00" "$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")"
+ck "paid a year ahead" "1" "$(Q "SELECT rent_paid_until = DATE_ADD(CURDATE(), INTERVAL 1 YEAR) FROM lockers WHERE id='$LKR'")"
+call POST /lockers/allot "$STAFF" "{\"locker_id\":\"$LKR\",\"account_number\":\"$CORP_ACC\",\"nominee_name\":\"X\"}"
+ck "an allotted locker cannot be given to someone else" 409 "$CODE"
+call POST /lockers/rent "$STAFF" "{\"locker_id\":\"$LKR\"}"
+ck "renewal adds another year on top" "1" "$(Q "SELECT rent_paid_until = DATE_ADD(CURDATE(), INTERVAL 2 YEAR) FROM lockers WHERE id='$LKR'")"
+call GET /lockers "$RETAIL"; ck "members cannot see the locker register" 403 "$CODE"
+call POST /lockers/surrender "$STAFF" "{\"locker_id\":\"$LKR\"}"
+ck "surrender frees it" "available" "$(Q "SELECT status FROM lockers WHERE id='$LKR'")"
+Q "DELETE FROM lockers WHERE id='$LKR'" >/dev/null
+[[ $WASMEMBER == 0 ]] && Q "DELETE FROM share_allotments WHERE user_id='retail-001'; DELETE FROM member_register WHERE user_id='retail-001';" >/dev/null
+reset_balances
+
 print "\n-- staff help bot --"
 call POST /staff/assistant "$RETAIL" '{"message":"where do I edit a plan?"}'; ck "members cannot use the staff bot" 403 "$CODE"
 call POST /staff/assistant "$STAFF" '{"message":"where do I edit a plan?","guides":"## Scheme Master"}'

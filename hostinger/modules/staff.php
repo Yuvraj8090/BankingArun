@@ -1061,3 +1061,143 @@ function route_kyc_document_review(array $d, string $id = ''): void
             . ($decision === 'verified' ? ' verified.'
                 : ' rejected. A replacement can now be uploaded.')]);
 }
+
+// --- Lockers -----------------------------------------------------------------------------
+// Safe-deposit lockers at a branch, for members only (Nidhi Rules allow the facility).
+// Rent is a year at a time, taken from the member's savings with a receipt.
+const LOCKER_SIZES = ['small', 'medium', 'large'];
+
+function locker_or_fail(string $id): array
+{
+    $locker = row('SELECT * FROM lockers WHERE id = ? FOR UPDATE', [clip($id, 36)]);
+    if (!$locker) {
+        fail(404, 'No such locker.');
+    }
+    return $locker;
+}
+
+// Takes a year's rent from the holder's savings and moves paid-until on a year.
+function charge_locker_rent(array $locker, array $account, array $staff): array
+{
+    global $pdo;
+    $rent = (float)$locker['annual_rent'];
+    if ((float)$account['balance'] < $rent) {
+        fail(400, 'The member\'s savings balance is less than the year\'s rent of ' . rupees($rent) . '.');
+    }
+    $from = $locker['rent_paid_until'] && $locker['rent_paid_until'] > date('Y-m-d') ? $locker['rent_paid_until'] : date('Y-m-d');
+    $until = (new DateTimeImmutable($from))->modify('+1 year')->format('Y-m-d');
+    $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$rent, $account['id']]);
+    $ref = 'LKR-' . gmdate('YmdHis') . '-' . random_int(100, 999);
+    insert_txn(['user_id' => $account['user_id'], 'account_number' => $account['account_number'], 'type' => 'debit',
+        'mode' => 'LOCKER_RENT', 'amount' => $rent, 'balance_after' => round((float)$account['balance'] - $rent, 2),
+        'counterparty_name' => 'Locker rent', 'counterparty_acc' => $locker['locker_no'], 'ref_number' => $ref,
+        'description' => "Locker {$locker['locker_no']} rent to $until"]);
+    $pdo->prepare('UPDATE lockers SET rent_paid_until = ? WHERE id = ?')->execute([$until, $locker['id']]);
+    $owner = row('SELECT * FROM users WHERE id = ?', [$account['user_id']]);
+    $branch = scalar('SELECT name FROM branches WHERE id = ?', [$locker['branch_id']]) ?: '';
+    return ['title' => 'Locker rent receipt'] + deposit_slip($staff, $owner, $account['account_number'], $rent, $ref, [
+        ['Locker', "{$locker['locker_no']} ({$locker['size']}) at $branch"], ['Rent paid until', $until],
+        ['Taken from', 'Savings account']]);
+}
+
+function route_lockers_list(array $d): void
+{
+    staff_user(CRM_ROLES);
+    respond(['lockers' => array_map(fn($l) => out($l) + ['overdue' => $l['status'] === 'allotted'
+            && $l['rent_paid_until'] !== null && $l['rent_paid_until'] < date('Y-m-d')],
+        rows("SELECT l.*, b.name AS branch_name, u.name AS holder_name FROM lockers l
+            LEFT JOIN branches b ON b.id = l.branch_id LEFT JOIN users u ON u.id = l.holder_user_id
+            WHERE l.status <> 'closed' ORDER BY b.name, l.locker_no")),
+        'branches' => rows('SELECT id, name FROM branches WHERE deleted_at IS NULL ORDER BY id'),
+        'sizes' => LOCKER_SIZES]);
+}
+
+function route_locker_create(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(ADMIN_ROLES);
+    need($d, 'branch_id', 'locker_no', 'size', 'annual_rent');
+    if (!row('SELECT 1 FROM branches WHERE id = ? AND deleted_at IS NULL', [clip($d['branch_id'], 36)])) {
+        fail(404, 'No such branch.');
+    }
+    $no = strtoupper(clip($d['locker_no'], 20));
+    $rent = money($d['annual_rent']);
+    if ($no === '' || !in_array($d['size'], LOCKER_SIZES, true) || $rent <= 0 || $rent > 100000) {
+        fail(422, 'Give the locker number, a size (small, medium or large) and a yearly rent up to ₹1,00,000.');
+    }
+    if (row('SELECT 1 FROM lockers WHERE branch_id = ? AND locker_no = ?', [$d['branch_id'], $no])) {
+        fail(409, "Locker $no already exists at that branch.");
+    }
+    $pdo->prepare('INSERT INTO lockers (id, branch_id, locker_no, size, annual_rent) VALUES (?, ?, ?, ?, ?)')
+        ->execute([uuid4(), clip($d['branch_id'], 36), $no, $d['size'], $rent]);
+    audit($staff, 'LOCKER_CREATED', "$no {$d['size']} " . rupees($rent) . '/year');
+    respond(['status' => 'SUCCESS', 'message' => "Locker $no added."]);
+}
+
+function route_locker_allot(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(CRM_ROLES);
+    need($d, 'locker_id', 'account_number', 'nominee_name');
+    $pdo->beginTransaction();
+    $locker = locker_or_fail($d['locker_id']);
+    if ($locker['status'] !== 'available') {
+        $pdo->rollBack();
+        fail(409, "Locker {$locker['locker_no']} is not free.");
+    }
+    $account = row("SELECT * FROM accounts WHERE account_number = ? AND status = 'active' FOR UPDATE", [clip($d['account_number'], 30)]);
+    $member = $account ? row('SELECT * FROM users WHERE id = ?', [$account['user_id']]) : null;
+    if (!$member) {
+        $pdo->rollBack();
+        fail(404, 'No active member account with that number.');
+    }
+    require_kyc_verified($member);
+    if (!membership_of($member['id'])) {
+        $pdo->rollBack();
+        fail(400, 'Lockers are for members only. Admit them to the member register first.');
+    }
+    $pdo->prepare("UPDATE lockers SET status = 'allotted', holder_user_id = ?, account_number = ?, nominee_name = ?,
+            allotted_on = CURDATE(), rent_paid_until = NULL WHERE id = ?")
+        ->execute([$member['id'], $account['account_number'], clip($d['nominee_name'], 150), $locker['id']]);
+    $receipt = charge_locker_rent($locker, $account, $staff);
+    audit($staff, 'LOCKER_ALLOTTED', "{$locker['locker_no']} to {$member['name']} ({$account['account_number']})");
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'message' => "Locker {$locker['locker_no']} allotted to {$member['name']}.", 'receipt' => $receipt]);
+}
+
+function route_locker_rent(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(CRM_ROLES);
+    need($d, 'locker_id');
+    $pdo->beginTransaction();
+    $locker = locker_or_fail($d['locker_id']);
+    if ($locker['status'] !== 'allotted') {
+        $pdo->rollBack();
+        fail(400, 'Only an allotted locker has rent to collect.');
+    }
+    $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$locker['account_number']]);
+    $receipt = charge_locker_rent($locker, $account, $staff);
+    audit($staff, 'LOCKER_RENT', "{$locker['locker_no']} " . rupees((float)$locker['annual_rent']));
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'message' => 'A year\'s rent collected.', 'receipt' => $receipt]);
+}
+
+// The member hands the key back. Rent already paid is not refunded.
+function route_locker_surrender(array $d): void
+{
+    global $pdo;
+    $staff = staff_user(CRM_ROLES);
+    need($d, 'locker_id');
+    $pdo->beginTransaction();
+    $locker = locker_or_fail($d['locker_id']);
+    if ($locker['status'] !== 'allotted') {
+        $pdo->rollBack();
+        fail(400, 'That locker is not allotted.');
+    }
+    $pdo->prepare("UPDATE lockers SET status = 'available', holder_user_id = NULL, account_number = NULL, nominee_name = NULL,
+            allotted_on = NULL, rent_paid_until = NULL WHERE id = ?")->execute([$locker['id']]);
+    audit($staff, 'LOCKER_SURRENDERED', $locker['locker_no']);
+    $pdo->commit();
+    respond(['status' => 'SUCCESS', 'message' => "Locker {$locker['locker_no']} is free again."]);
+}

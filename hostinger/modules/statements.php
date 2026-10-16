@@ -16,7 +16,7 @@ const PDF_COLS = [[50, 'Date', 'l', 10], [108, 'Ref No', 'l', 25], [42, 'Mode', 
 function statement_mode(string $mode): string
 {
     return ['DEPOSIT_INTEREST' => 'Interest', 'DEPOSIT_MATURITY' => 'Maturity', 'DEPOSIT_BOOKING' => 'Deposit',
-        'DEPOSIT_PREMATURE_CLOSURE' => 'Early close', 'SHARE_ALLOTMENT' => 'Shares', 'LOAN_DISBURSAL' => 'Loan', 'LOAN_EMI' => 'EMI', 'DEPOSIT_INSTALMENT' => 'Instalment'][$mode] ?? $mode;
+        'DEPOSIT_PREMATURE_CLOSURE' => 'Early close', 'SHARE_ALLOTMENT' => 'Shares', 'LOAN_DISBURSAL' => 'Loan', 'LOAN_EMI' => 'EMI', 'DEPOSIT_INSTALMENT' => 'Instalment', 'LOCKER_RENT' => 'Locker rent'][$mode] ?? $mode;
 }
 
 // Account number and dates arrive in the POST body, never in the URL.

@@ -486,6 +486,12 @@ Nidhi Rules rule 15 allows lending against the member's deposits; the brochure's
   be approved or paid out without it, or above it. Printed receipt; jewellery
   marked returned only after the loan is repaid (or the application rejected).
 
+### 32. Locker register ✅
+Members → Lockers (staff, managers, Director). Managers add lockers (branch,
+number, size, yearly rent); staff allot one to a KYC-verified member, which takes
+a year's rent from savings and prints a receipt; "Collect a year's rent" renews;
+overdue lockers show in red; Surrender frees it. Passbooks show "Locker rent".
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

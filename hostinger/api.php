@@ -1147,6 +1147,11 @@ $routes = [
     'GET /loans/gold-pledge' => 'route_gold_pledge_get',
     'POST /loans/gold-pledge' => 'route_gold_pledge_save',
     'POST /loans/gold-pledge/release' => 'route_gold_pledge_release',
+    'GET /lockers' => 'route_lockers_list',
+    'POST /lockers' => 'route_locker_create',
+    'POST /lockers/allot' => 'route_locker_allot',
+    'POST /lockers/rent' => 'route_locker_rent',
+    'POST /lockers/surrender' => 'route_locker_surrender',
     'GET /branches/locator' => 'route_branches',
     // A member's own standing, and what the next rung would take.
     'GET /my-standing' => 'route_my_standing',
