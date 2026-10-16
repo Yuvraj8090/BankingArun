@@ -28,7 +28,7 @@ export default function LoanDeptPanel() {
   };
   // Old unsecured applications (personal, vehicle...) can be rejected but never approved or paid out.
   const actionsFor = (a) => (NEXT[a.status] || [])
-    .filter((x) => !['disburse', 'approve'].includes(x) || ['gold', 'home'].includes(String(a.loan_type).toLowerCase()));
+    .filter((x) => !['disburse', 'approve'].includes(x) || ['gold', 'home', 'deposit'].includes(String(a.loan_type).toLowerCase()));
 
   if (!data) return <div className="p-10 flex items-center gap-2 text-slate-600"><RefreshCw className="w-4 h-4 animate-spin" /> Loading loan pipeline…</div>;
 
@@ -72,7 +72,7 @@ export default function LoanDeptPanel() {
               {data.applications.map(a => (
                 <tr key={a.id} className="hover:bg-blue-50/40 transition-colors">
                   <td className="p-3 font-semibold text-slate-900">{a.applicant}</td>
-                  <td className="p-3">{a.loan_type}</td>
+                  <td className="p-3">{a.loan_type}{a.security_deposit && <span className="block text-[10px] text-slate-500 font-mono">against {a.security_deposit}</span>}</td>
                   <td className="p-3 font-bold text-[#0b3b8c]">₹{Number(a.amount).toLocaleString('en-IN')}</td>
                   <td className="p-3">{a.tenure_months} mo</td>
                   <td className="p-3">{a.roi}%</td>

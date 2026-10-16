@@ -20,7 +20,7 @@ const REPORT_EXPORT_MAX = 20000;   // rows in a single download
 // One row of NDH return figures as they stand now. reports.php shows it live and
 // cron.php stores it each day into ndh_snapshots, so the two cannot drift apart.
 const NDH_COLUMNS = ['members', 'share_capital', 'savings_deposits', 'fixed_deposits', 'recurring_deposits',
-    'gold_loans', 'property_loans', 'npa_loans', 'net_owned_funds', 'branches'];
+    'gold_loans', 'property_loans', 'deposit_loans', 'npa_loans', 'net_owned_funds', 'branches'];
 const NDH_FIGURES_SQL = "SELECT
     (SELECT COUNT(*) FROM member_register WHERE status = 'active') AS members,
     (SELECT COALESCE(SUM(shares_held * share_face_value), 0) FROM member_register WHERE status = 'active') AS share_capital,
@@ -29,6 +29,7 @@ const NDH_FIGURES_SQL = "SELECT
     (SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active' AND instalment_amount IS NOT NULL) AS recurring_deposits,
     (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'gold') AS gold_loans,
     (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'home') AS property_loans,
+    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'deposit') AS deposit_loans,
     (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status = 'npa') AS npa_loans,
     (SELECT COALESCE(MAX(value), 0) FROM system_parameters WHERE param_key = 'net_owned_funds') AS net_owned_funds,
     (SELECT COUNT(*) FROM branches WHERE deleted_at IS NULL) AS branches";
@@ -332,7 +333,7 @@ function report_definitions(): array
             'order' => 'n.as_on DESC',
             'columns' => ['as_on' => 'date', 'members' => 'int', 'share_capital' => 'money', 'savings_deposits' => 'money',
                 'fixed_deposits' => 'money', 'recurring_deposits' => 'money', 'gold_loans' => 'money',
-                'property_loans' => 'money', 'npa_loans' => 'money', 'net_owned_funds' => 'money', 'branches' => 'int'],
+                'property_loans' => 'money', 'deposit_loans' => 'money', 'npa_loans' => 'money', 'net_owned_funds' => 'money', 'branches' => 'int'],
             'totals' => [],
         ],
         'audit_trail' => [

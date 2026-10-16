@@ -477,7 +477,7 @@ ck "the money reaches the member's savings" "149800.00" "$(Q "SELECT balance FRO
 ck "with twelve EMIs that repay exactly the principal" "12|12000.00" \
   "$(Q "SELECT CONCAT_WS('|',COUNT(*),SUM(principal_part)) FROM loan_emis e JOIN loans l ON l.id=e.loan_id WHERE l.application_id='$LAPP'")"
 LNO=$(Q "SELECT loan_number FROM loans WHERE application_id='$LAPP'")
-OLDAPP=$(Q "SELECT id FROM loan_applications WHERE loan_type NOT IN ('gold','home') LIMIT 1")
+OLDAPP=$(Q "SELECT id FROM loan_applications WHERE loan_type NOT IN ('gold','home','deposit') LIMIT 1")
 if [[ -n $OLDAPP ]]; then
   Q "UPDATE loan_applications SET status='approved' WHERE id='$OLDAPP'" >/dev/null
   call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$OLDAPP\",\"decision\":\"disburse\"}"
@@ -494,6 +494,47 @@ call GET /loans/my-applications "$RETAIL"
 has "the member sees the loan and its schedule" "$BODY" '"schedule"'
 Q "DELETE e FROM loan_emis e JOIN loans l ON l.id=e.loan_id WHERE l.application_id='$LAPP';
    DELETE FROM loans WHERE application_id='$LAPP'; DELETE FROM loan_applications WHERE id='$LAPP';" >/dev/null
+reset_balances
+
+print "\n-- loan against the member's own deposit --"
+reset_balances
+Q "INSERT INTO deposits (id, user_id, deposit_number, deposit_type, source_account, principal_amount, paid_amount,
+     interest_rate, tenure_months, interest_payout, maturity_amount, maturity_date, nominee_name, status, created_at)
+   VALUES ('apitest-dep', 'retail-001', 'APITEST-DEP', 'fixed', '$RETAIL_ACC', 20000, 20000, 7.5, 24, 'on_maturity',
+     23200, DATE_ADD(CURDATE(), INTERVAL 24 MONTH), 'Nominee', 'active', DATE_SUB(NOW(), INTERVAL 90 DAY))" >/dev/null
+DL='"loan_type":"deposit","deposit_number":"APITEST-DEP","monthly_income":0,"employment_type":"n/a","purpose":"APITEST deposit loan"'
+call POST /loans/apply "$RETAIL" "{$DL,\"amount_requested\":18001,\"tenure_months\":12}"
+ck "no more than 90% of what was paid in" 422 "$CODE"
+call POST /loans/apply "$RETAIL" "{$DL,\"amount_requested\":10000,\"tenure_months\":30}"
+ck "and repaid before the deposit matures" 422 "$CODE"
+Q "INSERT INTO deposits (id, user_id, deposit_number, deposit_type, source_account, principal_amount, paid_amount,
+     interest_rate, tenure_months, interest_payout, maturity_amount, maturity_date, nominee_name, status, created_at)
+   VALUES ('apitest-dep2', 'corp-001', 'APITEST-DEP2', 'fixed', '$CORP_ACC', 20000, 20000, 7.5, 24, 'on_maturity',
+     23200, DATE_ADD(CURDATE(), INTERVAL 24 MONTH), 'Nominee', 'active', NOW())" >/dev/null
+call POST /loans/apply "$RETAIL" '{"loan_type":"deposit","deposit_number":"APITEST-DEP2","monthly_income":0,"employment_type":"n/a","purpose":"x","amount_requested":1000,"tenure_months":6}'
+ck "only against your own deposit" 404 "$CODE"
+call POST /loans/apply "$RETAIL" "{$DL,\"amount_requested\":18000,\"tenure_months\":12}"
+ck "a member borrows 90% against their deposit" 200 "$CODE"
+call POST /loans/apply "$RETAIL" "{$DL,\"amount_requested\":1000,\"tenure_months\":6}"
+ck "one loan per deposit" 409 "$CODE"
+call POST /deposits/premature-close "$RETAIL" '{"deposit_number":"APITEST-DEP"}'
+ck "the deposit cannot be closed early while it secures a loan" 409 "$CODE"
+DAPP=$(Q "SELECT id FROM loan_applications WHERE security_deposit='APITEST-DEP'")
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$DAPP\",\"decision\":\"approve\"}"
+call POST /panel/loan-dept/decision "$OWNER" "{\"application_id\":\"$DAPP\",\"decision\":\"disburse\"}"
+ck "the loan desk approves and disburses it" 200 "$CODE"
+ck "the loan records its security" "APITEST-DEP|18000.00" "$(Q "SELECT CONCAT_WS('|',security_deposit,outstanding) FROM loans WHERE application_id='$DAPP'")"
+call GET /loans/my-applications "$RETAIL"
+hasnt "a pledged deposit is not offered again" "$(print -r -- "$BODY" | jq_ 'print([x["deposit_number"] for x in d["pledgeable"]])')" "APITEST-DEP"
+BAL=$(Q "SELECT balance FROM accounts WHERE account_number='$RETAIL_ACC'")
+ck "at maturity the loan is repaid from the proceeds" "DLOAN-OK|closed|0.00" "$(php -r '
+  require getenv("AJSPAY_ROOT")."/api.php"; global $pdo; $pdo->beginTransaction();
+  $d = row("SELECT * FROM deposits WHERE deposit_number = ?", ["APITEST-DEP"]);
+  echo settle_loan_from_deposit($d, date("Y-m-d")) ? "DLOAN-OK" : "none"; $pdo->commit();')|$(Q "SELECT CONCAT_WS('|',status,outstanding) FROM loans WHERE application_id='$DAPP'")"
+ck "and the 18,000 owed is taken from savings" "18000.00" "$(Q "SELECT ROUND($BAL - balance, 2) FROM accounts WHERE account_number='$RETAIL_ACC'")"
+Q "DELETE e FROM loan_emis e JOIN loans l ON l.id=e.loan_id WHERE l.application_id='$DAPP';
+   DELETE FROM loans WHERE application_id='$DAPP'; DELETE FROM loan_applications WHERE id='$DAPP';
+   DELETE FROM deposits WHERE id IN ('apitest-dep', 'apitest-dep2');" >/dev/null
 reset_balances
 
 print "\n-- sanctions and PEP screening --"
@@ -578,7 +619,7 @@ has "gold loan is still offered" "$PUB" "gold-loan"
 print "\n-- secured lending only --"
 call POST /loans/apply "$RETAIL" '{"loan_type":"personal","amount_requested":50000,"tenure_months":12,"monthly_income":40000,"employment_type":"salaried","purpose":"APITEST"}'
 ck "an unsecured personal loan is refused" 422 "$CODE"
-has "and the refusal says what we lend against" "$BODY" "gold or property"
+has "and the refusal says what we lend against" "$BODY" "gold, property or your own deposit"
 call POST /loans/apply "$RETAIL" '{"loan_type":"vehicle","amount_requested":50000,"tenure_months":12,"monthly_income":40000,"employment_type":"salaried","purpose":"APITEST"}'
 ck "a vehicle loan is refused" 422 "$CODE"
 

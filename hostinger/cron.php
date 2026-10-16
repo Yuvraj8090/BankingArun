@@ -551,6 +551,9 @@ function run_deposit_maturities(string $today, bool $dryRun, bool $verbose): arr
         // Gross interest earned, not what was actually paid out -- same
         // convention run_daily_interest_accrual uses for interest_paid.
         $interestPart = $grossInterest > 0 ? $grossInterest : round($payout - (float)$locked['principal_amount'], 2);
+        if ($settled = settle_loan_from_deposit($locked, $today)) {
+            say("  loan       $settled from {$locked['deposit_number']}");
+        }
         $pdo->prepare("UPDATE deposits SET status = 'matured', matured_on = ?, interest_paid = interest_paid + ?,
             tds_deducted = tds_deducted + ?, accrued_interest = 0 WHERE id = ?")
             ->execute([now_utc(), max($interestPart, 0), $tds, $locked['id']]);

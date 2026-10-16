@@ -73,7 +73,7 @@ const MEMBER = {
   },
   loans: {
     title: 'Loans',
-    what: 'Work out an EMI, apply for a loan, and manage the loans you have. As a Nidhi we lend only against gold jewellery or property.',
+    what: 'Work out an EMI, apply for a loan, and manage the loans you have. As a Nidhi we lend only against gold jewellery, property, or your own deposit.',
     steps: [
       'Choose Gold or Home loan.',
       'Move the sliders for amount and tenure to see the EMI.',
@@ -388,7 +388,7 @@ const MANAGER = {
   'loan-dept': {
     title: 'Loan Pipeline',
     what: 'Every loan application with its EMI, the applicant\'s income and a risk grade, plus the outstanding book and its NPA share.',
-    steps: ['Check the security (gold or property) and the documents.', 'Approve, ask for documents, or reject.',
+    steps: ['Check the security (gold, property, or the deposit number shown) and the documents.', 'Approve, ask for documents, or reject.',
       'Disburse an approved loan: the amount is credited to the member\'s savings and its EMI schedule starts. Only approved applications can be disbursed, and disbursal is final.'],
     fields: [],
     tips: ['Only gold and home loans can be applied for.']
@@ -604,7 +604,7 @@ const FAQ_MEMBER = [
   ['What is the transaction password?', 'A second password, used only to move money. It is different from the password you sign in with.'],
   ['How is interest on my deposit paid?', 'Automatically. Daily plans credit interest every day (TDS is deducted when it is released). Monthly-income plans credit monthly, and other deposits pay at maturity.'],
   ['Can I pay someone at another bank?', 'No. Transfers are between member accounts only.'],
-  ['What can I borrow against?', 'Gold jewellery or property.'],
+  ['What can I borrow against?', 'Gold jewellery, property, or your own deposit: up to 90% of what you have paid into it, repaid before it matures. The deposit cannot be closed early while the loan is open.'],
   ['Do I earn money for inviting people?', 'No. The Nidhi Rules forbid paying for introductions. Your network and standing are recognition only.'],
   ['I forgot my password.', 'Use "Forgot password" on the sign-in page. Five wrong attempts lock sign-in for 15 minutes.'],
   ['How do I complain?', 'Open Help & Support and raise a query. If you are not satisfied with the answer, escalate it there to the grievance officer, who must answer within 30 days. Beyond that, you can approach the Registrar of Companies or a consumer forum.']

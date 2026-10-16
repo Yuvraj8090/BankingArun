@@ -433,6 +433,17 @@ tests and build pass.
   printed (no security shown; a Nidhi lends only against gold, property or
   the member's own deposits).
 
+### 28. Loan against the member's own deposit ✅
+Nidhi Rules rule 15 allows lending against the member's deposits; the brochure's
+"loan facility" now has a lawful form. Loans → **Against my deposit**:
+- Up to 90% of what has been paid into an active deposit (Business Parameters:
+  "Loan against deposit, most lent"), at "Loan against deposit rate" (9.5%).
+- Repaid within the time the deposit has left; one loan per deposit.
+- While the loan or application is open the deposit cannot be closed early.
+- At maturity the loan is repaid from the proceeds before they are spendable.
+- The loan desk sees which deposit secures each application; NDH figures count
+  deposit loans separately.
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

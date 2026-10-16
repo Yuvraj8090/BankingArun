@@ -1541,3 +1541,15 @@ VALUES (UUID(), 'AJS-FD-135M', 'Paune Chaar Guna Yojana (3.75x in 135 months)', 
 DELETE FROM system_parameters WHERE param_key IN ('loan_rate_personal', 'loan_rate_vehicle', 'demand_draft_fee', 'card_limit_max');
 UPDATE system_parameters SET label = 'Property loan rate', description = 'Rate quoted on a loan against property.'
     WHERE param_key = 'loan_rate_home' AND label = 'Home loan rate';
+
+-- 16 Oct 2026: loans against the member's own deposit (Nidhi Rules, rule 15).
+-- The deposit number the loan is secured on; it cannot be closed early while the
+-- loan is open, and the loan is repaid from its maturity proceeds.
+ALTER TABLE loan_applications ADD COLUMN IF NOT EXISTS security_deposit VARCHAR(30) NULL;
+ALTER TABLE loans ADD COLUMN IF NOT EXISTS security_deposit VARCHAR(30) NULL;
+INSERT IGNORE INTO system_parameters (id, param_key, label, category, value, unit, min_value, max_value, description) VALUES
+('param-loan-deposit', 'loan_rate_deposit', 'Loan against deposit rate', 'loan_rates', 9.50, '% p.a.', 0, 36,
+    'Rate on a loan secured on the member\'s own deposit.'),
+('param-loan-deposit-ltv', 'loan_against_deposit_ltv', 'Loan against deposit, most lent', 'limits', 90.00, '%', 10, 95,
+    'The most a member can borrow, as a share of what they have paid into the deposit.');
+ALTER TABLE ndh_snapshots ADD COLUMN IF NOT EXISTS deposit_loans DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER property_loans;

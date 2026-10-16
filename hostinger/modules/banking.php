@@ -7,8 +7,39 @@ declare(strict_types=1);
 // never seeded. The rates actually charged/paid live in that table (see
 // modules/parameters.php and the Business Parameters screen), not here -- a
 // rate change is an admin-panel save, not a deploy.
-const LOAN_RATE_DEFAULTS = ['personal' => 10.50, 'home' => 8.40, 'vehicle' => 8.75, 'gold' => 7.90];
-const NIDHI_LOAN_TYPES = ['gold', 'home'];
+const LOAN_RATE_DEFAULTS = ['personal' => 10.50, 'home' => 8.40, 'vehicle' => 8.75, 'gold' => 7.90, 'deposit' => 9.50];
+// Nidhi Rules, 2014, rule 15: gold or jewellery, property, or the member's own
+// deposit. 'deposit' is a loan secured on one of the member's active deposits.
+const NIDHI_LOAN_TYPES = ['gold', 'home', 'deposit'];
+const DEPOSIT_LOAN_LTV_DEFAULT = 90.0;   // % of what has been paid into the deposit
+
+// What an active deposit is worth as security: what has actually been paid in.
+function deposit_security_value(array $deposit): float
+{
+    return (float)($deposit['instalment_amount'] !== null ? $deposit['paid_amount'] : $deposit['principal_amount']);
+}
+
+// How much can be borrowed against a deposit, and for how long: a share of what has
+// been paid in, repaid before the deposit matures.
+function deposit_loan_terms(array $deposit): array
+{
+    $ltv = param_value('loan_against_deposit_ltv', DEPOSIT_LOAN_LTV_DEFAULT);
+    $left = (new DateTimeImmutable('today'))->diff(new DateTimeImmutable($deposit['maturity_date']));
+    return ['value' => deposit_security_value($deposit), 'ltv' => $ltv,
+        'max_amount' => floor(deposit_security_value($deposit) * $ltv) / 100,
+        'max_months' => $left->invert ? 0 : $left->y * 12 + $left->m];
+}
+
+// The loan (or application still being decided) a deposit secures, if any. A deposit
+// secures at most one loan at a time, and cannot be closed early while it does.
+function deposit_lien(string $depositNumber): ?array
+{
+    return row("SELECT 'loan' AS kind, loan_number AS ref, outstanding AS amount FROM loans
+            WHERE security_deposit = ? AND status <> 'closed'
+        UNION ALL SELECT 'application', loan_application_no, amount FROM loan_applications
+            WHERE security_deposit = ? AND status IN ('under_review', 'approved') LIMIT 1", [$depositNumber, $depositNumber]);
+}
+
 const DEPOSIT_RATE_DEFAULTS = ['under_1y' => 6.50, '1y_to_2y' => 7.25, '2y_to_3y' => 7.50, 'over_3y' => 7.10];
 const SI_FREQUENCIES = ['daily', 'weekly', 'monthly', 'quarterly'];
 const SI_CATEGORIES = ['rent', 'sip', 'emi', 'insurance', 'generic'];
@@ -514,6 +545,11 @@ function route_premature_close(array $d): void
         $pdo->rollBack();
         fail(400, 'This deposit has no linked account to pay proceeds into. Contact the branch.');
     }
+    if ($lien = deposit_lien($deposit['deposit_number'])) {
+        $pdo->rollBack();
+        fail(409, "This deposit secures {$lien['kind']} {$lien['ref']}, so it cannot be closed early. "
+            . 'Repay the loan (or withdraw the application) first.');
+    }
     if (strtotime($deposit['maturity_date']) <= strtotime(now_utc())) {
         $pdo->rollBack();
         fail(400, 'This deposit has already reached its maturity date. It settles automatically at full '
@@ -604,7 +640,7 @@ function route_apply_loan(array $d): void
     // unsecured personal loans and vehicle loans are not taken. Old applications of
     // those types stay on record.
     if (!in_array($type, NIDHI_LOAN_TYPES, true)) {
-        fail(422, 'We lend against gold or property only: loan_type must be gold or home.');
+        fail(422, 'We lend against gold, property or your own deposit only: loan_type must be gold, home or deposit.');
     }
     $amount = money($d['amount_requested']);
     $tenure = (int)$d['tenure_months'];
@@ -618,17 +654,41 @@ function route_apply_loan(array $d): void
     if ($income < 0) {
         fail(422, 'Monthly income cannot be negative.');
     }
+    $security = null;
+    if ($type === 'deposit') {
+        need($d, 'deposit_number');
+        $security = row("SELECT * FROM deposits WHERE deposit_number = ? AND user_id = ? AND status = 'active'",
+            [clip($d['deposit_number'], 30), $user['id']]);
+        if (!$security) {
+            fail(404, 'No active deposit of yours with that number.');
+        }
+        if ($lien = deposit_lien($security['deposit_number'])) {
+            fail(409, "This deposit already secures {$lien['kind']} {$lien['ref']}.");
+        }
+        $terms = deposit_loan_terms($security);
+        if ($amount > $terms['max_amount']) {
+            fail(422, 'Against this deposit you can borrow up to ' . rupees($terms['max_amount'])
+                . " ({$terms['ltv']}% of the " . rupees($terms['value']) . ' paid in).');
+        }
+        if ($tenure > $terms['max_months']) {
+            fail(422, "The loan must be repaid before the deposit matures: at most {$terms['max_months']} month"
+                . ($terms['max_months'] === 1 ? '' : 's') . '.');
+        }
+    }
     $rate = loan_rate($type);
     $r = $rate / 12 / 100;
     $emi = round($amount * $r * (1 + $r) ** $tenure / ((1 + $r) ** $tenure - 1), 2);
-    $eligibility = $income * 0.5 >= $emi ? 'Pre-Approved' : 'Under Review';
+    // Fully secured by the member's own money, so income does not decide it.
+    $eligibility = $security || $income * 0.5 >= $emi ? 'Pre-Approved' : 'Under Review';
     $number = 'LN-' . gmdate('Ym') . '-' . random_int(10000, 99999);
     $id = uuid4();
     $pdo->prepare('INSERT INTO loan_applications (id, user_id, applicant, loan_application_no, loan_type, amount,
-            tenure_months, roi, calculated_emi, monthly_income, employment_type, purpose, eligibility_status, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            tenure_months, roi, calculated_emi, monthly_income, employment_type, purpose, eligibility_status, status,
+            security_deposit)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$id, $user['id'], $user['name'], $number, $type, $amount, $tenure, $rate, $emi, $income,
-            clip($d['employment_type'], 50), clip($d['purpose'], 255), $eligibility, 'under_review']);
+            clip($d['employment_type'], 50), clip($d['purpose'], 255), $eligibility, 'under_review',
+            $security['deposit_number'] ?? null]);
     audit($user, 'LOAN_APPLIED', "$number $type " . rupees($amount));
     // Grade it for the loan desk. The grade is advisory: it never decides the
     // application, and the applicant is not shown it.
@@ -756,7 +816,7 @@ function disburse_loan(array $app, array $staff): array
     // Applications taken before lending was limited to secured loans can still be
     // sitting at "approved"; none of them may be paid out.
     if (!in_array(strtolower($app['loan_type']), NIDHI_LOAN_TYPES, true)) {
-        fail(400, 'A ' . $app['loan_type'] . ' loan cannot be disbursed: a Nidhi lends only against gold or property. '
+        fail(400, 'A ' . $app['loan_type'] . ' loan cannot be disbursed: a Nidhi lends only against gold, property or deposits. '
             . 'Reject this application.');
     }
     $borrower = row('SELECT * FROM users WHERE id = ?', [$app['user_id']]);
@@ -772,6 +832,16 @@ function disburse_loan(array $app, array $staff): array
     if (!$account) {
         fail(400, 'The borrower has no active account to receive the loan.');
     }
+    if ($app['security_deposit']) {
+        $security = row("SELECT * FROM deposits WHERE deposit_number = ? AND user_id = ? AND status = 'active' FOR UPDATE",
+            [$app['security_deposit'], $borrower['id']]);
+        if (!$security) {
+            fail(400, "Deposit {$app['security_deposit']} securing this loan is no longer active. Reject this application.");
+        }
+        if (row("SELECT 1 FROM loans WHERE security_deposit = ? AND status <> 'closed'", [$app['security_deposit']])) {
+            fail(400, "Deposit {$app['security_deposit']} already secures another loan.");
+        }
+    }
     $principal = (float)$app['amount'];
     $rate = (float)$app['roi'];
     $months = (int)$app['tenure_months'];
@@ -780,9 +850,9 @@ function disburse_loan(array $app, array $staff): array
     $loanId = uuid4();
     $number = 'LA' . random_int(10000000, 99999999);
     $pdo->prepare('INSERT INTO loans (id, application_id, user_id, loan_number, loan_type, account_number, principal,
-            roi, tenure_months, emi, disbursed_on, outstanding) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            roi, tenure_months, emi, disbursed_on, outstanding, security_deposit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$loanId, $app['id'], $borrower['id'], $number, $app['loan_type'], $account['account_number'],
-            $principal, $rate, $months, $schedule[0]['emi'], $today, $principal]);
+            $principal, $rate, $months, $schedule[0]['emi'], $today, $principal, $app['security_deposit'] ?: null]);
     $insert = $pdo->prepare('INSERT INTO loan_emis (id, loan_id, n, due_date, emi, principal_part, interest_part,
         balance_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
     foreach ($schedule as $row) {
@@ -800,6 +870,34 @@ function disburse_loan(array $app, array $staff): array
 
 // Takes one EMI from the borrower's account if it holds enough. Called inside a
 // transaction with the loan row locked. Returns false, changing nothing, when short.
+// At maturity, a loan the deposit secures is repaid from the proceeds just credited
+// to the member's account, before they can spend them. The interest for the part
+// month since the last EMI is not charged.
+// ponytail: waives the broken-period interest (at most one month's); charge it
+// pro rata here if the loan desk wants it.
+function settle_loan_from_deposit(array $deposit, string $today): ?string
+{
+    global $pdo;
+    $loan = row("SELECT * FROM loans WHERE security_deposit = ? AND status <> 'closed' FOR UPDATE", [$deposit['deposit_number']]);
+    if (!$loan || (float)$loan['outstanding'] <= 0) {
+        return null;
+    }
+    $account = row('SELECT * FROM accounts WHERE account_number = ? FOR UPDATE', [$loan['account_number']]);
+    $due = (float)$loan['outstanding'];
+    if (!$account || (float)$account['balance'] < $due) {
+        return null;   // the nightly EMI run keeps collecting
+    }
+    $pdo->prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?')->execute([$due, $account['id']]);
+    $pdo->prepare('UPDATE loan_emis SET paid_on = ? WHERE loan_id = ? AND paid_on IS NULL')->execute([$today, $loan['id']]);
+    $pdo->prepare("UPDATE loans SET outstanding = 0, status = 'closed', dpd = 0 WHERE id = ?")->execute([$loan['id']]);
+    insert_txn(['user_id' => $account['user_id'], 'account_number' => $account['account_number'], 'type' => 'debit',
+        'mode' => 'LOAN_EMI', 'amount' => $due, 'balance_after' => round((float)$account['balance'] - $due, 2),
+        'counterparty_name' => 'Deposit loan', 'counterparty_acc' => $loan['loan_number'],
+        'ref_number' => 'SETTLE-' . $loan['loan_number'],
+        'description' => "Loan {$loan['loan_number']} repaid from the maturity of deposit {$deposit['deposit_number']}"]);
+    return $loan['loan_number'] . ' repaid ' . rupees($due);
+}
+
 function pay_loan_emi(array $loan, array $emi, string $today): bool
 {
     global $pdo;
@@ -867,13 +965,20 @@ function route_my_loans(array $d): void
     $user = current_user();
     respond(['loans' => out_all(rows('SELECT id, loan_application_no, loan_type, amount AS amount_requested,
             roi AS interest_rate, tenure_months, calculated_emi, monthly_income, employment_type, purpose,
-            eligibility_status, status, created_at
+            eligibility_status, status, security_deposit, created_at
         FROM loan_applications WHERE user_id = ? ORDER BY created_at DESC', [$user['id']])),
         // The loan accounts behind disbursed applications, each with its schedule.
         'accounts' => array_map(fn($l) => out($l) + ['schedule' => out_all(rows('SELECT n, due_date, emi,
                 principal_part, interest_part, balance_after, paid_on FROM loan_emis WHERE loan_id = ? ORDER BY n',
                 [$l['id']]))],
-            rows('SELECT * FROM loans WHERE user_id = ? ORDER BY created_at DESC', [$user['id']]))]);
+            rows('SELECT * FROM loans WHERE user_id = ? ORDER BY created_at DESC', [$user['id']])),
+        // Active deposits not already securing a loan, with what each can raise.
+        'pledgeable' => array_values(array_filter(array_map(
+            fn($dep) => deposit_lien($dep['deposit_number']) ? null : ['deposit_number' => $dep['deposit_number'],
+                'scheme_code' => $dep['scheme_code'], 'maturity_date' => $dep['maturity_date']] + deposit_loan_terms($dep),
+            rows("SELECT * FROM deposits WHERE user_id = ? AND status = 'active' ORDER BY maturity_date", [$user['id']])),
+            fn($x) => $x && $x['max_amount'] >= 1000 && $x['max_months'] >= 1)),
+        'deposit_loan_rate' => loan_rate('deposit')]);
 }
 
 // --- Support, branches & chatbot --------------------------------------------------------

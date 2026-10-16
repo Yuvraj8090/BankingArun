@@ -172,7 +172,7 @@ function route_loan_decision(array $d): void
     }
     if ($status === 'approved' && !in_array(strtolower($app['loan_type']), NIDHI_LOAN_TYPES, true)) {
         $pdo->rollBack();
-        fail(400, 'A ' . $app['loan_type'] . ' loan cannot be approved: a Nidhi lends only against gold or property.');
+        fail(400, 'A ' . $app['loan_type'] . ' loan cannot be approved: a Nidhi lends only against gold, property or deposits.');
     }
     $loan = $status === 'disbursed' ? disburse_loan($app, $user) : null;
     $pdo->prepare('UPDATE loan_applications SET status = ?, decision_note = ? WHERE id = ?')

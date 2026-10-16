@@ -511,7 +511,7 @@ Rules:
 - Use only the PAGE GUIDES below. Name the menu item exactly as written there and give numbered steps.
 - If the guides do not cover it, say so plainly and suggest asking the Director. Never invent pages, buttons or features.
 - If the page needed is not in the guides, this role cannot open it: say a Director or Branch Manager must do it.
-- The Nidhi Rules apply: deposits at most 12.5% a year, members only, loans only against gold or property, and no commission or brokerage for bringing members or deposits. Explain this when a question touches it.
+- The Nidhi Rules apply: deposits at most 12.5% a year, members only, loans only against gold, property or the member's own deposit, and no commission or brokerage for bringing members or deposits. Explain this when a question touches it.
 - You cannot see accounts, members or balances, and you take no actions.
 - Be short. Reply in the language the question was asked in (Hindi or English).
 TXT;

@@ -22,9 +22,13 @@ export default function LoansPage() {
   const [loanAccounts, setLoanAccounts] = useState([]);
   const [openSchedule, setOpenSchedule] = useState('');
   const [paying, setPaying] = useState('');
+  // Loans against the member's own deposits: which deposits can secure one, and the rate.
+  const [pledgeable, setPledgeable] = useState([]);
+  const [depositRate, setDepositRate] = useState(null);
+  const [pledged, setPledged] = useState('');
 
   const loadMyLoans = () => {
-    api.getMyLoans().then((res) => { setMyLoans(res.loans || []); setLoanAccounts(res.accounts || []); }).catch(() => {});
+    api.getMyLoans().then((res) => { setMyLoans(res.loans || []); setLoanAccounts(res.accounts || []); setPledgeable(res.pledgeable || []); setDepositRate(res.deposit_loan_rate ?? null); }).catch(() => {});
   };
 
   const payEmi = async (loanNumber) => {
@@ -42,10 +46,13 @@ export default function LoansPage() {
     personal: 10.50,
     home: 8.40,
     vehicle: 8.75,
-    gold: 7.90
+    gold: 7.90,
+    deposit: depositRate ?? 9.50
   };
 
   const rate = interestRates[loanType] || 10.50;
+  const security = pledgeable.find((x) => x.deposit_number === pledged) || null;
+  const onDeposit = loanType === 'deposit';
 
   // EMI Formula: [P x R x (1+R)^N]/[(1+R)^N-1]
   const calculateEmi = () => {
@@ -60,11 +67,14 @@ export default function LoansPage() {
   const monthlyEmi = calculateEmi();
   const totalRepayable = monthlyEmi * tenure;
   const totalInterest = totalRepayable - amount;
-  const isEligible = (monthlyIncome * 0.5) >= monthlyEmi;
+  const isEligible = loanType === 'deposit' || (monthlyIncome * 0.5) >= monthlyEmi;
 
   const handleApplyLoan = async (e) => {
     e.preventDefault();
-    if (amount < 10000 || monthlyIncome < 15000) {
+    if (onDeposit) {
+      if (!security) { toast.error('Choose the deposit to borrow against.'); return; }
+      if (amount < 1000 || amount > security.max_amount) { toast.error(`Borrow between ₹1,000 and ₹${security.max_amount.toLocaleString('en-IN')} against this deposit.`); return; }
+    } else if (amount < 10000 || monthlyIncome < 15000) {
       toast.error("Minimum loan is ₹10,000 and minimum monthly income is ₹15,000.");
       return;
     }
@@ -74,9 +84,11 @@ export default function LoansPage() {
         loan_type: loanType,
         amount_requested: parseFloat(amount),
         tenure_months: parseInt(tenure),
-        monthly_income: parseFloat(monthlyIncome),
-        employment_type: empType,
-        purpose: purpose
+        // A deposit loan is secured on the member's own money; income does not decide it.
+        monthly_income: onDeposit ? 0 : parseFloat(monthlyIncome),
+        employment_type: onDeposit ? 'Not needed (secured on deposit)' : empType,
+        purpose: purpose,
+        deposit_number: onDeposit ? pledged : undefined
       });
       setApplicationResult(res);
       toast.success(res.message);
@@ -98,21 +110,21 @@ export default function LoansPage() {
             Loans & EMI Calculator
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Secured loans for members: against gold jewellery or property
+            Secured loans for members: against gold jewellery, property, or your own deposit
           </p>
         </div>
 
         <div className="flex items-center gap-2 p-1 rounded-xl bg-white border border-slate-200 text-xs">
-          {['gold', 'home'].map(t => (
+          {['gold', 'home', 'deposit'].map(t => (
             <button
               key={t}
               data-testid={`loan-type-${t}`}
-              onClick={() => { setLoanType(t); setApplicationResult(null); }}
+              onClick={() => { setLoanType(t); setApplicationResult(null); if (t === 'deposit') { setAmount(0); setTenure(1); setPledged(''); } }}
               className={`px-3 py-1.5 rounded-lg font-medium capitalize transition ${
                 loanType === t ? 'bg-[#0b3b8c] text-white font-semibold' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              {t} Loan
+              {t === 'deposit' ? 'Against my deposit' : `${t} Loan`}
             </button>
           ))}
         </div>
@@ -129,6 +141,46 @@ export default function LoansPage() {
 
           <form onSubmit={handleApplyLoan} className="space-y-4 text-xs">
 
+            {onDeposit && (
+              <div className="space-y-3 p-4 rounded-xl bg-blue-50 border border-blue-100">
+                {pledgeable.length === 0 ? (
+                  <p className="text-slate-700">You have no active deposit that can secure a loan. Book a deposit first; you can borrow up to 90% of what you have paid into it.</p>
+                ) : (<>
+                  <div>
+                    <label className="block text-slate-600 mb-1" htmlFor="loan-deposit">Deposit to borrow against</label>
+                    <select id="loan-deposit" data-testid="loan-deposit-select" value={pledged}
+                      onChange={(e) => { const d = pledgeable.find((x) => x.deposit_number === e.target.value); setPledged(e.target.value); setAmount(d ? d.max_amount : 0); setTenure(d ? Math.min(12, d.max_months) : 1); }}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900">
+                      <option value="">Choose a deposit</option>
+                      {pledgeable.map((x) => (
+                        <option key={x.deposit_number} value={x.deposit_number}>
+                          {x.deposit_number}{x.scheme_code ? ` · ${x.scheme_code}` : ''} · paid in ₹{x.value.toLocaleString('en-IN')} · up to ₹{x.max_amount.toLocaleString('en-IN')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {security && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-600 mb-1" htmlFor="loan-deposit-amount">Amount (₹, up to {security.max_amount.toLocaleString('en-IN')})</label>
+                        <input id="loan-deposit-amount" data-testid="loan-deposit-amount" type="number" min="1000" max={security.max_amount}
+                          value={amount} onChange={(e) => setAmount(Number(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold" />
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 mb-1" htmlFor="loan-deposit-tenure">Repay over (months, up to {security.max_months})</label>
+                        <input id="loan-deposit-tenure" data-testid="loan-deposit-tenure" type="number" min="1" max={security.max_months}
+                          value={tenure} onChange={(e) => setTenure(Number(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold" />
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-600">While the loan is open the deposit cannot be closed early, and it keeps earning. Anything still owed when it matures is taken from the maturity amount first.</p>
+                </>)}
+              </div>
+            )}
+
+            {!onDeposit && (<>
             {/* Amount Slider */}
             <div>
               <div className="flex justify-between text-slate-600 mb-1">
@@ -194,6 +246,8 @@ export default function LoansPage() {
               </div>
             </div>
 
+            </>)}
+
             <div>
               <label className="block text-slate-500 mb-1">Purpose of Loan</label>
               <input
@@ -208,10 +262,10 @@ export default function LoansPage() {
             <button
               data-testid="submit-loan-btn"
               type="submit"
-              disabled={submitting}
-              className={`w-full py-3 rounded-xl ${currentTheme.buttonTheme} font-bold text-sm shadow-xl`}
+              disabled={submitting || (onDeposit && !security)}
+              className={`w-full py-3 rounded-xl ${currentTheme.buttonTheme} font-bold text-sm shadow-xl disabled:opacity-50`}
             >
-              {submitting ? 'Assessing Credit Score & Eligibility...' : `Apply for ${loanType.toUpperCase()} Loan (EMI: ₹${monthlyEmi.toLocaleString('en-IN')}/mo)`}
+              {submitting ? 'Assessing Credit Score & Eligibility...' : `Apply for ${onDeposit ? 'a loan against your deposit' : `${loanType.toUpperCase()} Loan`} (EMI: ₹${monthlyEmi.toLocaleString('en-IN')}/mo)`}
             </button>
           </form>
 
