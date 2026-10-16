@@ -95,40 +95,40 @@ export default function KycAccountPage() {
           <div className="space-y-4 text-xs">
             <div>
               <label className="block text-slate-500 mb-1">Permanent Account Number (PAN Card)</label>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <input
                   type="text"
                   readOnly
                   value={user?.pan_number || 'Not provided'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <div className="w-56 shrink-0"><DocumentUpload kind="pan" label="PAN card" hint="JPEG, PNG or PDF, up to 3 MB" existing={docs.pan} onUploaded={(r) => setDocs((v) => ({ ...v, pan: r.document }))} /></div>
+                <div className="w-full sm:w-56 shrink-0"><DocumentUpload kind="pan" label="PAN card" hint="JPEG, PNG or PDF, up to 3 MB" existing={docs.pan} onUploaded={(r) => setDocs((v) => ({ ...v, pan: r.document }))} /></div>
               </div>
             </div>
 
             <div>
               <label className="block text-slate-500 mb-1">Aadhaar Card / UIDAI Number (Masked)</label>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <input
                   type="text"
                   readOnly
                   value={user?.aadhaar_number || 'Not provided'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono"
                 />
-                <div className="w-56 shrink-0"><DocumentUpload kind="aadhaar" label="Aadhaar / UIDAI document" hint="Mask all but the last four digits if you prefer" existing={docs.aadhaar} onUploaded={(r) => setDocs((v) => ({ ...v, aadhaar: r.document }))} /></div>
+                <div className="w-full sm:w-56 shrink-0"><DocumentUpload kind="aadhaar" label="Aadhaar / UIDAI document" hint="Mask all but the last four digits if you prefer" existing={docs.aadhaar} onUploaded={(r) => setDocs((v) => ({ ...v, aadhaar: r.document }))} /></div>
               </div>
             </div>
 
             <div>
               <label className="block text-slate-500 mb-1">Proof of Address (Utility Bill / Passport)</label>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <input
                   type="text"
                   readOnly
                   value={docs.address ? `${docs.address.file_name || 'Document'} uploaded` : 'Not uploaded yet'}
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-600"
                 />
-                <div className="w-56 shrink-0"><DocumentUpload kind="address" label="Proof of address" hint="A utility bill or passport, up to 3 MB" existing={docs.address} onUploaded={(r) => setDocs((v) => ({ ...v, address: r.document }))} /></div>
+                <div className="w-full sm:w-56 shrink-0"><DocumentUpload kind="address" label="Proof of address" hint="A utility bill or passport, up to 3 MB" existing={docs.address} onUploaded={(r) => setDocs((v) => ({ ...v, address: r.document }))} /></div>
               </div>
             </div>
 

@@ -492,6 +492,11 @@ number, size, yearly rent); staff allot one to a KYC-verified member, which take
 a year's rent from savings and prints a receipt; "Collect a year's rent" renews;
 overdue lockers show in red; Surrender frees it. Passbooks show "Locker rent".
 
+### 33. Phone-width walk of every page ✅
+Every menu page for Director (26), member (12) and teller (11) opened at 375 px:
+no load errors, no error messages, no sideways overflow. Fixed: KYC / Profile
+upload boxes and the Security passkey row ran off the screen; they now stack.
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

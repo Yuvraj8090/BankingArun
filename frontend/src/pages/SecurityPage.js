@@ -134,16 +134,16 @@ export default function SecurityPage() {
 
       {/* Passkeys */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <Fingerprint className="w-4 h-4 text-[#0b3b8c]" /> Passkeys (Biometric / Face-ID Login)
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">Replace passwords with your device's built-in biometric — fastest and most secure.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input value={label} onChange={e => setLabel(e.target.value)} data-testid="passkey-label-input"
-              className="border border-slate-200 rounded-md px-3 py-1.5 text-xs w-40" placeholder="Device name" />
+              className="border border-slate-200 rounded-md px-3 py-1.5 text-xs w-40 flex-1 sm:flex-none min-w-0" placeholder="Device name" />
             <button data-testid="enroll-passkey-btn" disabled={enrolling} onClick={enroll}
               className="px-3 py-1.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50">
               {enrolling ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PlusCircle className="w-3.5 h-3.5" />}
