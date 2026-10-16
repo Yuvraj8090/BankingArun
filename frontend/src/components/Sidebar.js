@@ -22,12 +22,16 @@ export default function Sidebar({ activeTab, onSelectTab }) {
           </p>
         </div>
 
-        {navItems.map((item) => {
+        {navItems.map((item, i) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const heading = item.group && item.group !== navItems[i - 1]?.group;
           return (
+            <React.Fragment key={item.id}>
+            {heading && (
+              <p className="hidden md:block px-3 pt-3 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{item.group}</p>
+            )}
             <button
-              key={item.id}
               data-testid={item.testId}
               onClick={() => onSelectTab(item.id)}
               className={`shrink-0 md:w-full flex items-center gap-2 md:gap-3 px-3 md:px-3.5 py-2 md:py-2.5 rounded-md text-xs font-medium transition whitespace-nowrap ${
@@ -43,6 +47,7 @@ export default function Sidebar({ activeTab, onSelectTab }) {
               <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.highlight ? 'text-[#0b3b8c]' : 'text-slate-500'}`} />
               <span className="truncate">{item.label}</span>
             </button>
+            </React.Fragment>
           );
         })}
       </div>

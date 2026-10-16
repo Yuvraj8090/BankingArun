@@ -324,7 +324,7 @@ const COUNTER = {
       'Every export is written to the audit log with your name and the row count.']
   },
   agents: {
-    title: 'Agents & Collections',
+    title: 'Field Agents (cash collected)',
     what: 'Field agents and the money they collected from members. It is a record only, kept for traceability.',
     steps: [
       'Add an agent with a code, name, phone and branch.',
@@ -368,7 +368,7 @@ const MANAGER = {
     tips: ['Only gold and home loans can be applied for.']
   },
   collection: {
-    title: 'Collections',
+    title: 'Loan Recovery',
     what: 'Every loan with an EMI past its due date, worst first: days past due (DPD), the amount overdue and the last contact.',
     steps: ['Work the cases with the highest DPD first.', 'Record each reminder, legal notice or settlement on the case.',
       'A case leaves this list by itself once the member\'s EMIs are paid (from savings, every night).'],
@@ -376,7 +376,7 @@ const MANAGER = {
     tips: ['Cases at 90 days past due or more count as NPA risk.']
   },
   schemes: {
-    title: 'Scheme Master',
+    title: 'Scheme Master (FD / RD / plans)',
     what: 'The deposit plans staff can sell. Each one shows its true annual return.',
     steps: [
       'Choose the type first: the form then asks only for what that kind of plan needs.',

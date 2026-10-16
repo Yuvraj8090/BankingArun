@@ -36,7 +36,7 @@ export default function CollectionPanel() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
         <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <Wallet className="w-5 h-5 text-[#c8102e]" /> Collection Department
+          <Wallet className="w-5 h-5 text-[#c8102e]" /> Loan Recovery
         </h1>
         <p className="text-xs text-slate-500 mt-1">Loan recovery · Follow-ups · Settlement negotiation · NPA monitoring</p>
       </div>
