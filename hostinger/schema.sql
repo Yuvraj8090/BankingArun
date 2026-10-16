@@ -561,12 +561,8 @@ CREATE TABLE IF NOT EXISTS system_parameters (
 
 INSERT IGNORE INTO system_parameters
     (id, param_key, label, category, value, unit, min_value, max_value, description) VALUES
-('param-loan-personal', 'loan_rate_personal', 'Personal loan rate', 'loan_rates', 10.50, '% p.a.', 0, 36,
-    'Rate quoted on a personal loan application.'),
-('param-loan-home', 'loan_rate_home', 'Home loan rate', 'loan_rates', 8.40, '% p.a.', 0, 36,
-    'Rate quoted on a home loan application.'),
-('param-loan-vehicle', 'loan_rate_vehicle', 'Vehicle loan rate', 'loan_rates', 8.75, '% p.a.', 0, 36,
-    'Rate quoted on a vehicle loan application.'),
+('param-loan-home', 'loan_rate_home', 'Property loan rate', 'loan_rates', 8.40, '% p.a.', 0, 36,
+    'Rate quoted on a loan against property.'),
 ('param-loan-gold', 'loan_rate_gold', 'Gold loan rate', 'loan_rates', 7.90, '% p.a.', 0, 36,
     'Rate quoted on a gold loan application.'),
 ('param-dep-under-1y', 'deposit_rate_under_1y', 'Deposit rate, under 1 year', 'deposit_rates', 6.50, '% p.a.', 0, 12.5,
@@ -579,10 +575,6 @@ INSERT IGNORE INTO system_parameters
     'Self-service fixed/recurring deposit, tenure over 36 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
 ('param-face-threshold', 'face_match_auto_threshold', 'Face-match auto-approval threshold', 'program', 92.00, '%', 50, 100,
     'Video KYC face-match score at or above which a review is auto-approved.'),
-('param-dd-fee', 'demand_draft_fee', 'Demand draft issuing fee', 'fees', 50.00, '₹', 0, 1000,
-    'Flat fee charged in addition to the draft amount when a demand draft is issued.'),
-('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
-    'The highest online/ATM limit a member can set on a debit card.'),
 ('param-net-owned-funds', 'net_owned_funds', 'Net owned funds', 'limits', 0.00, '₹', 0, 10000000000,
     'Paid-up equity plus free reserves, less accumulated losses and intangibles, from the latest audited balance sheet. Drives the Nidhi Rules checks on the branch dashboard: at least ₹20 lakh, and deposits no more than 20 times this figure.'),
 ('param-tds-daily-interest', 'tds_rate_daily_interest', 'TDS on daily-interest payout', 'fees', 10.00, '%', 0, 30,

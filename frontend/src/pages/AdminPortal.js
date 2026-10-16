@@ -4,6 +4,7 @@ import {
   BarChart3, Database, Lock, Users, Wallet, ShieldCheck, FileText, Search,
   UserPlus, Key
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Modal, { Field, inputClass, PasswordGenField } from '../components/Modal';
@@ -26,6 +27,7 @@ const ROLE_LABELS = Object.fromEntries([
 ]);
 
 export default function AdminPortal() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [overview, setOverview] = useState(null);
   const [rbiReports, setRbiReports] = useState(null);
@@ -180,9 +182,9 @@ export default function AdminPortal() {
               <h2 className="text-sm font-semibold text-slate-900">Statutory Reporting — PMLA / FIU-IND</h2>
               <p className="text-[11px] text-slate-500">PMLA Sec 12 &amp; Master Direction KYC 2016 formats</p>
             </div>
-            <button data-testid="export-rbi-csv" onClick={() => toast.success("Statutory report CSV downloaded")}
+            <button data-testid="export-rbi-csv" onClick={() => navigate('/app/reports')}
               className="px-3 py-1.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] text-white text-xs font-semibold flex items-center gap-1.5">
-              <Download className="w-3.5 h-3.5" /> Export CSV
+              <Download className="w-3.5 h-3.5" /> Open CTR / STR in Reports
             </button>
           </div>
 

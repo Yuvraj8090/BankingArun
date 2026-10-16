@@ -560,12 +560,8 @@ CREATE TABLE IF NOT EXISTS system_parameters (
 
 INSERT IGNORE INTO system_parameters
     (id, param_key, label, category, value, unit, min_value, max_value, description) VALUES
-('param-loan-personal', 'loan_rate_personal', 'Personal loan rate', 'loan_rates', 10.50, '% p.a.', 0, 36,
-    'Rate quoted on a personal loan application.'),
-('param-loan-home', 'loan_rate_home', 'Home loan rate', 'loan_rates', 8.40, '% p.a.', 0, 36,
-    'Rate quoted on a home loan application.'),
-('param-loan-vehicle', 'loan_rate_vehicle', 'Vehicle loan rate', 'loan_rates', 8.75, '% p.a.', 0, 36,
-    'Rate quoted on a vehicle loan application.'),
+('param-loan-home', 'loan_rate_home', 'Property loan rate', 'loan_rates', 8.40, '% p.a.', 0, 36,
+    'Rate quoted on a loan against property.'),
 ('param-loan-gold', 'loan_rate_gold', 'Gold loan rate', 'loan_rates', 7.90, '% p.a.', 0, 36,
     'Rate quoted on a gold loan application.'),
 ('param-dep-under-1y', 'deposit_rate_under_1y', 'Deposit rate, under 1 year', 'deposit_rates', 6.50, '% p.a.', 0, 12.5,
@@ -578,10 +574,6 @@ INSERT IGNORE INTO system_parameters
     'Self-service fixed/recurring deposit, tenure over 36 months. Capped at the 12.5% Nidhi Rules ceiling regardless of the value entered here.'),
 ('param-face-threshold', 'face_match_auto_threshold', 'Face-match auto-approval threshold', 'program', 92.00, '%', 50, 100,
     'Video KYC face-match score at or above which a review is auto-approved.'),
-('param-dd-fee', 'demand_draft_fee', 'Demand draft issuing fee', 'fees', 50.00, '₹', 0, 1000,
-    'Flat fee charged in addition to the draft amount when a demand draft is issued.'),
-('param-card-limit-max', 'card_limit_max', 'Card limit ceiling', 'limits', 1000000.00, '₹', 0, 10000000,
-    'The highest online/ATM limit a member can set on a debit card.'),
 ('param-net-owned-funds', 'net_owned_funds', 'Net owned funds', 'limits', 0.00, '₹', 0, 10000000000,
     'Paid-up equity plus free reserves, less accumulated losses and intangibles, from the latest audited balance sheet. Drives the Nidhi Rules checks on the branch dashboard: at least ₹20 lakh, and deposits no more than 20 times this figure.'),
 ('param-tds-daily-interest', 'tds_rate_daily_interest', 'TDS on daily-interest payout', 'fees', 10.00, '%', 0, 30,
@@ -1542,3 +1534,10 @@ VALUES (UUID(), 'AJS-FD-135M', 'Paune Chaar Guna Yojana (3.75x in 135 months)', 
     NULL, NULL, 200000.0, 200000.0, 750000.0, 'maturity', 'active',
     '[{"unit":8000,"deposit":8000,"maturity":30000},{"unit":16000,"deposit":16000,"maturity":60000},{"unit":24000,"deposit":24000,"maturity":90000},{"unit":32000,"deposit":32000,"maturity":120000},{"unit":40000,"deposit":40000,"maturity":150000},{"unit":48000,"deposit":48000,"maturity":180000},{"unit":56000,"deposit":56000,"maturity":210000},{"unit":64000,"deposit":64000,"maturity":240000},{"unit":72000,"deposit":72000,"maturity":270000},{"unit":80000,"deposit":80000,"maturity":300000},{"unit":88000,"deposit":88000,"maturity":330000},{"unit":96000,"deposit":96000,"maturity":360000},{"unit":104000,"deposit":104000,"maturity":390000},{"unit":112000,"deposit":112000,"maturity":420000},{"unit":120000,"deposit":120000,"maturity":450000},{"unit":128000,"deposit":128000,"maturity":480000},{"unit":136000,"deposit":136000,"maturity":510000},{"unit":144000,"deposit":144000,"maturity":540000},{"unit":152000,"deposit":152000,"maturity":570000},{"unit":160000,"deposit":160000,"maturity":600000},{"unit":168000,"deposit":168000,"maturity":630000},{"unit":176000,"deposit":176000,"maturity":660000},{"unit":184000,"deposit":184000,"maturity":690000},{"unit":192000,"deposit":192000,"maturity":720000},{"unit":200000,"deposit":200000,"maturity":750000}]',
     'Multiples of ₹8,000: ₹8,000 → ₹30,000, ₹16,000 → ₹60,000. 12.47% a year, inside the 12.5% cap.');
+
+-- 16 Oct 2026: settings for products a Nidhi does not offer (personal and vehicle
+-- loans, demand drafts, debit cards). No code reads them; they only cluttered
+-- Business Parameters. A loan against a home is a loan against property.
+DELETE FROM system_parameters WHERE param_key IN ('loan_rate_personal', 'loan_rate_vehicle', 'demand_draft_fee', 'card_limit_max');
+UPDATE system_parameters SET label = 'Property loan rate', description = 'Rate quoted on a loan against property.'
+    WHERE param_key = 'loan_rate_home' AND label = 'Home loan rate';

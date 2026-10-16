@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Users, UserCheck, FileText, RefreshCw, Phone, Mail, MessageSquare, Banknote } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import DepositSlip from '../components/DepositSlip';
 
 export default function StaffPanel() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
 
   useEffect(() => { api.getStaffPanel().then(setData).catch(() => toast.error('Access denied')); }, []);
@@ -65,9 +67,9 @@ export default function StaffPanel() {
                   <td className="p-3 text-slate-600">{c.branch}</td>
                   <td className="p-3 text-right">
                     <button data-testid={`staff-assist-${c.id}`}
-                      onClick={() => toast.success(`Assisting ${c.name}`)}
+                      onClick={() => navigate('/app/crm')}
                       className="px-3 py-1 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/25 active:scale-[0.98] transition text-white text-[11px] font-semibold">
-                      Assist
+                      Open in Relationship Desk
                     </button>
                   </td>
                 </tr>

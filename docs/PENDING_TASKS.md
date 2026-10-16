@@ -414,6 +414,25 @@ tests and build pass.
 - **Removed:** 46 unused UI-kit files, the unused toast hook, 44 unused npm
   packages, 5 unused API client calls, an unused PHP password helper.
 
+### 27. Plans missing from the live site; fake numbers and buttons ✅
+- **5 plans hidden on ajspay.co.in** (Savadhi 8 Year, both MIS plans, Dwigun 6
+  Year, Shubh Lakshmi 21): still priced above 12.5% on the server, so the public
+  list hid them. Re-pricing now runs first in the nightly job (a failure in an
+  earlier job used to skip it) and once on every deploy (`cron.php --reprice-only`).
+- **Owner dashboard rate tiles** were fixed numbers in the code (savings 4%,
+  FD 8%, personal loan 10.5%). They now show the real Business Parameters, and
+  the button opens that page instead of a fake "sent for approval" message.
+- **Fake buttons** ("+ Add Branch", statutory "Export CSV", teller "Assist")
+  now open the real pages.
+- **Removed settings** for products a Nidhi does not offer: personal and vehicle
+  loan rates, demand-draft fee, card limit. "Home loan" is now "Property loan".
+- **Brochure (ADHUNIK PDF) checked:** every plan and denomination is in the
+  system. Not added: the commission, turnover-incentive and "fix monthly
+  income" pages (Nidhi Rule 6, Money Circulation Schemes Act), the land
+  investment offer (not a Nidhi activity), and the 5-month weekly loan as
+  printed (no security shown; a Nidhi lends only against gold, property or
+  the member's own deposits).
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.

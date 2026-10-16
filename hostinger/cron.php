@@ -718,6 +718,27 @@ function run_rail_reconciliation(bool $dryRun, bool $verbose): array
     return [$dispatched, $dispatchFailed, $settled, $stuck];
 }
 
+// Brings every live plan inside the 12.5% cap (reprice_scheme_to_cap). A plan over
+// the cap is hidden from the public list and refused at booking, so until this runs
+// it is simply missing from the site.
+function run_plan_repricing(bool $dryRun): int
+{
+    $repriced = 0;
+    foreach (rows("SELECT * FROM schemes WHERE status = 'active' AND deleted_at IS NULL") as $scheme) {
+        // One plan that cannot be re-priced must not stop the rest.
+        try {
+            if (!$dryRun && ($summary = reprice_scheme_to_cap($scheme)) !== null) {
+                security_event('SCHEME_REPRICED_TO_CAP', 'warning', $summary);
+                say("  re-priced  $summary");
+                $repriced++;
+            }
+        } catch (Throwable $e) {
+            say("  FAILED     re-pricing {$scheme['code']}: " . $e->getMessage());
+        }
+    }
+    return $repriced;
+}
+
 // --- Run ------------------------------------------------------------------------------
 $today = today_ist();
 say('AJSPay cron starting for ' . $today . ' IST' . ($dryRun ? ' (dry run — nothing will be written)' : ''));
@@ -725,6 +746,15 @@ say('AJSPay cron starting for ' . $today . ' IST' . ($dryRun ? ' (dry run — no
 // One run at a time. An overlapping run exits quietly rather than double-paying.
 if ((int)scalar('SELECT GET_LOCK(?, 0)', [CRON_LOCK]) !== 1) {
     say('Another cron run holds the lock. Exiting.');
+    $finished = true;
+    exit(0);
+}
+
+// --reprice-only: just the plans, straight after a deploy (scripts/deploy-vps.sh),
+// so a migration that restored brochure figures does not hide plans until tonight.
+if (in_array('--reprice-only', $argv, true)) {
+    say('Plans re-priced to the cap: ' . run_plan_repricing($dryRun));
+    scalar('SELECT RELEASE_LOCK(?)', [CRON_LOCK]);
     $finished = true;
     exit(0);
 }
@@ -738,22 +768,11 @@ $pdo->prepare('INSERT INTO cron_runs (id, dry_run, status) VALUES (?, ?, ?)')
     ->execute([$runId, (int)$dryRun, 'running']);
 
 try {
+    // Plans first, so nothing priced above the cap is sold tomorrow -- and so a
+    // failure in any later job cannot leave a plan over the cap and off the site.
+    $repriced = run_plan_repricing($dryRun);
     [$siDone, $siFailed] = run_standing_instructions($today, $dryRun, $verbose);
     [$payDone, $payFailed] = run_scheduled_payments($today, $dryRun, $verbose);
-    // Plans first, so nothing priced above the cap is sold tomorrow.
-    $repriced = 0;
-    foreach (rows("SELECT * FROM schemes WHERE status = 'active' AND deleted_at IS NULL") as $scheme) {
-        // One plan that cannot be re-priced must not stop the night's interest and maturities.
-        try {
-            if (!$dryRun && ($summary = reprice_scheme_to_cap($scheme)) !== null) {
-                security_event('SCHEME_REPRICED_TO_CAP', 'warning', $summary);
-                say("  re-priced  $summary");
-                $repriced++;
-            }
-        } catch (Throwable $e) {
-            say("  FAILED     re-pricing {$scheme['code']}: " . $e->getMessage());
-        }
-    }
     $capped = run_cap_rerate($today, $dryRun, $verbose);
     [$instTaken, $instShort] = run_instalments($today, $dryRun, $verbose);
     [$emiPaid, $emiShort] = run_loan_emis($today, $dryRun, $verbose);

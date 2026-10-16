@@ -121,6 +121,11 @@ if systemctl list-unit-files ajspay-pyapi.service >/dev/null 2>&1 &&
   sudo -n /usr/local/sbin/ajspay-apply-proxy ||
     echo 'WARNING: could not apply the proxy map; routes are unchanged' >&2
 fi
+# Plans the migration left above the 12.5% cap are hidden until re-priced, so do
+# it now rather than at tonight's cron run. Best effort: the nightly run does it
+# anyway, so a failure here only warns.
+/usr/bin/php /srv/ajspay/current/cron.php --reprice-only ||
+  echo 'WARNING: could not re-price plans now; the nightly cron run will' >&2
 # A failed smoke check restores the prior release without touching the database.
 # Everything below is a different backend from the one above it: version.txt is
 # a static file, /api/auth/me is PHP, and /api/public/features is proxied to the

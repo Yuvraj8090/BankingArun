@@ -204,6 +204,13 @@ done
 ck "paused after three consecutive failures" "paused|3" \
   "$(Q "SELECT CONCAT_WS('|',status,failures) FROM standing_instructions WHERE id='crontest-poor'")"
 
+print "\n-- a deploy re-prices an over-cap plan straight away --"
+OLD8Y=$(Q "SELECT CONCAT_WS('|',maturity_amount,slabs) FROM schemes WHERE code='AJS-FD-8Y'")
+Q "UPDATE schemes SET maturity_amount=450000 WHERE code='AJS-FD-8Y'" >/dev/null
+CRON --reprice-only >/dev/null 2>&1
+ck "--reprice-only brings it back inside the cap" "1" "$(Q "SELECT maturity_amount < 450000 FROM schemes WHERE code='AJS-FD-8Y'")"
+Q "UPDATE schemes SET maturity_amount=SUBSTRING_INDEX('$OLD8Y','|',1) WHERE code='AJS-FD-8Y'" >/dev/null
+
 print "\n-- cron refuses to run over HTTP --"
 ck "CLI guard present" "1" "$(grep -c "PHP_SAPI" "$ROOT/cron.php" >/dev/null && grep -cF "PHP_SAPI !== " "$ROOT/cron.php")"
 

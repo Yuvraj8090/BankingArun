@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Crown, Users, Wallet, Building2, TrendingUp, BadgeCheck, Award, Landmark, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
 export default function BankOwnerPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.getBankOwnerPanel().then(setData).catch(() => toast.error('Access denied')).finally(() => setLoading(false));
@@ -44,7 +46,7 @@ export default function BankOwnerPanel() {
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
         <div className="p-5 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-900">Rate &amp; Policy Configuration</h2>
-          <p className="text-[11px] text-slate-500">Head-office rates apply bank-wide once approved.</p>
+          <p className="text-[11px] text-slate-500">The rates the system charges and pays now. Change them in Business Parameters; plan rates are set per plan in Scheme Master.</p>
         </div>
         <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
           {data.policies.map(p => (
@@ -52,8 +54,8 @@ export default function BankOwnerPanel() {
               <p className="text-[10px] uppercase text-slate-500 tracking-wide">{p.label}</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{p.value}</p>
               <button data-testid={`policy-edit-${p.key}`}
-                onClick={() => toast.success(`${p.label} sent for board approval`)}
-                className="text-[11px] text-[#0b3b8c] font-semibold mt-2 hover:underline focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/20 active:scale-[0.98] rounded py-1.5 px-1 -mx-1 transition">Propose change →</button>
+                onClick={() => navigate('/app/parameters')}
+                className="text-[11px] text-[#0b3b8c] font-semibold mt-2 hover:underline focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/20 active:scale-[0.98] rounded py-1.5 px-1 -mx-1 transition">Change in Business Parameters →</button>
             </div>
           ))}
         </div>
@@ -64,7 +66,7 @@ export default function BankOwnerPanel() {
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Branch Network</h2>
           <button data-testid="add-branch-btn"
-            onClick={() => toast.success('Branch creation form queued for BOD approval')}
+            onClick={() => navigate('/app/branch-admin')}
             className="px-3 py-1.5 rounded-md bg-[#0b3b8c] hover:bg-[#092e6f] focus:outline-none focus:ring-2 focus:ring-[#0b3b8c]/25 active:scale-[0.98] transition text-white text-xs font-semibold">+ Add Branch</button>
         </div>
         <div className="overflow-x-auto">

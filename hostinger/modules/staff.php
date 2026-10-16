@@ -33,13 +33,23 @@ function route_panel_bank_owner(array $d): void
             'members' => (int)scalar("SELECT COUNT(*) FROM users WHERE role IN ('retail', 'corporate')")],
         'loan_pipeline' => $loans,
         'branches' => $branches,
-        'policies' => [
-            ['key' => 'savings_roi', 'label' => 'Savings Account Interest Rate', 'value' => '4.00% p.a.'],
-            ['key' => 'fd_max_roi', 'label' => 'FD Peak Rate (Senior 2-3 Yr)', 'value' => '8.00% p.a.'],
-            ['key' => 'home_loan_min', 'label' => 'Home Loan Starting Rate', 'value' => '8.40% p.a.'],
-            ['key' => 'personal_loan_min', 'label' => 'Personal Loan Starting Rate', 'value' => '10.50% p.a.'],
-            ['key' => 'nof_deposit_cap', 'label' => 'NOF : Deposits cap (Nidhi Rules)', 'value' => '1:20'],
-        ],
+        // Read from Business Parameters, where the owner changes them. These used
+        // to be fixed numbers in this file that matched nothing the system charged.
+        'policies' => (function (): array {
+            $p = array_column(rows('SELECT param_key, value FROM system_parameters'), 'value', 'param_key');
+            $pct = fn($k) => isset($p[$k]) ? rtrim(rtrim(number_format((float)$p[$k], 2), '0'), '.') . '% a year' : 'not set';
+            $nof = (float)($p['net_owned_funds'] ?? 0);
+            return [
+                ['key' => 'deposit_rate_under_1y', 'label' => 'FD rate, under 1 year', 'value' => $pct('deposit_rate_under_1y')],
+                ['key' => 'deposit_rate_1y_to_2y', 'label' => 'FD rate, 1-2 years', 'value' => $pct('deposit_rate_1y_to_2y')],
+                ['key' => 'deposit_rate_2y_to_3y', 'label' => 'FD rate, 2-3 years', 'value' => $pct('deposit_rate_2y_to_3y')],
+                ['key' => 'deposit_rate_over_3y', 'label' => 'FD rate, over 3 years', 'value' => $pct('deposit_rate_over_3y')],
+                ['key' => 'loan_rate_gold', 'label' => 'Gold loan rate', 'value' => $pct('loan_rate_gold')],
+                ['key' => 'loan_rate_home', 'label' => 'Property loan rate', 'value' => $pct('loan_rate_home')],
+                ['key' => 'net_owned_funds', 'label' => 'Net owned funds (deposits up to 20×)',
+                    'value' => $nof > 0 ? rupees($nof) : 'not entered yet'],
+            ];
+        })(),
     ]);
 }
 
