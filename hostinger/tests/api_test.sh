@@ -604,6 +604,15 @@ call GET /reports/fiu_ctr "$STAFF"; ck "tellers cannot see it" 403 "$CODE"
 call GET /reports/fiu_str "$OWNER"; ck "the STR register runs" 200 "$CODE"
 call GET /reports/ndh_figures "$OWNER"; ck "the NDH figures run" 200 "$CODE"
 has "with members and share capital" "$BODY" "share_capital"
+Q "INSERT INTO ndh_snapshots (as_on, members, share_capital, savings_deposits, fixed_deposits, recurring_deposits,
+   gold_loans, property_loans, npa_loans, net_owned_funds, branches)
+   VALUES ('2026-03-31', 7, 700, 1, 2, 3, 4, 5, 0, 2000000, 1), ('2026-04-01', 8, 800, 1, 2, 3, 4, 5, 0, 2000000, 1)" >/dev/null
+call GET "/reports/ndh_figures?period=half-year%20ends" "$OWNER"
+ck "a past half-year end can be pulled up, other days left out" "2026-03-31:7" \
+  "$(print -r -- "$BODY" | jq_ 'print(",".join(r["as_on"] + ":" + str(r["members"]) for r in d["rows"]))')"
+call GET "/reports/ndh_figures?from_date=2026-04-01&to_date=2026-04-01" "$OWNER"
+ck "and any recorded day by date" "2026-04-01:8" \
+  "$(print -r -- "$BODY" | jq_ 'print(",".join(r["as_on"] + ":" + str(r["members"]) for r in d["rows"]))')"
 reset_balances
 # A folio admitted by its own first deposit before share money was taken.
 [[ -z $(Q "SELECT folio_no FROM member_register WHERE user_id='retail-001' AND status='active'") ]] \

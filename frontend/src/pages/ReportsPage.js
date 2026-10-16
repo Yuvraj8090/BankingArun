@@ -16,7 +16,7 @@ const FILTER_INPUT = {
 const FILTER_LABEL = {
   q: 'Search', from_date: 'From', to_date: 'To', min_amount: 'Min amount', max_amount: 'Max amount',
   kyc_status: 'KYC status', loan_type: 'Loan type', deposit_type: 'Deposit type', risk_grade: 'Risk grade',
-  account_number: 'Account number', agent_id: 'Agent id', scheme_code: 'Plan code (e.g. AJS-MIS-40M)', plan: 'Plan code (e.g. AJS-MIS-40M)', state: 'State'
+  account_number: 'Account number', agent_id: 'Agent id', scheme_code: 'Plan code (e.g. AJS-MIS-40M)', plan: 'Plan code (e.g. AJS-MIS-40M)', state: 'State', period: 'Period'
 };
 const CHOICES = {
   status: ['', 'active', 'matured', 'closed', 'approved', 'disbursed', 'under_review', 'rejected',
@@ -27,6 +27,7 @@ const CHOICES = {
   kyc_status: ['', 'verified', 'pending_approval', 'rejected'],
   risk_grade: ['', 'A', 'B', 'C', 'D', 'E'],
   deposit_type: ['', 'fixed', 'recurring'],
+  period: ['', 'half-year ends'],
   state: ['', 'enrolled', 'interest pending', 'enquired, not booked', 'waiting KYC', 'matured', 'closed']
 };
 

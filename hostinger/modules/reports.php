@@ -17,6 +17,32 @@ const REPORT_ROLES = ['staff', 'loan_officer', 'admin', 'branch_manager', 'bank_
 const REPORT_EXPORT_MAX = 20000;   // rows in a single download
 
 // Column formats: 'text', 'money', 'date', 'datetime', 'int'.
+// One row of NDH return figures as they stand now. reports.php shows it live and
+// cron.php stores it each day into ndh_snapshots, so the two cannot drift apart.
+const NDH_COLUMNS = ['members', 'share_capital', 'savings_deposits', 'fixed_deposits', 'recurring_deposits',
+    'gold_loans', 'property_loans', 'npa_loans', 'net_owned_funds', 'branches'];
+const NDH_FIGURES_SQL = "SELECT
+    (SELECT COUNT(*) FROM member_register WHERE status = 'active') AS members,
+    (SELECT COALESCE(SUM(shares_held * share_face_value), 0) FROM member_register WHERE status = 'active') AS share_capital,
+    (SELECT COALESCE(SUM(balance), 0) FROM accounts) AS savings_deposits,
+    (SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active' AND instalment_amount IS NULL) AS fixed_deposits,
+    (SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active' AND instalment_amount IS NOT NULL) AS recurring_deposits,
+    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'gold') AS gold_loans,
+    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'home') AS property_loans,
+    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status = 'npa') AS npa_loans,
+    (SELECT COALESCE(MAX(value), 0) FROM system_parameters WHERE param_key = 'net_owned_funds') AS net_owned_funds,
+    (SELECT COUNT(*) FROM branches WHERE deleted_at IS NULL) AS branches";
+
+// Today's NDH figures into ndh_snapshots. Later runs the same day overwrite it, so
+// the row a date keeps is that day's last run (21:30 IST): close of business.
+function record_ndh_snapshot(string $today): void
+{
+    $update = implode(', ', array_map(fn($c) => "$c = VALUES($c)", NDH_COLUMNS));
+    global $pdo;
+    $pdo->prepare('INSERT INTO ndh_snapshots (as_on, ' . implode(', ', NDH_COLUMNS) . ') SELECT ?, f.* FROM ('
+        . NDH_FIGURES_SQL . ") f ON DUPLICATE KEY UPDATE $update, taken_at = NOW()")->execute([$today]);
+}
+
 function report_definitions(): array
 {
     // An instalment plan (Masik / Daily Yojana) stores the contracted total as
@@ -292,25 +318,18 @@ function report_definitions(): array
             'totals' => ['amount'],
         ],
         // The figures Form NDH-1 (yearly, within 90 days of the year end) and NDH-3
-        // (half-yearly, within 30 days) ask for, as they stand today. Run it on the last
-        // day of the period, or export it then, and copy the figures onto the MCA form.
+        // (half-yearly, within 30 days) ask for. Today's row is live; earlier rows are
+        // the snapshot cron.php keeps each day, so 31 March and 30 September can be
+        // pulled up after the date has passed.
         'ndh_figures' => [
             'name' => 'Nidhi return figures (NDH-1 / NDH-3)',
-            'note' => 'Members, share capital, deposits, loans and the net owned funds test, as at today. Run it on the last day of the half-year or year and copy the figures into the MCA form.',
+            'note' => 'Members, share capital, deposits, loans and the net owned funds test: today live, earlier days as recorded that night. Set Period to "half-year ends" for 31 March and 30 September, and copy those figures into the MCA form.',
             'roles' => ['admin', 'branch_manager', 'bank_owner'],
-            'sql' => "SELECT * FROM (SELECT CURDATE() AS as_on,
-                    (SELECT COUNT(*) FROM member_register WHERE status = 'active') AS members,
-                    (SELECT COALESCE(SUM(shares_held * share_face_value), 0) FROM member_register WHERE status = 'active') AS share_capital,
-                    (SELECT COALESCE(SUM(balance), 0) FROM accounts) AS savings_deposits,
-                    (SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active' AND instalment_amount IS NULL) AS fixed_deposits,
-                    (SELECT COALESCE(SUM(paid_amount), 0) FROM deposits WHERE status = 'active' AND instalment_amount IS NOT NULL) AS recurring_deposits,
-                    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'gold') AS gold_loans,
-                    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status <> 'closed' AND loan_type = 'home') AS property_loans,
-                    (SELECT COALESCE(SUM(outstanding), 0) FROM loans WHERE status = 'npa') AS npa_loans,
-                    (SELECT value FROM system_parameters WHERE param_key = 'net_owned_funds') AS net_owned_funds,
-                    (SELECT COUNT(*) FROM branches WHERE deleted_at IS NULL) AS branches) n WHERE 1 = 1",
-            'filters' => [],
-            'order' => 'n.as_on',
+            'sql' => 'SELECT * FROM (SELECT CURDATE() AS as_on, f.* FROM (' . NDH_FIGURES_SQL . ') f
+                UNION ALL SELECT as_on, ' . implode(', ', NDH_COLUMNS) . ' FROM ndh_snapshots WHERE as_on < CURDATE()) n WHERE 1 = 1',
+            'filters' => ['from_date' => ['n.as_on >= ?', 'date_only'], 'to_date' => ['n.as_on <= ?', 'date_only'],
+                'period' => ["DATE_FORMAT(n.as_on, '%m-%d') IN ('03-31', '09-30') AND ? <> ''", 'exact']],
+            'order' => 'n.as_on DESC',
             'columns' => ['as_on' => 'date', 'members' => 'int', 'share_capital' => 'money', 'savings_deposits' => 'money',
                 'fixed_deposits' => 'money', 'recurring_deposits' => 'money', 'gold_loans' => 'money',
                 'property_loans' => 'money', 'npa_loans' => 'money', 'net_owned_funds' => 'money', 'branches' => 'int'],

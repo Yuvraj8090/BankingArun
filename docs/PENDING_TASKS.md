@@ -8,8 +8,8 @@ the browser for every role. Each item below is something that run found.
 
 | Suite | Result |
 |---|---|
-| `api_test.sh`: API regression | 279 / 279 |
-| `cron_test.sh`: daily jobs, interest, maturity | 43 / 43 |
+| `api_test.sh`: API regression | 281 / 281 |
+| `cron_test.sh`: daily jobs, interest, maturity | 44 / 44 |
 | `role_smoke.sh`: role, menu and report checks | 534 / 534 |
 | `market_rates_test.php` | ok |
 | `pyapi` pytest | 43 / 43 |
@@ -27,8 +27,8 @@ Work through the list top to bottom. Type **next** to fix the next open item.
 ## Current open work
 - FIU-IND upload/submission files are still missing. CTR/STR figures are built;
   they are not validated FINnet submission files.
-- NDH figures are available as at today. Historical period-end snapshots and
-  completed MCA filing forms are not built.
+- NDH figures: fixed 16 Oct (item 24). The completed MCA e-forms are still
+  filed by hand on the MCA portal; the report gives the figures to copy in.
 - The new five-level referral feature is a Director-only simulation. Live
   deposit commissions remain disabled under Nidhi Rule 6(k). Demo Silver/Gold
   thresholds are editable examples, not agreed business rules.
@@ -370,6 +370,19 @@ At the start of this check, the live `version.txt` and local `HEAD` both pointed
 to `8bcc1e53a5909ca2bb68a8d0dc861a3d9dbcca0b`; there was no version mismatch.
 Also corrected stale deployment instructions: the existing deployment script
 already applies migrations after a backup and before swapping releases.
+
+## Round 5 (16 Oct): past NDH figures
+
+### 24. NDH-1 / NDH-3 figures for a past date ✅
+The report only showed today, so 31 March could not be reported once it had
+passed. Now cron.php stores the day's figures in `ndh_snapshots` at every run
+(the 21:30 IST run is the one a date keeps). Reports → Nidhi return figures
+shows today live plus every recorded day; filter by date, or set **Period** to
+"half-year ends" for 31 March and 30 September only. History starts from the
+first night this is deployed; earlier dates cannot be rebuilt.
+
+Tests: api 281/281, cron 44/44, role smoke 534/534, pyapi 43/43, frontend
+tests and build pass.
 
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of

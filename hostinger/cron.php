@@ -761,6 +761,10 @@ try {
     [$dailyAccrued, $dailyReleased, $dailyFailed] = run_daily_interest_accrual($today, $dryRun, $verbose);
     [$matDone, $matFailed] = run_deposit_maturities($today, $dryRun, $verbose);
     [$railSent, $railFailed, $railDone, $railStuck] = run_rail_reconciliation($dryRun, $verbose);
+    // Last, so the day's figures include everything the run above posted.
+    if (!$dryRun) {
+        record_ndh_snapshot($today);
+    }
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

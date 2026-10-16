@@ -192,6 +192,10 @@ ck "interest credited once only" "1" "$(Q "SELECT COUNT(*) FROM transactions WHE
 ck "daily interest not accrued twice" "110.00" "$(Q "SELECT accrued_interest FROM deposits WHERE deposit_number='CRONTEST-DAILY-A'")"
 ck "daily interest not released twice" "1" "$(Q "SELECT COUNT(*) FROM transactions WHERE ref_number LIKE 'DINT-CRONTEST-DAILY-B%'")"
 
+print "\n-- NDH return figures are kept for the day --"
+ck "one snapshot for today, members as live" "1|$(Q "SELECT COUNT(*) FROM member_register WHERE status='active'")" \
+  "$(Q "SELECT CONCAT_WS('|',COUNT(*),MAX(members)) FROM ndh_snapshots WHERE as_on='$TODAY'")"
+
 print "\n-- repeated failure pauses the instruction --"
 for day in 1 2; do
   Q "UPDATE standing_instructions SET last_run=DATE_SUB('$TODAY',INTERVAL 1 DAY) WHERE id='crontest-poor'" >/dev/null

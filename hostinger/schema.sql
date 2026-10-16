@@ -1277,3 +1277,20 @@ CREATE TABLE IF NOT EXISTS beneficiaries (
     deleted_at DATETIME,
     UNIQUE KEY uq_payee (user_id, account_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- NDH-1 / NDH-3 figures as they stood at each day's last cron run, so a past
+-- 31 March or 30 September can still be reported (reports.php: ndh_figures).
+CREATE TABLE IF NOT EXISTS ndh_snapshots (
+    as_on DATE PRIMARY KEY,
+    members INT NOT NULL,
+    share_capital DECIMAL(15,2) NOT NULL,
+    savings_deposits DECIMAL(15,2) NOT NULL,
+    fixed_deposits DECIMAL(15,2) NOT NULL,
+    recurring_deposits DECIMAL(15,2) NOT NULL,
+    gold_loans DECIMAL(15,2) NOT NULL,
+    property_loans DECIMAL(15,2) NOT NULL,
+    npa_loans DECIMAL(15,2) NOT NULL,
+    net_owned_funds DECIMAL(15,2) NOT NULL,
+    branches INT NOT NULL,
+    taken_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
