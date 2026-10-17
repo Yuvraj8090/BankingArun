@@ -28,6 +28,7 @@ require __DIR__ . '/modules/crm.php';
 require __DIR__ . '/modules/reports.php';
 require __DIR__ . '/modules/ai.php';
 require __DIR__ . '/modules/rails.php';
+require __DIR__ . '/modules/jobs.php';
 
 const MAX_FAILS = 5;  // wrong passwords allowed per 15 minutes before lockout
 const TRANSFER_MODES = ['IMPS', 'NEFT', 'RTGS', 'UPI'];
@@ -748,10 +749,11 @@ function route_self_register(array $d): void
     }
     // The introduction is not recorded here, only held until KYC is verified (see
     // pay_pending_referral and its callers in modules/staff.php). An unknown
-    // code is dropped rather than blocking the sign-up over a typo.
+    // code is refused with a message, so a typo is fixed now rather than the
+    // introduction silently never being recorded.
     $referredBy = strtoupper(clip($d['referral_code'] ?? '', 12));
     if ($referredBy !== '' && !row('SELECT id FROM users WHERE referral_code = ?', [$referredBy])) {
-        $referredBy = '';
+        fail(422, "No member has the referral ID $referredBy. Check it with them, or leave it blank.");
     }
 
     $userId = uuid4();
@@ -1161,6 +1163,7 @@ $routes = [
     'GET /rank-tiers' => 'route_rank_tiers',
     'POST /rank-tiers' => 'route_rank_tier_create',
     'GET /admin/automation' => 'route_automation_status',
+    'POST /admin/automation/run' => 'route_automation_run',
     'GET /admin/recycle-bin' => 'route_recycle_bin',
     'POST /admin/recycle-bin/restore' => 'route_recycle_restore',
     'GET /standing-instructions' => 'route_si_list',

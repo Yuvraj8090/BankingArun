@@ -269,6 +269,11 @@ function route_support_notifications(array $d): void
 function route_notifications(array $d): void
 {
     $user = current_user();
+    // Staff use the app all day, so their requests keep the scheduled jobs running
+    // even when the server timer is not (modules/jobs.php).
+    if (in_array($user['role'], SUPPORT_STAFF_ROLES, true) || in_array($user['role'], ['loan_officer', 'collection_agent'], true)) {
+        catch_up_jobs_after_response();
+    }
     $today = (new DateTimeImmutable('now', new DateTimeZone(IST)))->format('Y-m-d');
     $items = [];
     $add = function (string $title, string $detail, string $tab, string $tone = 'info') use (&$items): void {

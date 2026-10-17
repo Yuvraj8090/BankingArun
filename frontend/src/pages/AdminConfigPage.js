@@ -17,6 +17,19 @@ const STATE_STYLE = {
 function AutomationPanel() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+
+  // Runs every job now, on the website (modules/jobs.php). Safe at any time: a lock
+  // keeps runs apart and each job does each item at most once a day.
+  const runNow = async () => {
+    setRunning(true);
+    try {
+      const r = await api.automationRun();
+      (r.status === 'attention' ? toast.warning : toast.success)(r.message);
+      load();
+    } catch (e) { toast.error(e.response?.data?.detail || 'The run could not start'); }
+    finally { setRunning(false); }
+  };
 
   const load = async () => {
     setBusy(true);
@@ -36,10 +49,16 @@ function AutomationPanel() {
           <span className="font-bold uppercase tracking-wide text-[10px]">
             {data.state.replace('_', ' ')}
           </span>
-          <button onClick={load} disabled={busy} data-testid="automation-refresh"
-            className="text-[10px] font-semibold underline disabled:opacity-50 py-1.5 px-1 -mx-1">
-            {busy ? 'checking…' : 'check again'}
-          </button>
+          <span className="flex items-center gap-3">
+            <button onClick={load} disabled={busy} data-testid="automation-refresh"
+              className="text-[10px] font-semibold underline disabled:opacity-50 py-1.5 px-1 -mx-1">
+              {busy ? 'checking…' : 'check again'}
+            </button>
+            <button onClick={runNow} disabled={running} data-testid="automation-run-now"
+              className="px-3 py-1.5 rounded-md bg-[#0b3b8c] text-white text-[11px] font-semibold disabled:opacity-50">
+              {running ? 'Running…' : 'Run jobs now'}
+            </button>
+          </span>
         </div>
         <p className="mt-1">{data.message}</p>
       </div>

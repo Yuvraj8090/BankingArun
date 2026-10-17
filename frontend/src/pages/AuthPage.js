@@ -23,6 +23,8 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
 
   // register fields
   const [name, setName] = useState('');
+  // Typed by the applicant, or filled in from a referral link (?ref=CODE).
+  const [refCode, setRefCode] = useState(referralCode);
   const [phone, setPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regPasswordConfirm, setRegPasswordConfirm] = useState('');
@@ -81,7 +83,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
         phone: phone.trim(),
         email: email.trim() || undefined,
         password: regPassword,
-        referral_code: referralCode || undefined,
+        referral_code: refCode.trim().toUpperCase() || undefined,
         captcha_id: captcha?.captcha_id,
         captcha_answer: captchaAnswer.trim(),
       });
@@ -284,7 +286,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
               </div>
             ) : (
             <form onSubmit={doSelfRegister} className="space-y-3" data-testid="register-form">
-              {referralCode && (
+              {referralCode && refCode === referralCode && (
                 <div data-testid="register-referral-banner"
                   className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">
                   <Gift className="w-3.5 h-3.5 shrink-0" />
@@ -327,6 +329,13 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
               </p>
 
               <div>
+              <Field icon={Gift} label="Referral ID (optional)">
+                <input data-testid="register-referral-input" value={refCode} maxLength={12}
+                  onChange={e => setRefCode(e.target.value.toUpperCase())}
+                  placeholder="ID of the member who told you about us"
+                  className="w-full bg-white border border-slate-300 rounded-md pl-9 pr-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[#0b3b8c]" />
+              </Field>
+              <p className="text-[10px] text-slate-500 -mt-1">Recorded once your KYC is verified. No one is paid for introducing you.</p>
                 <CaptchaField testId="register-captcha" captcha={captcha} captchaAnswer={captchaAnswer}
                   setCaptchaAnswer={setCaptchaAnswer} onRefresh={newCaptcha} />
                 <p className="text-[10px] text-slate-500 mt-1">

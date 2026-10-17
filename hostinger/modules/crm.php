@@ -324,7 +324,10 @@ function route_crm_lead_document_upload(array $d, string $id = ''): void
     if ($lead['converted_user_id'] !== null) {
         fail(400, 'This enquiry already became an account. Upload further documents against the member instead.');
     }
-    rate_limit('leaddoc:' . $staff['id'], 60, 3600, 'Too many uploads. Please try again later.');
+    // About three documents per new account, so 60 an hour stopped a teller at ~20
+    // accounts. Staff are signed in and every upload is audited; this only stops a
+    // runaway script.
+    rate_limit('leaddoc:' . $staff['id'], 600, 3600, 'More than 600 uploads in an hour from your login. Please try again shortly.');
     $doc = kyc_document_payload($d);
 
     // A re-upload replaces whatever is not already cleared, so a reviewer is

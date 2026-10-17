@@ -236,6 +236,7 @@ export const api = {
     (await axios.post(`${API}/kyc/documents/${id}/review`, payload, getAuthHeaders())).data,
   // The applicant's file, built against the enquiry before any account exists.
   // Whether the nightly run is actually happening -- see route_automation_status.
+  automationRun: async () => (await axios.post(`${API}/admin/automation/run`, {}, getAuthHeaders())).data,
   automationStatus: async () => (await axios.get(`${API}/admin/automation`, getAuthHeaders())).data,
   leadDocuments: async (id) => (await axios.get(`${API}/crm/leads/${id}/documents`, getAuthHeaders())).data,
   leadDocumentUpload: async (id, payload) =>

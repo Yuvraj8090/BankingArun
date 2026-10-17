@@ -710,6 +710,22 @@ Q "DELETE FROM lockers WHERE id='$LKR'" >/dev/null
 [[ $WASMEMBER == 0 ]] && Q "DELETE FROM share_allotments WHERE user_id='retail-001'; DELETE FROM member_register WHERE user_id='retail-001';" >/dev/null
 reset_balances
 
+print "\n-- sign-up with a referral ID --"
+call POST /register/self "" "{$(cap),\"name\":\"Apitest Signup\",\"phone\":\"9000000777\",\"password\":\"Zq8!mvT#r2pL\",\"referral_code\":\"NOSUCH1\"}"
+ck "an unknown referral ID is refused with a message" 422 "$CODE"
+has "naming the ID" "$BODY" "NOSUCH1"
+call POST /register/self "" "{$(cap),\"name\":\"Apitest Signup\",\"phone\":\"9000000777\",\"password\":\"Zq8!mvT#r2pL\",\"referral_code\":\"$REFCODE\"}"
+ck "a real one is accepted" 200 "$CODE"
+ck "and held until KYC is verified" "$REFCODE" "$(Q "SELECT referred_by_code FROM users WHERE phone='9000000777'")"
+Q "DELETE a FROM accounts a JOIN users u ON u.id=a.user_id WHERE u.phone='9000000777'; DELETE FROM users WHERE phone='9000000777'" >/dev/null
+
+print "\n-- scheduled jobs from the website --"
+call POST /admin/automation/run "$STAFF" '{}'; ck "only the Director can run the jobs" 403 "$CODE"
+call POST /admin/automation/run "$OWNER" '{}'; ck "the Director runs them from System Config" 200 "$CODE"
+has "and gets the outcome" "$BODY" '"log"'
+ck "recorded as a completed run" "1" "$(Q "SELECT COUNT(*) > 0 FROM cron_runs WHERE dry_run=0 AND status IN ('ok','attention') AND started_at >= UTC_TIMESTAMP() - INTERVAL 5 MINUTE")"
+reset_balances
+
 print "\n-- staff help bot --"
 call POST /staff/assistant "$RETAIL" '{"message":"where do I edit a plan?"}'; ck "members cannot use the staff bot" 403 "$CODE"
 call POST /staff/assistant "$STAFF" '{"message":"where do I edit a plan?","guides":"## Scheme Master"}'

@@ -507,6 +507,17 @@ automation status), and the others still run. fail() throws inside cron instead
 of exiting. The 12.5% re-rate now runs straight after plan re-pricing.
 MIS checked: monthly payouts match each plan's printed amount exactly.
 
+### 35. Jobs run without the server timer; referral ID at sign-up; 20-user limit ✅
+- Jobs moved to modules/jobs.php, run by cron.php (timer) and by the website:
+  System Config → **Run jobs now** (Director), and automatically after any staff
+  request once no run has completed for 3 hours (production PHP-FPM only, after
+  the response is sent). A lock keeps runs apart.
+- Sign-up has a "Referral ID (optional)" field (filled from ?ref= links); an
+  unknown ID is refused with a message instead of being silently dropped.
+  Recognition only: nothing is paid.
+- Staff account-opening uploads were capped at 60 an hour (~20 new accounts at
+  three documents each); now 600.
+
 ## Not done, deliberately
 - **Reversing ₹500 referral bonuses already paid.** Taking money back out of
   members' accounts without their agreement needs a decision, and legal advice.
