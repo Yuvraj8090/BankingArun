@@ -8,5 +8,6 @@ for t in api_test.sh cron_test.sh role_smoke.sh; do
   print -n "$t: "; zsh $t | tail -1; (( ${pipestatus[1]} )) && rc=1
 done
 print -n "market_rates_test.php: "; php market_rates_test.php || rc=1
+print -n "password_rule_test.php: "; php -d zend.assertions=1 -d assert.exception=1 password_rule_test.php || rc=1
 print -n "pyapi: "; (cd ../../pyapi && .venv/bin/python -m pytest -q | tail -1) || rc=1
 exit $rc

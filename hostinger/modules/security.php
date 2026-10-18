@@ -704,7 +704,8 @@ function route_reset_password(array $d): void
 // suffix it holds under that prefix — tens of thousands of them — and the comparison
 // happens here. The service cannot tell which of those, if any, was being asked about,
 // and never sees the password or its full hash.
-const PASSWORD_MIN = 8;
+const PASSWORD_MIN = 6;         // members: simple passwords such as 1234567 are allowed (owner, 18 Oct 2026)
+const STAFF_PASSWORD_MIN = 8;
 const PASSWORD_MAX = 72;   // bcrypt truncates beyond this
 
 function password_is_breached(string $password): ?bool
@@ -743,10 +744,14 @@ function password_is_breached(string $password): ?bool
 // Applied wherever a login password is set. $context is whatever the member has
 // already given away — their name and email — so a password that simply repeats
 // it is refused before it is ever hashed.
-function assert_password_acceptable(mixed $password, array $context = []): void
+// ponytail: members may pick simple passwords (owner's call); sign-in lockout after
+// five tries and the separate transaction password still guard payments. Staff
+// accounts set by the Director/admin ($strict) keep 8+ and the breach check.
+function assert_password_acceptable(mixed $password, array $context = [], bool $strict = false): void
 {
-    if (!is_string($password) || strlen($password) < PASSWORD_MIN || strlen($password) > PASSWORD_MAX) {
-        fail(422, 'Your password must be between ' . PASSWORD_MIN . ' and ' . PASSWORD_MAX . ' characters.');
+    $min = $strict ? STAFF_PASSWORD_MIN : PASSWORD_MIN;
+    if (!is_string($password) || strlen($password) < $min || strlen($password) > PASSWORD_MAX) {
+        fail(422, 'Your password must be between ' . $min . ' and ' . PASSWORD_MAX . ' characters.');
     }
     $lower = strtolower($password);
     foreach ($context as $hint) {
@@ -755,7 +760,7 @@ function assert_password_acceptable(mixed $password, array $context = []): void
             fail(422, 'Please choose a password that does not contain your name or email address.');
         }
     }
-    if (password_is_breached($password) === true) {
+    if ($strict && password_is_breached($password) === true) {
         fail(422, 'That password appears in a known data breach. Please choose a different one — '
             . 'it is not about this account, but attackers try published passwords first.');
     }

@@ -275,7 +275,7 @@ export default function SecurityPage() {
               {changingPwd ? 'Changing…' : 'Change password'}
             </button>
             <p className="text-[11px] text-slate-500">
-              At least 8 characters, and not one that has appeared in a known breach.
+              At least 6 characters (staff: 8, and not one from a known breach).
             </p>
           </div>
         </div>

@@ -499,7 +499,7 @@ function route_admin_user_create(array $d): void
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         fail(422, 'That email address does not look right.');
     }
-    assert_password_acceptable($d['password'] ?? null, [$name, strstr($email, '@', true)]);
+    assert_password_acceptable($d['password'] ?? null, [$name, strstr($email, '@', true)], true);
     if (row('SELECT id FROM users WHERE email = ?', [$email])) {
         fail(400, 'A login with this email already exists.');
     }
@@ -578,7 +578,7 @@ function route_admin_user_password(array $d): void
         fail(400, 'Use Security & Login to change your own password.');
     }
     assert_password_acceptable($d['password'] ?? null,
-        [$target['name'], $target['email'] ? strstr($target['email'], '@', true) : '']);
+        [$target['name'], $target['email'] ? strstr($target['email'], '@', true) : ''], $target['role'] !== 'retail');
     if (password_verify((string)$d['password'], $target['password_hash'])) {
         fail(422, 'That is already this user\'s current password.');
     }

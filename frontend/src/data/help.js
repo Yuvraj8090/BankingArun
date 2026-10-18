@@ -159,7 +159,7 @@ const MEMBER = {
     ],
     fields: [
       ['Current password', 'Needed to change anything sensitive.'],
-      ['New password / Confirm', 'At least 8 characters. Do not reuse an old one.']
+      ['New password / Confirm', 'At least 6 characters. Do not reuse an old one.']
     ],
     tips: ['Once 2FA is on, your password alone no longer signs you in.']
   },

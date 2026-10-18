@@ -69,13 +69,13 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
   const doSelfRegister = async (e) => {
     e?.preventDefault();
     if (!name.trim() || !phone.trim()) return toast.error('Please give us your name and phone number');
-    if (regPassword.length < 8) return toast.error('Your password must be at least 8 characters');
+    if (regPassword.length < 6) return toast.error('Your password must be at least 6 characters');
     if (regPassword !== regPasswordConfirm) return toast.error('Those two passwords do not match');
     if (!captchaAnswer.trim()) return toast.error('Please type the number shown in the image');
     setLoading(true);
     try {
       // The applicant picks their own login password here; the server still
-      // has the final word (length, not a known-breached password, not just
+      // has the final word (6+ characters, not just
       // their own name or email — see assert_password_acceptable in
       // hostinger/db.php and modules/security.php) before it is accepted.
       const r = await api.selfRegister({
@@ -313,7 +313,7 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
               </div>
 
               <Field icon={Lock} label="Choose a password">
-                <PasswordInput testId="register-password-input" label="password" placeholder="At least 8 characters"
+                <PasswordInput testId="register-password-input" label="password" placeholder="At least 6 characters"
                   value={regPassword} onChange={e => setRegPassword(e.target.value)} />
               </Field>
               <PasswordStrength password={regPassword} />
@@ -324,9 +324,6 @@ export default function AuthPage({ onSuccess, defaultIsRegister, portal = 'membe
               {regPasswordConfirm && regPassword !== regPasswordConfirm && (
                 <p className="text-[11px] text-[#c8102e] -mt-2">Passwords do not match.</p>
               )}
-              <p className="text-[10px] text-slate-500 -mt-1">
-                We'll also check it isn't one already exposed in a known data breach when you submit.
-              </p>
 
               <div>
               <Field icon={Gift} label="Referral ID (optional)">

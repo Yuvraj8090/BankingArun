@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
   const reset = async (e) => {
     e.preventDefault();
     if (password !== confirm) return toast.error('The two passwords do not match.');
-    if (password.length < 8) return toast.error('Use at least 8 characters.');
+    if (password.length < 6) return toast.error('Use at least 6 characters.');
     setBusy(true);
     try {
       const r = await api.resetPassword({ email: email.trim(), otp: otp.trim(), new_password: password });
@@ -114,7 +114,7 @@ export default function ForgotPasswordPage() {
                 className={`${input} pl-3`} />
             </label>
             <p className="text-[10px] text-slate-500 -mt-2 leading-relaxed">
-              At least 8 characters, and not one that has appeared in a known breach.
+              At least 6 characters.
               We check this without your password leaving our server.
             </p>
             <label className="block">

@@ -391,7 +391,7 @@ function route_change_password(array $d): void
     clear_fails($identifier);
 
     $new = $d['new_password'] ?? null;
-    assert_password_acceptable($new, [$user['name'], strstr($user['email'], '@', true)]);
+    assert_password_acceptable($new, [$user['name'], strstr($user['email'], '@', true)], $user['role'] !== 'retail');
     if (is_string($new) && password_verify($new, $user['password_hash'])) {
         fail(422, 'That is your current password. Please choose a different one.');
     }
@@ -495,9 +495,6 @@ function route_register(array $d): void
     // bcrypt silently ignores everything past 72 bytes, so cap it rather than pretend.
     assert_password_acceptable($d['password'] ?? null,
         [$d['name'] ?? '', $email === '' ? '' : strstr($email, '@', true)]);
-    if (!is_string($d['password']) || strlen($d['password']) < 8 || strlen($d['password']) > 72) {
-        fail(422, 'Password must be 8 to 72 characters.');
-    }
     if (!is_string($d['transaction_password']) || strlen($d['transaction_password']) < 4
         || strlen($d['transaction_password']) > 72) {
         fail(422, 'Transaction password must be 4 to 72 characters.');
