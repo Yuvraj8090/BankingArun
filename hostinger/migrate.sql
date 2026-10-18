@@ -1645,3 +1645,16 @@ CREATE TABLE IF NOT EXISTS lockers (
     rent_paid_until DATE,
     UNIQUE KEY uq_locker (branch_id, locker_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18 Oct 2026: ST Monthly Plan, the owner's "ST / monthly plan" sheet as a lawful
+-- RD. The sheet ran it for up to 4 months with booster rates for introductions;
+-- Nidhi Rules 2014 (rule 7) set 12 months as the shortest RD, and the boosters
+-- are not offered (see the 15 Oct note above). Maturities are 12.5% a year
+-- compounded monthly, rounded down to the rupee (cap_compliant_maturity).
+-- INSERT only, so a director's later edits in Scheme Master are kept.
+INSERT IGNORE INTO schemes (id, code, name, scheme_type, tenure_months, contribution_months,
+    contribution_amount, principal_amount, total_deposit, maturity_amount, payout_type, status, slabs, notes)
+VALUES (UUID(), 'AJS-ST-1Y', 'ST Monthly Plan 1 Year', 'recurring', 12,
+    NULL, 50000.0, NULL,
+    600000.0, 639894.0, 'maturity', 'active', '[{"unit":1000,"deposit":12000,"maturity":12797},{"unit":5000,"deposit":60000,"maturity":63989},{"unit":10000,"deposit":120000,"maturity":127978},{"unit":50000,"deposit":600000,"maturity":639894}]',
+    'ST sheet as a 12-month RD at 12.5% a year; no booster');
