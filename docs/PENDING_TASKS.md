@@ -29,7 +29,7 @@ Work through the list top to bottom. Type **next** to fix the next open item.
   they are not validated FINnet submission files.
 - NDH figures: fixed 16 Oct (item 24). The completed MCA e-forms are still
   filed by hand on the MCA portal; the report gives the figures to copy in.
-- The new five-level referral feature is a Director-only simulation. Live
+- The twenty-level referral feature is a Director-only simulation. Live
   deposit commissions remain disabled under Nidhi Rule 6(k). Demo Silver/Gold
   thresholds are editable examples, not agreed business rules.
 - Historical ₹500 bonus reversals and removal of old tables remain deferred.
@@ -352,6 +352,7 @@ existed. Now:
 ## Round 4 (15 Oct): referral demo and version check
 
 ### 23. Five-level referral demo, editable plans and Silver / Gold ✅
+_18 Oct: now twenty levels (default 5, 3, 2, 1, 1, 0.5 ×5, 0.25 ×10 = 17%) and a three-leg Left / Center / Right tree with spillover when a person is full._
 Director → Member Standings → **Five-level referral demo**:
 - Defaults to 5% of the amount received for each of five ancestors: 25% total.
   Signup alone allocates ₹0; the old ₹500 signup bonus stays disabled.

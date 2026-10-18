@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Field, inputClass } from '../components/Modal';
 import { NetworkTreeChart } from './ReferralPage';
 import { inr } from '../utils/format';
-import { calculateReferralDemo, rankThresholds, validateDemoPlan } from '../utils/referralDemo';
+import { calculateReferralDemo, DEFAULT_RATES, LEVELS, matrixTree, rankThresholds, validateDemoPlan } from '../utils/referralDemo';
 
-const STORAGE_KEY = 'ajspay.referral-demo.v1';
-const newPlan = () => ({ name: '', type: 'FD', rates: [5, 5, 5, 5, 5] });
+const STORAGE_KEY = 'ajspay.referral-demo.v2';
+const newPlan = () => ({ name: '', type: 'FD', rates: [...DEFAULT_RATES] });
 const DEFAULTS = {
   plans: ['FD', 'RD', 'MLM'].map(type => ({ ...newPlan(), name: `${type} demo`, type })),
   silver: 500, gold: 2500,
@@ -35,20 +35,14 @@ export default function ReferralDemo() {
   const [gold, setGold] = useState(initial.settings.gold);
   const [amount, setAmount] = useState('10000');
   const [funded, setFunded] = useState(true);
-  const [earned, setEarned] = useState([0, 0, 0, 0, 0]);
+  const [earned, setEarned] = useState(Array(LEVELS).fill(0));
   const [message, setMessage] = useState(initial.warning);
-  let preview = [], error = '';
+  const [placed, setPlaced] = useState('13');
+  let preview = [], error = '', matrix = null, matrixError = '';
   try { preview = calculateReferralDemo(plan, amount, funded, silver, gold, earned); }
   catch (e) { error = e.message; }
   const total = preview.reduce((sum, row) => sum + row.payment, 0);
-  let tree = { id: 'buyer', parent_id: 'person-1', name: 'New member', detail: funded ? `${plan.type} funded` : 'Signup only' };
-  preview.forEach(row => {
-    tree = {
-      id: `person-${row.level}`, parent_id: row.level < 5 ? `person-${row.level + 1}` : null,
-      name: `Person ${row.level}`, detail: `L${row.level} · ${row.rate}%`,
-      children: [tree, { id: `empty-${row.level}`, parent_id: `person-${row.level}`, name: 'Empty right', detail: 'No payout' }],
-    };
-  });
+  try { matrix = matrixTree(placed); } catch (e) { matrixError = e.message; }
 
   const save = (event) => {
     event.preventDefault();
@@ -74,7 +68,7 @@ export default function ReferralDemo() {
     <section className="space-y-4" aria-label="Referral commission demo" data-testid="referral-demo">
       <div className="p-4 rounded-lg border border-amber-300 bg-amber-50 text-sm text-amber-950">
         <h2 className="font-semibold">Referral demo · no real payouts</h2>
-        <p className="mt-1 text-xs">Fictional people only. A signup pays ₹0. A funded plan allocates 5% to each of five ancestors by default (25% total).
+        <p className="mt-1 text-xs">Fictional people only. A signup pays ₹0. A funded plan allocates to twenty ancestor levels by default: 5%, 3%, 2%, 1%, 1%, then 0.5% for levels 6–10 and 0.25% for levels 11–20 (17% total).
           This simulation does not book deposits, change live ranks or move money.</p>
       </div>
       <form onSubmit={save} className="bg-white p-5 rounded-lg border border-slate-200 space-y-4">
@@ -96,13 +90,13 @@ export default function ReferralDemo() {
             {['FD', 'RD', 'MLM'].map(type => <option key={type}>{type}</option>)}
           </select></Field>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-3">
           {plan.rates.map((rate, i) => <Field key={i} label={`Level ${i + 1} (%)`}>
             <input className={inputClass} type="number" required min="0" max="100" step="0.01" value={rate}
               onChange={e => setPlan({ ...plan, rates: plan.rates.map((r, j) => j === i ? e.target.value : r) })} />
           </Field>)}
         </div>
-        <p className="text-xs text-slate-600">Level 1 is the direct referrer; level 5 is the fifth ancestor. Each percentage uses the same amount received.</p>
+        <p className="text-xs text-slate-600">Level 1 is the direct referrer; level 20 is the twentieth ancestor. Each percentage uses the same amount received.</p>
         <fieldset className="border-t border-slate-100 pt-3">
           <legend className="text-sm font-semibold">Demo rank thresholds</legend>
           <p className="text-xs text-slate-600 mb-3">Editable examples: Silver from ₹500 and Gold from ₹2,500 of cumulative simulated commission per person. These do not set commission rates.</p>
@@ -128,7 +122,7 @@ export default function ReferralDemo() {
         {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : <>
           <p className="text-sm font-semibold" data-testid="demo-total">Next event: {inr(total / 100, { decimals: 2 })} total · {funded ? preview.reduce((sum, row) => sum + Math.round(row.rate * 100), 0) / 100 : 0}%</p>
           <div className="overflow-x-auto"><table className="w-full text-xs text-left">
-            <caption className="text-left mb-2 text-slate-600">Five fictional referrers · rank after the next event</caption>
+            <caption className="text-left mb-2 text-slate-600">Twenty fictional referrers · rank after the next event</caption>
             <thead><tr>{['Person / level', 'Rate', 'Next allocation', 'Total after event', 'Demo rank'].map(label => <th key={label} scope="col" className="p-2">{label}</th>)}</tr></thead>
             <tbody>{preview.map(row => <tr key={row.level} className="border-t border-slate-100">
               <th scope="row" className="p-2">Person {row.level} / L{row.level}</th><td className="p-2">{row.rate}%</td>
@@ -142,15 +136,20 @@ export default function ReferralDemo() {
             setEarned(preview.map(row => row.total));
             setMessage(`Simulated ${funded ? 'one plan payment' : 'one signup'}: ${inr(total / 100, { decimals: 2 })} allocated. The table now previews the next event.`);
           }}>Simulate this event</button>
-          <button type="button" className={buttonClass} onClick={() => { setEarned([0, 0, 0, 0, 0]); setMessage('Simulation totals reset. Saved plans are kept.'); }}>Reset simulation</button>
+          <button type="button" className={buttonClass} onClick={() => { setEarned(Array(LEVELS).fill(0)); setMessage('Simulation totals reset. Saved plans are kept.'); }}>Reset simulation</button>
         </div>
         <p className="text-xs text-slate-500">Each click simulates another event for the same fictional member.</p>
         <p role="status" className="text-xs text-slate-700">{message}</p>
       </div>
-      {!error && <>
-        <NetworkTreeChart tree={tree} title="Binary demo · five ancestor levels" />
-        <p className="text-xs text-slate-600">Left path shown. Each ancestor has two positions; the right positions are empty and receive nothing. There is no pair-matching bonus.</p>
-      </>}
+      <div className="bg-white p-5 rounded-lg border border-slate-200 space-y-3">
+        <Field label="Fictional members placed under the sponsor (0–39)">
+          <input className={inputClass} type="number" min="0" max="39" step="1" value={placed} onChange={e => setPlaced(e.target.value)} />
+        </Field>
+        <p className="text-xs text-slate-600">Each person has three positions: Left, Center and Right. When all three are full, the next member spills to the level below, filled left to right.
+          Placement only decides the tree; allocations above still follow the twenty sponsor levels.</p>
+        {matrixError && <p role="alert" className="text-sm text-red-700">{matrixError}</p>}
+      </div>
+      {matrix && <NetworkTreeChart tree={matrix} total={Number(placed)} title="Three-leg demo · Left, Center, Right with spillover" />}
     </section>
   );
 }

@@ -505,12 +505,13 @@ const DIRECTOR = {
     title: 'Member Standings',
     what: 'The recognition ladder (Silver to Brand Ambassador), and how many members hold each rank.',
     steps: ['Edit a rank: how many introductions it needs, and at what rank.', 'Write the recognition it brings.',
-      'Open Five-level referral demo to try fictional FD, RD or MLM allocations. Create or edit a demo plan and save its five percentages.',
+      'Open Twenty-level referral demo to try fictional FD, RD or MLM allocations. Create or edit a demo plan and save its twenty percentages.',
       'Set the example Silver / Gold earnings thresholds, then preview a signup (₹0) or a funded plan. Simulate events to see ranks progress.'],
     fields: [
       ['Members to introduce / Each must already be', 'The rule for reaching the rank.'],
       ['Recognition', 'For example "Certificate at the annual meet". There is no money.'],
-      ['Demo level percentages', 'Default: 5% for each of five ancestors, 25% total. All use the same paid amount; allocations round down to paisa.'],
+      ['Demo level percentages', 'Default: 5, 3, 2, 1, 1%, then 0.5% for levels 6–10 and 0.25% for levels 11–20: 17% total. All use the same paid amount; allocations round down to paisa.'],
+      ['Demo three-leg tree', 'Left, Center, Right under each person; when all three are full the next member spills to the level below.'],
       ['Demo amount received', 'For RD, enter only the instalment paid now. A signup alone pays nothing.'],
       ['Demo Silver / Gold', 'Example cumulative commission thresholds per fictional person. Editable; separate from real member standings.']
     ],

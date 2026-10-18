@@ -303,7 +303,7 @@ export default function MemberRanksPage() {
       </div>
 
       {canEdit && <details className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-[#0b3b8c]">Five-level referral demo · plans, percentages & Silver / Gold</summary>
+        <summary className="cursor-pointer text-sm font-semibold text-[#0b3b8c]">Twenty-level referral demo · plans, percentages & Silver / Gold</summary>
         <div className="mt-4"><ReferralDemo /></div>
       </details>}
 
