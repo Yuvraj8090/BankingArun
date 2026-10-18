@@ -81,7 +81,7 @@ export default function ChatbotWidget() {
               </div>
               <div>
                 <h3 className="text-xs font-bold flex items-center gap-1.5">
-                  AJSPay Assistant <Sparkles className="w-3 h-3 text-amber-600" />
+                  AJSPay Assistant <Sparkles className="w-3 h-3 text-amber-300" />
                 </h3>
                 <p className="text-[10px] text-blue-100 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span> Online
@@ -92,7 +92,7 @@ export default function ChatbotWidget() {
               data-testid="chatbot-close-btn"
               aria-label="Close chat"
               onClick={() => { setIsOpen(false); setMessages([]); }}
-              className="p-1 rounded-lg hover:bg-white/10 text-slate-600 hover:text-slate-900"
+              className="p-1 rounded-lg text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
             >
               <X className="w-4 h-4" />
             </button>
