@@ -1274,7 +1274,7 @@ function route_referral_history(array $d): void
 // Every member below this one, with the referrer they actually joined under. Walked
 // a level at a time with everybody seen so far excluded, so a chain that loops back
 // on itself cannot spin here.
-function referral_tree(string $userId, int $maxDepth = 8): array
+function referral_tree(string $userId, int $maxDepth = 20): array
 {
     $seen = [$userId => true];
     $frontier = [$userId];

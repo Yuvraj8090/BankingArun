@@ -53,7 +53,7 @@ function NetworkTree() {
   useEffect(() => {
     api.referralTree()
       .then((data) => {
-        setTree(buildNetworkTree({ id: data.root.id, name: 'You', direct_count: data.root.direct_count }, data.nodes || []));
+        setTree(buildNetworkTree({ id: data.root.id, name: 'You', direct_count: data.root.direct_count }, (data.nodes || []).map((n) => ({ ...n, detail: `Level ${n.level}` }))));
         setTotal(data.total_members || 0);
       })
       .catch(() => setTree(null));
