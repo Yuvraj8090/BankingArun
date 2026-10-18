@@ -37,12 +37,19 @@ export default function ReferralDemo() {
   const [funded, setFunded] = useState(true);
   const [earned, setEarned] = useState(Array(LEVELS).fill(0));
   const [message, setMessage] = useState(initial.warning);
-  const [placed, setPlaced] = useState('13');
+  const [placed, setPlaced] = useState('20');
   let preview = [], error = '', matrix = null, matrixError = '';
   try { preview = calculateReferralDemo(plan, amount, funded, silver, gold, earned); }
   catch (e) { error = e.message; }
   const total = preview.reduce((sum, row) => sum + row.payment, 0);
-  try { matrix = matrixTree(placed); } catch (e) { matrixError = e.message; }
+  const paidLabel = row => `L${row.level} ${row.rate}% ${inr(row.payment / 100, { decimals: 2 })}`;
+  try { matrix = matrixTree(placed, preview, paidLabel); } catch (e) { matrixError = e.message; }
+  // Straight line of twenty uplines above the paying member, Person 20 at the top.
+  let chain = { id: 'payer', parent_id: 'person-1', name: 'New member', detail: funded ? `Pays ${inr(Number(amount), { decimals: 2 })}` : 'Signup only' };
+  preview.forEach(row => {
+    chain = { id: `person-${row.level}`, parent_id: row.level < LEVELS ? `person-${row.level + 1}` : null,
+      name: `Person ${row.level}`, detail: paidLabel(row), children: [chain] };
+  });
 
   const save = (event) => {
     event.preventDefault();
@@ -141,12 +148,13 @@ export default function ReferralDemo() {
         <p className="text-xs text-slate-500">Each click simulates another event for the same fictional member.</p>
         <p role="status" className="text-xs text-slate-700">{message}</p>
       </div>
+      {!error && <NetworkTreeChart tree={chain} title={`Twenty uplines · what each receives when the new member pays`} />}
       <div className="bg-white p-5 rounded-lg border border-slate-200 space-y-3">
         <Field label="Fictional members placed under the sponsor (0–39)">
           <input className={inputClass} type="number" min="0" max="39" step="1" value={placed} onChange={e => setPlaced(e.target.value)} />
         </Field>
         <p className="text-xs text-slate-600">Each person has three positions: Left, Center and Right. When all three are full, the next member spills to the level below, filled left to right.
-          Placement only decides the tree; allocations above still follow the twenty sponsor levels.</p>
+          The newest member is the one who pays: the person directly above them gets L1, the next one up L2, and so on. Others get nothing from this payment.</p>
         {matrixError && <p role="alert" className="text-sm text-red-700">{matrixError}</p>}
       </div>
       {matrix && <NetworkTreeChart tree={matrix} total={Number(placed)} title="Three-leg demo · Left, Center, Right with spillover" />}

@@ -511,7 +511,8 @@ const DIRECTOR = {
       ['Members to introduce / Each must already be', 'The rule for reaching the rank.'],
       ['Recognition', 'For example "Certificate at the annual meet". There is no money.'],
       ['Demo level percentages', 'Default: 5, 3, 2, 1, 1%, then 0.5% for levels 6–10 and 0.25% for levels 11–20: 17% total. All use the same paid amount; allocations round down to paisa.'],
-      ['Demo three-leg tree', 'Left, Center, Right under each person; when all three are full the next member spills to the level below.'],
+      ['Demo three-leg tree', 'Left, Center, Right under each person; when all three are full the next member spills to the level below. The newest member pays; each person above shows the level, % and ₹ they get.'],
+      ['Demo twenty uplines', 'A straight line of Person 1 (L1) to Person 20 (L20) above the paying member, with each one\'s % and ₹.'],
       ['Demo amount received', 'For RD, enter only the instalment paid now. A signup alone pays nothing.'],
       ['Demo Silver / Gold', 'Example cumulative commission thresholds per fictional person. Editable; separate from real member standings.']
     ],

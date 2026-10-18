@@ -37,10 +37,16 @@ test('twenty-level demo uses paid amounts, exact percentages and independent ran
   expect(() => calculateReferralDemo(plan, 1000, true, 0, 500)).toThrow();
   expect(validateDemoPlan({ ...plan, name: ' Custom ', rates: ['5', ...plan.rates.slice(1)] }).name).toBe('Custom');
   const sponsor = matrixTree(13);
-  expect(sponsor.children.map(c => c.detail)).toEqual(['Left of Sponsor', 'Center of Sponsor', 'Right of Sponsor']);
+  expect(sponsor.children.map(c => c.detail)).toEqual(['Left', 'Center', 'Right']);
   expect(sponsor.children[0].children.map(c => c.name)).toEqual(['Member 4', 'Member 5', 'Member 6']);
-  expect(sponsor.children[0].children[0].children.map(c => c.detail)).toEqual(['Left of Member 4']);
+  expect(sponsor.children[0].children[0].children.map(c => c.detail)).toEqual(['Left · pays']);
   expect(matrixTree(0).children).toEqual([]);
+  const paid = matrixTree(13, run({ rates: DEFAULT_RATES }));
+  expect(paid.children[0].children[0].children[0].detail).toBe('Left · pays');
+  expect(paid.children[0].children[0].detail).toBe('Left · gets L1 · 5%');
+  expect(paid.children[0].detail).toBe('Left · gets L2 · 3%');
+  expect(paid.detail).toBe('Top · gets L3 · 2%');
+  expect(paid.children[1].detail).toBe('Center');
   for (const bad of ['-1', '40', '1.5', 'x']) expect(() => matrixTree(bad)).toThrow();
   expect(canOpen('bank_owner', 'member-ranks')).toBe(true);
   for (const role of ['retail', 'staff', 'admin', 'branch_manager', 'loan_officer', 'collection_agent']) {

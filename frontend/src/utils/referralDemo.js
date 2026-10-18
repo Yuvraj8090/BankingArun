@@ -46,15 +46,21 @@ export function calculateReferralDemo(plan, amount, funded, silver, gold, earned
 
 // Three-leg matrix under one sponsor: Left, Center, Right fill first; once a
 // person's three positions are full, the next member spills to the level below,
-// filled left to right (breadth-first).
-export function matrixTree(count) {
+// filled left to right (breadth-first). The newest member is the one who pays:
+// rows[0] goes to their parent (L1), rows[1] to the grandparent (L2), and so on.
+export function matrixTree(count, rows = [], label = row => `gets L${row.level} · ${row.rate}%`) {
   const n = Number(count);
   if (!Number.isInteger(n) || n < 0 || n > 39) throw new Error('Members under the sponsor: enter 0 to 39.');
-  const nodes = [{ id: 'm0', parent_id: null, name: 'Sponsor', detail: 'Person 1', children: [] }];
+  const nodes = [{ id: 'm0', parent_id: null, name: 'Sponsor', detail: 'Top', children: [] }];
   for (let i = 1; i <= n; i++) {
     const parent = nodes[Math.floor((i - 1) / 3)];
-    const node = { id: `m${i}`, parent_id: parent.id, name: `Member ${i}`, detail: `${SLOTS[(i - 1) % 3]} of ${parent.name}`, children: [] };
+    const node = { id: `m${i}`, parent_id: parent.id, name: `Member ${i}`, detail: SLOTS[(i - 1) % 3], children: [] };
     parent.children.push(node); nodes.push(node);
+  }
+  if (n > 0) nodes[n].detail += ' · pays';
+  for (let i = n, level = 0; i > 0 && level < rows.length; level++) {
+    i = Math.floor((i - 1) / 3);
+    nodes[i].detail += ` · ${label(rows[level])}`;
   }
   return nodes[0];
 }
