@@ -191,11 +191,13 @@ export default function ReferralPage() {
           <div className="flex-1">
             <h1 className="text-2xl font-bold">Network Dashboard</h1>
             <p className="text-sm text-white/85 mt-1">{user?.name}</p>
+            {/* The member folio is the ID members recognise; it is allotted after KYC, so the system ID stands in until then. */}
             <p className="mt-1 text-xs text-white/85 flex items-center gap-1.5" data-testid="network-user-id">
-              User ID <span className="font-mono text-white break-all">{user?.id}</span>
-              <button aria-label="Copy user ID" onClick={() => { navigator.clipboard.writeText(user?.id || ''); toast.success('User ID copied'); }}
+              {data.folio_no ? 'Member ID' : 'User ID'} <span className="font-mono text-white break-all">{data.folio_no || user?.id}</span>
+              <button aria-label="Copy ID" onClick={() => { navigator.clipboard.writeText(data.folio_no || user?.id || ''); toast.success('ID copied'); }}
                 className="p-1 rounded hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white"><Copy className="w-3.5 h-3.5" /></button>
             </p>
+            {!data.folio_no && <p className="text-[11px] text-white/70">Your Member ID (folio number) is allotted once your KYC is approved.</p>}
             <p className="text-sm text-white/85 mt-2">{data.note}</p>
           </div>
           <div className="text-right">

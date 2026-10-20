@@ -601,6 +601,7 @@ has "and says what is missing" "$BODY" "Twilio"
 print "\n-- referrals before KYC --"
 call GET /referrals/my-code "$RETAIL"
 REFCODE=$(print -r -- "$BODY" | jq_ 'print(d["referral_code"])')
+ck "the network dashboard shows the member's folio as their ID" "$(Q "SELECT folio_no FROM member_register WHERE user_id='retail-001'")" "$(print -r -- "$BODY" | jq_ 'print(d.get("folio_no") or "")')"
 PENDING_HASH=$(php -r 'echo password_hash("Pending@123", PASSWORD_BCRYPT);')
 Q "DELETE FROM referrals WHERE referee_id='apitest-ref-pending';
    DELETE FROM users WHERE id='apitest-ref-pending' OR email='apitest.pending.referral@example.com';

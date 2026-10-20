@@ -1231,6 +1231,8 @@ function route_referral_code(array $d): void
     $user = current_user();
     $code = ensure_referral_code($user);
     respond(['referral_code' => $code,
+        // Allotted on admission to the member register (after KYC); null before that.
+        'folio_no' => scalar('SELECT folio_no FROM member_register WHERE user_id = ?', [$user['id']]),
         'referral_link' => rtrim($config['public_app_url'], '/') . '/open-account?ref=' . rawurlencode($code),
         'note' => 'Anyone who opens a member account with your link and completes KYC is recorded as '
             . 'introduced by you. No bonus or commission is paid for introductions (Nidhi Rules, 2014).']);
