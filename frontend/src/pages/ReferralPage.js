@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Gift, Share2, Copy, Users, MessageCircle, Twitter, Mail, RefreshCw, CheckCircle2, Info, Award } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import MyStandingPage from './MyStandingPage';
 import { toast } from 'sonner';
 
@@ -124,6 +125,7 @@ export function NetworkTreeChart({ tree, total, title = 'Your Network' }) {
 }
 
 export default function ReferralPage() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [history, setHistory] = useState({ referrals: [], total_earned: 0, count: 0 });
   const [loading, setLoading] = useState(true);
@@ -187,8 +189,14 @@ export default function ReferralPage() {
         <div className="flex items-start gap-3">
           <div className="w-11 h-11 rounded-md bg-white/10 flex items-center justify-center"><Gift className="w-6 h-6 text-white" /></div>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">My Network</h1>
-            <p className="text-sm text-white/85 mt-1">{data.note}</p>
+            <h1 className="text-2xl font-bold">Network Dashboard</h1>
+            <p className="text-sm text-white/85 mt-1">{user?.name}</p>
+            <p className="mt-1 text-xs text-white/85 flex items-center gap-1.5" data-testid="network-user-id">
+              User ID <span className="font-mono text-white break-all">{user?.id}</span>
+              <button aria-label="Copy user ID" onClick={() => { navigator.clipboard.writeText(user?.id || ''); toast.success('User ID copied'); }}
+                className="p-1 rounded hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white"><Copy className="w-3.5 h-3.5" /></button>
+            </p>
+            <p className="text-sm text-white/85 mt-2">{data.note}</p>
           </div>
           <div className="text-right">
             <div className="text-xs text-white/70">Introduced</div>

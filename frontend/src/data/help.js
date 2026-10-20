@@ -108,7 +108,7 @@ const MEMBER = {
     tips: ['If your balance is too low, the payment is retried. After three failures in a row the instruction pauses.']
   },
   referrals: {
-    title: 'My Network',
+    title: 'Network Dashboard',
     what: 'Invite people to become members, and see who joined through you. It is recognition only: no money is paid for introductions.',
     steps: [
       'Copy your link or code, or share it on WhatsApp or email.',

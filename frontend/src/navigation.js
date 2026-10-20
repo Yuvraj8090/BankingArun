@@ -16,7 +16,7 @@ export const NAV_BY_ROLE = {
     { id: 'deposits', label: 'Deposits', icon: PiggyBank, testId: 'tab-deposits' },
     { id: 'loans', label: 'Loans', icon: Banknote, testId: 'tab-loans' },
     { id: 'standing-instructions', label: 'Standing Instructions', icon: Repeat, testId: 'tab-si' },
-    { id: 'referrals', label: 'My Network', icon: Users, testId: 'tab-referrals' },
+    { id: 'referrals', label: 'Network Dashboard', icon: Users, testId: 'tab-referrals' },
     { id: 'statements', label: 'Statements (PDF/Excel)', icon: FileText, testId: 'tab-statements' },
     { id: 'video-kyc', label: 'Video KYC', icon: Video, testId: 'tab-video-kyc' },
     { id: 'security', label: 'Security & Passkeys', icon: ShieldCheck, testId: 'tab-security' },
