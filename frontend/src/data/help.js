@@ -505,7 +505,7 @@ const DIRECTOR = {
     title: 'Member Standings',
     what: 'The recognition ladder (Silver to Brand Ambassador), and how many members hold each rank.',
     steps: ['Edit a rank: how many introductions it needs, and at what rank.', 'Write the recognition it brings.',
-      'Open Twenty-level referral demo to try fictional FD, RD or MLM allocations. Create or edit a demo plan and save its twenty percentages.',
+      'Open Twenty-level referral demo to try fictional FD, RD or MIS allocations. Create or edit a demo plan and save its twenty percentages.',
       'Set the example Silver / Gold earnings thresholds, then preview a signup (₹0) or a funded plan. Simulate events to see ranks progress.'],
     fields: [
       ['Members to introduce / Each must already be', 'The rule for reaching the rank.'],

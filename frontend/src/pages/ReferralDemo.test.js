@@ -17,7 +17,7 @@ test('twenty-level demo uses paid amounts, exact percentages and independent ran
   expect(run({}, '10000', false).every(row => row.payment === 0 && row.rank === 'Unranked')).toBe(true);
   expect(run({}, '', false).every(row => row.payment === 0)).toBe(true);
   expect(run({}, '10000', false, [250000, ...Array(LEVELS - 1).fill(0)])[0].total).toBe(250000);
-  for (const type of ['FD', 'RD', 'MLM']) {
+  for (const type of ['FD', 'RD', 'MIS']) {
     expect(run({ type }, '1000')[0].payment).toBe(5000);
   }
   expect(run({ rates: [1.25, 0, 5, 10, 20, ...z] }, '100.01').map(row => row.payment).slice(0, 5))

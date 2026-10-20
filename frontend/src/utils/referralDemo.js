@@ -18,7 +18,7 @@ export function validateDemoPlan(plan) {
   if (typeof plan?.name !== 'string' || !plan.name.trim() || plan.name.trim().length > 60) {
     throw new Error('Give the demo plan a name of 1–60 characters.');
   }
-  if (!['FD', 'RD', 'MLM'].includes(plan.type)) throw new Error('Choose FD, RD or MLM.');
+  if (!['FD', 'RD', 'MIS'].includes(plan.type)) throw new Error('Choose FD, RD or MIS.');
   if (!Array.isArray(plan.rates) || plan.rates.length !== LEVELS) throw new Error(`Set all ${LEVELS} percentages.`);
   const rates = plan.rates.map((rate, i) => hundredths(rate, `Level ${i + 1}`, 10000));
   if (rates.reduce((a, b) => a + b, 0) > 10000) throw new Error(`The ${LEVELS} percentages must total at most 100%.`);

@@ -7,7 +7,7 @@ import { calculateReferralDemo, DEFAULT_RATES, LEVELS, matrixTree, rankThreshold
 const STORAGE_KEY = 'ajspay.referral-demo.v2';
 const newPlan = () => ({ name: '', type: 'FD', rates: [...DEFAULT_RATES] });
 const DEFAULTS = {
-  plans: ['FD', 'RD', 'MLM'].map(type => ({ ...newPlan(), name: `${type} demo`, type })),
+  plans: ['FD', 'RD', 'MIS'].map(type => ({ ...newPlan(), name: `${type} demo`, type })),
   silver: 500, gold: 2500,
 };
 const buttonClass = 'px-3 py-2 rounded-md border border-slate-300 text-xs font-semibold hover:bg-slate-50';
@@ -18,7 +18,8 @@ function loadSettings() {
     if (!raw) return { settings: DEFAULTS, warning: '' };
     const settings = JSON.parse(raw);
     if (!Array.isArray(settings.plans) || !settings.plans.length) throw new Error('No plans');
-    settings.plans = settings.plans.map(validateDemoPlan);
+    // ponytail: plans saved before the rename still say MLM
+    settings.plans = settings.plans.map(p => validateDemoPlan(p?.type === 'MLM' ? { ...p, type: 'MIS' } : p));
     rankThresholds(settings.silver, settings.gold);
     return { settings, warning: '' };
   } catch {
@@ -94,7 +95,7 @@ export default function ReferralDemo() {
           <Field label="Demo plan name"><input className={inputClass} required maxLength={60} value={plan.name}
             onChange={e => setPlan({ ...plan, name: e.target.value })} /></Field>
           <Field label="Plan type"><select className={inputClass} value={plan.type} onChange={e => setPlan({ ...plan, type: e.target.value })}>
-            {['FD', 'RD', 'MLM'].map(type => <option key={type}>{type}</option>)}
+            {['FD', 'RD', 'MIS'].map(type => <option key={type}>{type}</option>)}
           </select></Field>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-3">
